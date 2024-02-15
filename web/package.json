@@ -1,0 +1,21 @@
+{
+  "name": "js-100-web",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "prepare": "node ./scripts/copy-projects.js",
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.5.4",
+    "@astrojs/tailwind": "^5.1.0",
+    "@midudev/tailwind-animations": "^0.0.7",
+    "astro": "^4.3.7",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
+  }
+}
