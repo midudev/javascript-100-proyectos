@@ -1,3 +1,13 @@
+---
+const response = await fetch(
+  "https://api.github.com/repos/midudev/javascript-100-proyectos"
+)
+
+const data = await response.json()
+
+const starCounter = data.stargazers_count
+---
+
 <div
   class="absolute left-0 right-0 md:top-4 md:mr-4 md:justify-end mx-auto w-full flex justify-center"
 >
@@ -27,7 +37,7 @@
         class="overflow-hidden flex flex-col h-8 items-center rounded-md bg-gray-100 px-4 font-medium text-xs justify-center group-hover:bg-yellow-200 transition w-36 relative"
       >
         <span class="absolute group-hover:animate-fade-out-up"
-          >78 estrellas en GitHub</span
+          >{`${starCounter} estrellas en GitHub`}</span
         >
         <span
           class="absolute opacity-0 -translate-y-5 group-hover:animate-fade-in-up"
