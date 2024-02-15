@@ -6,6 +6,8 @@ interface Props {
 }
 
 const { title } = Astro.props
+const description =
+  "Proyectos prácticos para aprender JavaScript con código fuente y vídeo. Totalmente gratis."
 ---
 
 <!doctype html>
@@ -13,10 +15,7 @@ const { title } = Astro.props
   <head>
     <title>{title}</title>
     <meta charset="UTF-8" />
-    <meta
-      name="description"
-      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
-    />
+    <meta name="description" content={description} />
     <meta name="author" content="Miguel Ángel Durán" />
     <meta
       name="keywords"
@@ -26,16 +25,10 @@ const { title } = Astro.props
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:creator" content="@midudev" />
     <meta name="twitter:title" content={title} />
-    <meta
-      name="twitter:description"
-      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
-    />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content="https://javascript100.dev/og.jpg" />
     <meta property="og:title" content={title} />
-    <meta
-      property="og:description"
-      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
-    />
+    <meta property="og:description" content={description} />
     <meta property="og:image" content="https://javascript100.dev/og.jpg" />
     <link rel="canonical" href="https://javascript100.dev" />
     <meta name="viewport" content="width=device-width" />
