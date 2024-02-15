@@ -1,0 +1,24 @@
+---
+import Layout from "../layouts/Layout.astro"
+import Header from "../components/Header.astro"
+import Hero from "../components/Hero.astro"
+import Projects from "../components/Projects.astro"
+import Footer from "../components/Footer.astro"
+---
+
+<Layout title="100 proyectos de JavaScript">
+  <main class="pt-24 min-h-screen flex gap-y-20 flex-col justify-between">
+    <div
+      class="absolute inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#f5f5f5,transparent_1px),linear-gradient(to_bottom,#f5f5f5,transparent_1px)] bg-[size:6rem_4rem]"
+    >
+      <div
+        class="absolute bottom-0 left-0 right-0 top-0 bg-[radial-gradient(circle_500px_at_50%_200px,#fffdd0,transparent)]"
+      >
+      </div>
+    </div>
+    <Header />
+    <Hero />
+    <Projects />
+    <Footer />
+  </main>
+</Layout>
