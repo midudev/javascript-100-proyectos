@@ -86,7 +86,7 @@ Realiza los cambios y crea una pull request 🚀.
 npm install -g pnpm
 ```
 
-1. Haz [fork](https://github.com/midudev/javascript-100-proyectos/fork) del repositorio e instala las dependencias:
+1. Instala las dependencias:
 
 ```bash
 cd web
