@@ -9,14 +9,37 @@ const { title } = Astro.props
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
+    <title>{title}</title>
     <meta charset="UTF-8" />
-    <meta name="description" content="Astro description" />
+    <meta
+      name="description"
+      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
+    />
+    <meta name="author" content="Miguel Ángel Durán" />
+    <meta
+      name="keywords"
+      content="javascript, js, programación, desarrollo web"
+    />
+    <meta name="theme-color" content="#f7df1e" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@midudev" />
+    <meta name="twitter:title" content={title} />
+    <meta
+      name="twitter:description"
+      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
+    />
+    <meta name="twitter:image" content="https://javascript100.dev/og.jpg" />
+    <meta property="og:title" content={title} />
+    <meta
+      property="og:description"
+      content="Proyectos prácticos para aprender JavaScript con código fuente y vídeo"
+    />
+    <meta property="og:image" content="https://javascript100.dev/og.jpg" />
+    <link rel="canonical" href="https://javascript100.dev" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="generator" content={Astro.generator} />
-    <title>{title}</title>
     <ViewTransitions />
   </head>
   <body class="px-8">
