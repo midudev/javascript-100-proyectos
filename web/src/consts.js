@@ -10,5 +10,6 @@ export const PROJECTS = [
       "Eventos de mouse y touch",
       "Transiciones CSS",
     ],
+    youtube: 'https://www.youtube.com/watch?v=u01WD_YNENY'
   },
 ]
