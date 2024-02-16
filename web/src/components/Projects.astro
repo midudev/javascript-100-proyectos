@@ -61,7 +61,7 @@ import { PROJECTS } from "../consts"
                       clip-rule="evenodd"
                     />
                   </svg>
-                  Ver código
+                  Código
                 </a>
               </li>
               <li>
@@ -85,9 +85,38 @@ import { PROJECTS } from "../consts"
                       d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418"
                     />
                   </svg>
-                  Ver web
+                  Demo
                 </a>
               </li>
+              {project.youtube != null && (
+                <li>
+                  <a
+                    href={`/${project.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center px-3 py-2 text-xs font-semibold text-center text-red-700 bg-white transition border border-red-700/60 rounded-lg hover:bg-red-600/20 md:text-sm"
+                  >
+                    <svg
+                      class="w-5 h-5 mr-1"
+                      viewBox="0 0 256 180"
+                      width="256"
+                      height="180"
+                      xmlns="http://www.w3.org/2000/svg"
+                      preserveAspectRatio="xMidYMid"
+                    >
+                      <path
+                        d="M250.346 28.075A32.18 32.18 0 0 0 227.69 5.418C207.824 0 127.87 0 127.87 0S47.912.164 28.046 5.582A32.18 32.18 0 0 0 5.39 28.24c-6.009 35.298-8.34 89.084.165 122.97a32.18 32.18 0 0 0 22.656 22.657c19.866 5.418 99.822 5.418 99.822 5.418s79.955 0 99.82-5.418a32.18 32.18 0 0 0 22.657-22.657c6.338-35.348 8.291-89.1-.164-123.134Z"
+                        fill="red"
+                      />
+                      <path
+                        fill="#FFF"
+                        d="m102.421 128.06 66.328-38.418-66.328-38.418z"
+                      />
+                    </svg>
+                    Vídeo
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </article>
@@ -99,6 +128,8 @@ import { PROJECTS } from "../consts"
   >
     <a
       href="https://twitch.tv/midudev"
+      target="_blank"
+      rel="noopener noreferrer"
       class="group hover:scale-110 transition flex justify-center flex-col h-full items-center font-semibold text-purple-700 text-center text-xl"
     >
       <svg
