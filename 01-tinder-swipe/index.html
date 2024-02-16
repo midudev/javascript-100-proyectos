@@ -1,7 +1,8 @@
 <title>100 proyectos JS · 01 - Tinder Swipe</title>
-
+<div class="shadow">
 <main>
   <section>
+    <div class="white-bkg"></div>
     <header>
       <img src="./tinder-logo.webp" alt="Tinder Logo" />
     </header>
@@ -36,7 +37,7 @@
     </footer>
   </section>
 </main>
-
+</div>
 <style>
   *,
   *::before,
@@ -55,18 +56,25 @@
     user-select: none;
     background: #e5e5e5;
   }
-
+  .white-bkg {
+    position: absolute;
+    background: #f6f6f6;
+    inset: 0;
+    z-index: -10;
+  }
+  .shadow{
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+  }
   main {
     background: url('./iphone.webp') no-repeat;
     background-size: contain;
     width: 320px;
     height: 640px;
     display: flex;
-    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+    position: relative;
   }
 
   section {
-    background: #f6f6f6;
     width: 100%;
     border-radius: 32px;
     display: flex;
@@ -80,7 +88,8 @@
 
   header {
     display: flex;
-    justify-content: center;
+    justify-content: start;
+    padding-left: 1rem;
 
     & img {
       width: 24px;
