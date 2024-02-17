@@ -7,21 +7,7 @@
       <img src="./tinder-logo.webp" alt="Tinder Logo" />
     </header>
 
-    <div class="cards">
-      <article>
-        <img src="./photos/2.webp" alt="Álex, brown hair man, 25 years old" />
-        <h2>Álex <span>25</span></h2>
-        <div class="choice nope">NOPE</div>
-        <div class="choice like">LIKE</div>
-      </article>
-
-      <article>
-        <img src="./photos/1.webp" alt="Leila, redhead, 25 years old" />
-        <h2>Leila <span>27</span></h2>
-        <div class="choice nope">NOPE</div>
-        <div class="choice like">LIKE</div>
-      </article>
-
+    <div class="cards" id="cards">
       <span>
         No hay más personas cerca de ti...<br />
         Vuelve a intentarlo más tarde
@@ -250,8 +236,20 @@
 </style>
 
 <script>
+  const PEOPLE = [
+    {
+      name: 'Álex',
+      age: 25,
+      photo: './photos/2.webp'
+    },
+    {
+      name: 'Leila',
+      age: 27,
+      photo: './photos/1.webp'
+    }]
   const DECISION_THRESHOLD = 75
   const $resetBtn = document.getElementById('restart') // Para una mejor UX el usuario puede reiniciar
+  const $cardsContainer = document.getElementById('cards')
 
   let isAnimating = false
   let pullDeltaX = 0 // distance que la card se está arrastrando
@@ -340,7 +338,22 @@
     }
   }
 
+  function drawCards(listOfPeople) {
+    listOfPeople.forEach(person => {
+      const card = document.createElement('article')
+      card.innerHTML = `
+        <img src="${person.photo}" alt="${person.name}, ${person.age} years old" />
+        <h2>${person.name} <span>${person.age}</span></h2>
+        <div class="choice nope">NOPE</div>
+        <div class="choice like">LIKE</div>
+      `
+      $cardsContainer.appendChild(card)
+    })
+  }
+
   document.addEventListener('mousedown', startDrag)
   document.addEventListener('touchstart', startDrag, { passive: true })
-  $resetBtn.addEventListener('click', () => window.location.reload())
+  $resetBtn.addEventListener('click', () => drawCards(PEOPLE))
+
+  drawCards(PEOPLE)
 </script>
