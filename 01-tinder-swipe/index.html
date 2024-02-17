@@ -336,6 +336,11 @@
         pullDeltaX = 0
         isAnimating = false
       })
+
+      // reset the choice info opacity
+      actualCard
+        .querySelectorAll(".choice")
+        .forEach((el) => (el.style.opacity = 0));
     }
   }
 
