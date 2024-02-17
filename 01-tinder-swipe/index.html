@@ -7,7 +7,8 @@
       <img src="./tinder-logo.webp" alt="Tinder Logo" />
     </header>
 
-    <div class="cards" id="cards">
+    <div class="cards">
+      <div id="cardsContainer"></div>
       <span>
         No hay más personas cerca de ti...<br />
         Vuelve a intentarlo más tarde
@@ -249,7 +250,7 @@
     }]
   const DECISION_THRESHOLD = 75
   const $resetBtn = document.getElementById('restart') // Para una mejor UX el usuario puede reiniciar
-  const $cardsContainer = document.getElementById('cards')
+  const $cardsContainer = document.getElementById('cardsContainer')
 
   let isAnimating = false
   let pullDeltaX = 0 // distance que la card se está arrastrando
@@ -353,7 +354,11 @@
 
   document.addEventListener('mousedown', startDrag)
   document.addEventListener('touchstart', startDrag, { passive: true })
-  $resetBtn.addEventListener('click', () => drawCards(PEOPLE))
+  $resetBtn.addEventListener('click', () => {
+    $cardsContainer.innerHTML = ''
+    drawCards(PEOPLE)
+  
+  })
 
   drawCards(PEOPLE)
 </script>
