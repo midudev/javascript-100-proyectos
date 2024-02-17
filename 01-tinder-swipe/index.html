@@ -29,7 +29,7 @@
     </div>
 
     <footer>
-      <button class="is-undo" aria-label="undo"></button>
+      <button class="is-undo" aria-label="undo" id="restart"></button>
       <button class="is-remove is-big" aria-label="remove"></button>
       <button class="is-star" aria-label="star"></button>
       <button class="is-fav is-big" aria-label="fav"></button>
@@ -251,6 +251,7 @@
 
 <script>
   const DECISION_THRESHOLD = 75
+  const $resetBtn = document.getElementById('restart') // Para una mejor UX el usuario puede reiniciar
 
   let isAnimating = false
   let pullDeltaX = 0 // distance que la card se está arrastrando
@@ -341,4 +342,5 @@
 
   document.addEventListener('mousedown', startDrag)
   document.addEventListener('touchstart', startDrag, { passive: true })
+  $resetBtn.addEventListener('click', () => window.location.reload())
 </script>
