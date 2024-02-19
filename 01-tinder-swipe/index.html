@@ -253,7 +253,7 @@
   const DECISION_THRESHOLD = 75
 
   let isAnimating = false
-  let pullDeltaX = 0 // distance que la card se está arrastrando
+  let pullDeltaX = 0 // distance from the card being dragged
 
   function startDrag(event) {
     if (isAnimating) return
@@ -265,7 +265,7 @@
     // get initial position of mouse or finger
     const startX = event.pageX ?? event.touches[0].pageX
 
-    // listen the mouse and touch movemenets
+    // listen the mouse and touch movements
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onEnd)
 
@@ -275,16 +275,22 @@
     function onMove(event) {
       // current position of mouse or finger
       const currentX = event.pageX ?? event.touches[0].pageX
+
       // the distance between the initial and current position
       pullDeltaX = currentX - startX
-      // no hay distancia recorrida
+
+      // there is no distance traveled in X axis
       if (pullDeltaX === 0) return
+
       // change the flag to indicate we are animating
       isAnimating = true
+
       // calculate the rotation of the card using the distance
       const deg = pullDeltaX / 14
+
       // apply the transformation to the card
       actualCard.style.transform = `translateX(${pullDeltaX}px) rotate(${deg}deg)`
+
       // change the cursor to grabbing
       actualCard.style.cursor = 'grabbing'
 
@@ -314,7 +320,7 @@
         const goRight = pullDeltaX >= 0
         const goLeft = !goRight
 
-        // add class acording to the decision
+        // add class according to the decision
         actualCard.classList.add(goRight ? 'go-right' : 'go-left')
         actualCard.addEventListener('transitionend', () => {
           actualCard.remove()
