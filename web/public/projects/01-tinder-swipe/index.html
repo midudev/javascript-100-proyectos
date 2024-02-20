@@ -1,7 +1,8 @@
 <title>100 proyectos JS · 01 - Tinder Swipe</title>
-
+<div class="shadow">
 <main>
   <section>
+    <div class="white-bkg"></div>
     <header>
       <img src="./tinder-logo.webp" alt="Tinder Logo" />
     </header>
@@ -36,7 +37,7 @@
     </footer>
   </section>
 </main>
-
+</div>
 <style>
   *,
   *::before,
@@ -55,18 +56,25 @@
     user-select: none;
     background: #e5e5e5;
   }
-
+  .white-bkg {
+    position: absolute;
+    background: #f6f6f6;
+    inset: 0;
+    z-index: -10;
+  }
+  .shadow{
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+  }
   main {
     background: url('./iphone.webp') no-repeat;
     background-size: contain;
     width: 320px;
     height: 640px;
     display: flex;
-    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+    position: relative;
   }
 
   section {
-    background: #f6f6f6;
     width: 100%;
     border-radius: 32px;
     display: flex;
@@ -80,7 +88,8 @@
 
   header {
     display: flex;
-    justify-content: center;
+    justify-content: start;
+    padding-left: 1rem;
 
     & img {
       width: 24px;
@@ -244,7 +253,7 @@
   const DECISION_THRESHOLD = 75
 
   let isAnimating = false
-  let pullDeltaX = 0 // distance que la card se está arrastrando
+  let pullDeltaX = 0 // distance from the card being dragged
 
   function startDrag(event) {
     if (isAnimating) return
@@ -256,7 +265,7 @@
     // get initial position of mouse or finger
     const startX = event.pageX ?? event.touches[0].pageX
 
-    // listen the mouse and touch movemenets
+    // listen the mouse and touch movements
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onEnd)
 
@@ -266,16 +275,22 @@
     function onMove(event) {
       // current position of mouse or finger
       const currentX = event.pageX ?? event.touches[0].pageX
+
       // the distance between the initial and current position
       pullDeltaX = currentX - startX
-      // no hay distancia recorrida
+
+      // there is no distance traveled in X axis
       if (pullDeltaX === 0) return
+
       // change the flag to indicate we are animating
       isAnimating = true
+
       // calculate the rotation of the card using the distance
       const deg = pullDeltaX / 14
+
       // apply the transformation to the card
       actualCard.style.transform = `translateX(${pullDeltaX}px) rotate(${deg}deg)`
+
       // change the cursor to grabbing
       actualCard.style.cursor = 'grabbing'
 
@@ -303,9 +318,8 @@
 
       if (decisionMade) {
         const goRight = pullDeltaX >= 0
-        const goLeft = !goRight
 
-        // add class acording to the decision
+        // add class according to the decision
         actualCard.classList.add(goRight ? 'go-right' : 'go-left')
         actualCard.addEventListener('transitionend', () => {
           actualCard.remove()
@@ -327,6 +341,11 @@
         pullDeltaX = 0
         isAnimating = false
       })
+
+      // reset the choice info opacity
+      actualCard
+        .querySelectorAll(".choice")
+        .forEach((el) => (el.style.opacity = 0));
     }
   }
 
