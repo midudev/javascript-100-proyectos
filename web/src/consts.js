@@ -12,4 +12,16 @@ export const PROJECTS = [
     ],
     youtube: 'https://www.youtube.com/watch?v=u01WD_YNENY'
   },
+  {
+    slug: "02-arkanoid-game",
+    title: "Arkanoid Game",
+    description:
+      "Juego mítico y clásico de Arkanoid para controlar con teclado",
+    learnings: [
+      "Dibujar en Canvas",
+      "Eventos de teclado",
+      "RequestAnimationFrame",
+      "Sprites"
+    ]
+  },
 ]
