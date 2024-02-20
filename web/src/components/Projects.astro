@@ -2,7 +2,9 @@
 import { PROJECTS } from "../consts"
 ---
 
-<div class="grid gap-8 mb-6 lg:mb-16 md:grid-cols-2 max-w-3xl mx-auto">
+<div
+  class="grid gap-8 mb-6 lg:mb-16 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto"
+>
   {
     PROJECTS.map((project, index) => {
       const num = `${index + 1}`.padStart(2, "0")
