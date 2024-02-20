@@ -43,6 +43,8 @@
   let dy = -3
 
   /* VARIABLES DE LA PALETA */
+  const PADDLE_SENSITIVITY = 8
+
   const paddleHeight = 10;
   const paddleWidth = 50;
 
@@ -85,8 +87,6 @@
     }
   }
 
-
-  const PADDLE_SENSITIVITY = 8
 
   function drawBall() {
     ctx.beginPath() // iniciar el trazado
@@ -180,7 +180,7 @@
     if (isBallSameXAsPaddle && isBallTouchingPaddle) {
       dy = -dy // cambiamos la dirección de la pelota
     } else if ( // la pelota toca el suelo
-      y + dy > canvas.height - ballRadius
+      y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
     ) {
       console.log('Game Over')
       document.location.reload()
