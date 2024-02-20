@@ -133,6 +133,10 @@
     }
   }
 
+  function drawUI() {
+    ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
+  }
+
   function collisionDetection() {
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
@@ -226,20 +230,48 @@
     }
   }
 
+  // a que velocidad de fps queremos que renderice nuestro juego
+  const fps = 60
+  
+  let msPrev = window.performance.now()
+  let msFPSPrev = window.performance.now() + 1000;
+  const msPerFrame = 1000 / fps
+  let frames = 0
+  let framesPerSec = fps;
+
   function draw() {
+    window.requestAnimationFrame(draw)
+
+    const msNow = window.performance.now()
+    const msPassed = msNow - msPrev
+
+    if (msPassed < msPerFrame) return
+
+    const excessTime = msPassed % msPerFrame
+    msPrev = msNow - excessTime
+
+    frames++
+
+    if (msFPSPrev < msNow)
+    {
+      msFPSPrev = window.performance.now() + 1000
+      framesPerSec = frames;
+      frames = 0;
+    }
+
+    // ... render code
     cleanCanvas()
     // hay que dibujar los elementos
     drawBall()
     drawPaddle()
     drawBricks()
-    // drawScore()
+    drawUI()
 
     // colisiones y movimientos
     collisionDetection()
     ballMovement()
     paddleMovement()
 
-    window.requestAnimationFrame(draw)
   }
 
   draw()
