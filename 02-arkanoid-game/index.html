@@ -206,6 +206,7 @@
   function initEvents() {
     document.addEventListener('keydown', keyDownHandler)
     document.addEventListener('keyup', keyUpHandler)
+    document.onmousemove = moveMousePaddle;
 
     function keyDownHandler(event) {
       const { key } = event
@@ -223,6 +224,16 @@
       } else if (key === 'Left' || key === 'ArrowLeft') {
         leftPressed = false
       }
+    }
+  }
+
+
+  function moveMousePaddle(event) {
+    const canv = canvas.getBoundingClientRect(); // Posición del canvas
+    const mousePosX = event.pageX - canv.left; // Posición del ratón en el canvas
+    // El 'paddle' solo se moverá si es dentro del canvas
+    if (mousePosX > 0 && mousePosX < (canvas.width - paddleWidth)) {
+      paddleX = mousePosX;
     }
   }
 
