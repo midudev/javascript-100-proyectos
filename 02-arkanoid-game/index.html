@@ -34,7 +34,7 @@
   /* Variables de nuestro juego */
 
   /* VARIABLES DE LA PELOTA */
-  const ballRadius = 3
+  const ballRadius = 3;
   // posicion de la pelota
   let x = canvas.width / 2
   let y = canvas.height - 30
@@ -45,8 +45,8 @@
   /* VARIABLES DE LA PALETA */
   const PADDLE_SENSITIVITY = 8
 
-  const paddleHeight = 10
-  const paddleWidth = 50
+  const paddleHeight = 10;
+  const paddleWidth = 50;
 
   let paddleX = (canvas.width - paddleWidth) / 2
   let paddleY = canvas.height - paddleHeight - 10
@@ -55,18 +55,18 @@
   let leftPressed = false
   let spacePressed = false
   /* VARIABLES DE LOS LADRILLOS */
-  const brickRowCount = 6
-  const brickColumnCount = 13
-  const brickWidth = 32
-  const brickHeight = 16
-  const brickPadding = 0
-  const brickOffsetTop = 80
-  const brickOffsetLeft = 16
-  const bricks = []
+  const brickRowCount = 6;
+  const brickColumnCount = 13;
+  const brickWidth = 32;
+  const brickHeight = 16;
+  const brickPadding = 0;
+  const brickOffsetTop = 80;
+  const brickOffsetLeft = 16;
+  const bricks = [];
 
   const BRICK_STATUS = {
     ACTIVE: 1,
-    DESTROYED: 0,
+    DESTROYED: 0
   }
 
   for (let c = 0; c < brickColumnCount; c++) {
@@ -82,7 +82,7 @@
         x: brickX,
         y: brickY,
         status: BRICK_STATUS.ACTIVE,
-        color: random,
+        color: random
       }
     }
   }
@@ -113,7 +113,7 @@
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
         const currentBrick = bricks[c][r]
-        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
 
         const clipX = currentBrick.color * 32
 
@@ -140,7 +140,7 @@
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
         const currentBrick = bricks[c][r]
-        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
 
         const isBallSameXAsBrick =
           x > currentBrick.x && x < currentBrick.x + brickWidth
@@ -238,7 +238,6 @@
 
 
     function keyDownHandler(event) {
-      console.log(event.key)
       const { key } = event
       if (key === 'Right' || key === 'ArrowRight') {
         rightPressed = true
@@ -263,10 +262,10 @@
   const fps = 60
 
   let msPrev = window.performance.now()
-  let msFPSPrev = window.performance.now() + 1000
+  let msFPSPrev = window.performance.now() + 1000;
   const msPerFrame = 1000 / fps
   let frames = 0
-  let framesPerSec = fps
+  let framesPerSec = fps;
 
   function draw() {
     window.requestAnimationFrame(draw)
@@ -283,8 +282,8 @@
 
     if (msFPSPrev < msNow) {
       msFPSPrev = window.performance.now() + 1000
-      framesPerSec = frames
-      frames = 0
+      framesPerSec = frames;
+      frames = 0;
     }
 
     // ... render code
