@@ -186,8 +186,20 @@
     const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth
 
     const isBallTouchingPaddle = y + dy > paddleY
+    const centerPaddle = (paddleWidth / 2)
+    //! si la pelota toca la pala del lado izquierdo o derecho la bola va a tomar una dirección diferente
+    if (isBallTouchingPaddle && isBallSameXAsPaddle) {
+      if (x < paddleX + centerPaddle) {
+        dx = -3
+        dy = -3
+      } else {
+        dx = 3
+        dy = -3
+      }
+    } else
 
     if (isBallSameXAsPaddle && isBallTouchingPaddle) {
+      
       dy = -dy // cambiamos la dirección de la pelota
     } else if (
       // la pelota toca el suelo
