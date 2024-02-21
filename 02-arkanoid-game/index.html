@@ -43,6 +43,8 @@
   let dy = -3
 
   /* VARIABLES DE LA PALETA */
+  const PADDLE_SENSITIVITY = 8
+
   const paddleHeight = 10;
   const paddleWidth = 50;
 
@@ -85,8 +87,6 @@
     }
   }
 
-
-  const PADDLE_SENSITIVITY = 8
 
   function drawBall() {
     ctx.beginPath() // iniciar el trazado
@@ -131,6 +131,10 @@
         )
       }
     }
+  }
+
+  function drawUI() {
+    ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
   }
 
   function collisionDetection() {
@@ -180,7 +184,7 @@
     if (isBallSameXAsPaddle && isBallTouchingPaddle) {
       dy = -dy // cambiamos la dirección de la pelota
     } else if ( // la pelota toca el suelo
-      y + dy > canvas.height - ballRadius
+      y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
     ) {
       console.log('Game Over')
       document.location.reload()
@@ -226,20 +230,48 @@
     }
   }
 
+  // a que velocidad de fps queremos que renderice nuestro juego
+  const fps = 60
+  
+  let msPrev = window.performance.now()
+  let msFPSPrev = window.performance.now() + 1000;
+  const msPerFrame = 1000 / fps
+  let frames = 0
+  let framesPerSec = fps;
+
   function draw() {
+    window.requestAnimationFrame(draw)
+
+    const msNow = window.performance.now()
+    const msPassed = msNow - msPrev
+
+    if (msPassed < msPerFrame) return
+
+    const excessTime = msPassed % msPerFrame
+    msPrev = msNow - excessTime
+
+    frames++
+
+    if (msFPSPrev < msNow)
+    {
+      msFPSPrev = window.performance.now() + 1000
+      framesPerSec = frames;
+      frames = 0;
+    }
+
+    // ... render code
     cleanCanvas()
     // hay que dibujar los elementos
     drawBall()
     drawPaddle()
     drawBricks()
-    // drawScore()
+    drawUI()
 
     // colisiones y movimientos
     collisionDetection()
     ballMovement()
     paddleMovement()
 
-    window.requestAnimationFrame(draw)
   }
 
   draw()
