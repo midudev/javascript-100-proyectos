@@ -10,7 +10,7 @@ export const PROJECTS = [
       "Eventos de mouse y touch",
       "Transiciones CSS",
     ],
-    youtube: 'https://www.youtube.com/watch?v=u01WD_YNENY'
+    youtube: "https://www.youtube.com/watch?v=u01WD_YNENY",
   },
   {
     slug: "02-arkanoid-game",
@@ -21,7 +21,8 @@ export const PROJECTS = [
       "Dibujar en Canvas",
       "Eventos de teclado",
       "RequestAnimationFrame",
-      "Sprites"
-    ]
+      "Sprites",
+    ],
+    twitch: "https://www.twitch.tv/videos/2068533559",
   },
-]
+];

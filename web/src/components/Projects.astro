@@ -1,5 +1,5 @@
 ---
-import { PROJECTS } from "../consts"
+import { PROJECTS } from "../consts";
 ---
 
 <div
@@ -7,7 +7,7 @@ import { PROJECTS } from "../consts"
 >
   {
     PROJECTS.map((project, index) => {
-      const num = `${index + 1}`.padStart(2, "0")
+      const num = `${index + 1}`.padStart(2, "0");
 
       return (
         <article class="relative items-center text-black rounded-lg">
@@ -119,10 +119,40 @@ import { PROJECTS } from "../consts"
                   </a>
                 </li>
               )}
+              {project.twitch != null && (
+                <li>
+                  <a
+                    href={project.twitch}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center px-3 py-2 text-xs font-semibold text-center text-[#874af6] transition bg-white rounded-lg hover:bg-[#d1b9ff] md:text-sm border border-[#874af6]"
+                  >
+                    <svg
+                      class="w-5 h-5 mr-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="256"
+                      height="180"
+                      viewBox="0 0 118 138"
+                    >
+                      <g fill="none" fill-rule="evenodd">
+                        <path
+                          fill="#FFF"
+                          d="m107.8058 63.7036-19.602 19.601h-19.6l-17.152 17.151v-17.151h-22.05V9.8006h78.404z"
+                        />
+                        <path
+                          fill="#9146FF"
+                          d="M117.605 0v68.605l-44.102 44.099H53.904l-24.503 24.503v-24.503H0V24.502L24.5 0h93.105Zm-9.8 9.801H29.401v73.503h22.051v17.15l17.153-17.15h19.601l19.599-19.601V9.801ZM93.1042 26.9518v29.4h-9.8v-29.4h9.8Zm-26.951 0v29.4h-9.8v-29.4h9.8Z"
+                        />
+                      </g>
+                    </svg>
+                    Twitch
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </article>
-      )
+      );
     })
   }
   <article
