@@ -22,6 +22,7 @@ export const PROJECTS = [
       "Eventos de teclado",
       "RequestAnimationFrame",
       "Sprites"
-    ]
+    ],
+    youtube: 'https://www.youtube.com/watch?v=b6du6MvQmuQ'
   },
 ]
