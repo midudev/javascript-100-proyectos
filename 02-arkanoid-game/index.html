@@ -196,9 +196,9 @@
   }
 
   function paddleMovement() {
-    if (rightPressed && paddleX < canvas.width - paddleWidth) {
+    if (rightPressed && !leftPressed && paddleX < canvas.width - paddleWidth) {
       paddleX += PADDLE_SENSITIVITY
-    } else if (leftPressed && paddleX > 0) {
+    } else if (leftPressed && !rightPressed && paddleX > 0) {
       paddleX -= PADDLE_SENSITIVITY
     }
   }
@@ -232,7 +232,7 @@
 
   // a que velocidad de fps queremos que renderice nuestro juego
   const fps = 60
-  
+
   let msPrev = window.performance.now()
   let msFPSPrev = window.performance.now() + 1000;
   const msPerFrame = 1000 / fps
@@ -252,8 +252,7 @@
 
     frames++
 
-    if (msFPSPrev < msNow)
-    {
+    if (msFPSPrev < msNow) {
       msFPSPrev = window.performance.now() + 1000
       framesPerSec = frames;
       frames = 0;
