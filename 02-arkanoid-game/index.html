@@ -213,18 +213,18 @@
 
     function keyDownHandler(event) {
       const { key } = event
-      if (key === 'Right' || key === 'ArrowRight') {
+      if (key === 'Right' || key === 'ArrowRight' || key === 'd') {
         rightPressed = true
-      } else if (key === 'Left' || key === 'ArrowLeft') {
+      } else if (key === 'Left' || key === 'ArrowLeft' || key === 'a') {
         leftPressed = true
       }
     }
 
     function keyUpHandler(event) {
       const { key } = event
-      if (key === 'Right' || key === 'ArrowRight') {
+      if (key === 'Right' || key === 'ArrowRight' || key === 'd') {
         rightPressed = false
-      } else if (key === 'Left' || key === 'ArrowLeft') {
+      } else if (key === 'Left' || key === 'ArrowLeft' || key === 'a') {
         leftPressed = false
       }
     }
