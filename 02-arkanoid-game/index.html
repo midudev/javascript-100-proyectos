@@ -213,18 +213,19 @@
 
     function keyDownHandler(event) {
       const { key } = event
-      if (key === 'Right' || key === 'ArrowRight') {
+      console.log(key)
+      if (key === 'Right' || key === 'ArrowRight' || key === 'd') {
         rightPressed = true
-      } else if (key === 'Left' || key === 'ArrowLeft') {
+      } else if (key === 'Left' || key === 'ArrowLeft' || key === 'a') {
         leftPressed = true
       }
     }
 
     function keyUpHandler(event) {
       const { key } = event
-      if (key === 'Right' || key === 'ArrowRight') {
+      if (key === 'Right' || key === 'ArrowRight' || key === 'd') {
         rightPressed = false
-      } else if (key === 'Left' || key === 'ArrowLeft') {
+      } else if (key === 'Left' || key === 'ArrowLeft' || key === 'a') {
         leftPressed = false
       }
     }
@@ -232,7 +233,7 @@
 
   // a que velocidad de fps queremos que renderice nuestro juego
   const fps = 60
-  
+
   let msPrev = window.performance.now()
   let msFPSPrev = window.performance.now() + 1000;
   const msPerFrame = 1000 / fps
