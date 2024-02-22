@@ -4,6 +4,7 @@
     background-color: #f0f0f0;
     display: grid;
     place-content: center;
+    font-family: monospace;
   }
 
   canvas {
@@ -14,9 +15,97 @@
     display: block;
     box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.4);
   }
+
+  form {
+    position: relative;
+    top: -2;
+    box-sizing: border-box;
+    max-width: 455px;
+    padding-inline: 10px;
+    padding-bottom: 15px;
+    border-bottom-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    background: #0002;
+  }
+
+  h2 {
+    margin-bottom: 6px;
+  }
+
+  input[type="range"]:disabled {
+    transition: all 300ms;
+    filter: saturate(0);
+  }
+
+  input[type="range"] {
+    /* removing default appearance */
+    -webkit-appearance: none;
+    appearance: none;
+    /* creating a custom design */
+    width: 100%;
+    cursor: pointer;
+    outline: none;
+    /*  slider progress trick  */
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  /* Track: webkit browsers */
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 15px;
+    background: #fff4;
+    border-radius: 16px;
+  }
+
+  /* Track: Mozilla Firefox */
+  input[type="range"]::-moz-range-track {
+    height: 15px;
+    background: #ccc;
+    border-radius: 16px;
+  }
+
+  /* Thumb: webkit */
+  input[type="range"]::-webkit-slider-thumb {
+    /* removing default appearance */
+    -webkit-appearance: none;
+    appearance: none;
+    /* creating a custom design */
+    height: 15px;
+    width: 15px;
+    background-color: #fff;
+    border-radius: 50%;
+    border: 2px solid #f50;
+    /*  slider progress trick  */
+    box-shadow: -407px 0 0 400px #f50;
+  }
+
+
+  /* Thumb: Firefox */
+  input[type="range"]::-moz-range-thumb {
+    height: 15px;
+    width: 15px;
+    background-color: #fff;
+    border-radius: 50%;
+    border: 1px solid #f50;
+    /*  slider progress trick  */
+    box-shadow: -407px 0 0 400px #f50;
+  }
 </style>
 
 <canvas></canvas>
+<form>
+  <h2>Controls</h2>
+  <!-- Dificultad: Velocidad de la bola -->
+  <label for="mode_game">
+    Dificultad del juego
+    <input accesskey="none" type="range" step="1" min="1" max="5" id="mode_game">
+  </label>
+  <!-- Velocidad del paddle -->
+  <label for="mode_paddle">
+    Paddle sensitivity
+    <input accesskey="none" type="range" max="16" min="4" id="mode_paddle">
+  </label>
+</form>
 
 <img hidden id="sprite" src="./sprite.png" alt="Sprite Arkanoid" />
 <img hidden id="bricks" src="./bricks.png" alt="Sprite Bricks Arkanoid" />
@@ -27,23 +116,25 @@
 
   const $sprite = document.querySelector('#sprite')
   const $bricks = document.querySelector('#bricks')
+  const $rangePaddle = document.querySelector('#mode_paddle')
+  const $rangeBall = document.querySelector('#mode_game')
 
   canvas.width = 448
   canvas.height = 400
 
   /* Variables de nuestro juego */
-
+  let isPaused = true
   /* VARIABLES DE LA PELOTA */
   const ballRadius = 3;
   // posicion de la pelota
   let x = canvas.width / 2
   let y = canvas.height - 30
   // velocidad de la pelota
-  let dx = -3
-  let dy = -3
+  let dx = getControlsValues().ball
+  let dy = getControlsValues().ball
 
   /* VARIABLES DE LA PALETA */
-  const PADDLE_SENSITIVITY = 8
+  let PADDLE_SENSITIVITY = getControlsValues().paddle
 
   const paddleHeight = 10;
   const paddleWidth = 50;
@@ -86,6 +177,24 @@
       }
     }
   }
+
+  function setControlsValues(event, key) {
+    const { value } = event.target
+    sessionStorage.setItem(key, value)
+  }
+
+  function getControlsValues(key) {
+    const ballValue = sessionStorage.getItem("ball") || 2
+    const paddleValue = sessionStorage.getItem("paddle") || 8
+
+    $rangeBall.value = ballValue
+    $rangePaddle.value = paddleValue
+    return {
+      ball: Number(ballValue),
+      paddle: Number(paddleValue)
+    }
+  }
+
 
 
   function drawBall() {
@@ -132,9 +241,10 @@
       }
     }
   }
-
   function drawUI() {
-    ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
+    ctx.beginPath()
+    ctx.fillText(`FPS: ${framesPerSec}`, 5, 20)
+    ctx.closePath()
   }
 
   function collisionDetection() {
@@ -186,11 +296,15 @@
     } else if ( // la pelota toca el suelo
       y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
     ) {
-      console.log('Game Over')
-      document.location.reload()
+      cleanCanvas()
+      writeCenterText("Game Over!", 85, "#f00", 50)
+      isPaused = true
+      setTimeout(() => {
+        if (confirm("Do you want to play again?")) document.location.reload()
+      }, 1000)
     }
 
-    // mover la pelota
+    // mover la pelotas
     x += dx
     y += dy
   }
@@ -207,13 +321,50 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
 
+  function writeCenterText(text = "",
+    x = canvas.width / 3.5 - 50,
+    color = "#fff",
+    font = 20) {
+    ctx.beginPath()
+    ctx.font = `bold ${font}px monospace`;
+    ctx.fillStyle = color
+    ctx.fillText(text, x, canvas.height / 2)
+    ctx.closePath()
+  }
+
+  function togglePause(event) {
+    const { key, code } = event
+    if (key === "p" || code == "Space") {
+      isPaused = !isPaused
+      if (!isPaused) draw()
+      $rangeBall.setAttribute('disabled', true)
+      $rangePaddle.setAttribute('disabled', true)
+    }
+  }
+
+
   function initEvents() {
+    document.addEventListener('keydown', togglePause)
     document.addEventListener('keydown', keyDownHandler)
     document.addEventListener('keyup', keyUpHandler)
+    $rangePaddle.addEventListener('change', e => setControlsValues(e, 'paddle'))
+    $rangeBall.addEventListener('change', e => setControlsValues(e, 'ball'))
+
+
+    getControlsValues()
+
+
+
+    writeCenterText("Press space to start now!")
+
+    ctx.beginPath()
+    ctx.fillStyle = "#fff"
+    ctx.fillRect(canvas.width / 3.5, canvas.height, 150, 100);
+    ctx.closePath()
+
 
     function keyDownHandler(event) {
       const { key } = event
-      console.log(key)
       if (key === 'Right' || key === 'ArrowRight' || key === 'd') {
         rightPressed = true
       } else if (key === 'Left' || key === 'ArrowLeft' || key === 'a') {
@@ -232,7 +383,7 @@
   }
 
   // a que velocidad de fps queremos que renderice nuestro juego
-  const fps = 60
+  const fps = 30
 
   let msPrev = window.performance.now()
   let msFPSPrev = window.performance.now() + 1000;
@@ -241,7 +392,7 @@
   let framesPerSec = fps;
 
   function draw() {
-    window.requestAnimationFrame(draw)
+    if (!isPaused) window.requestAnimationFrame(draw)
 
     const msNow = window.performance.now()
     const msPassed = msNow - msPrev
@@ -253,8 +404,7 @@
 
     frames++
 
-    if (msFPSPrev < msNow)
-    {
+    if (msFPSPrev < msNow) {
       msFPSPrev = window.performance.now() + 1000
       framesPerSec = frames;
       frames = 0;
@@ -275,6 +425,5 @@
 
   }
 
-  draw()
   initEvents()
 </script>
