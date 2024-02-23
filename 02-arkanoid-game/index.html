@@ -1,207 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
 <title>Arkanoid en JavaScript</title>
 <style>
   body {
-    background-color: #f0f0f0;
-    display: grid;
+    margin:0;
+    display:grid;
     place-content: center;
+    background-color: #080f29;
+    align-items: center;
+    background-image: url(/ArkanoidBG.webp);
+    background-size: cover;
+    background-position: bottom bottom;
+    min-height:100vh;
+    
   }
-
+  
   canvas {
     border: 4px solid #000;
     border-bottom: transparent;
     background: url('./bkg.png') repeat;
+    
     margin: 0 auto;
     display: block;
     box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.4);
   }
+  .gameOverScreen{
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    
+    position:absolute;
+    inset:0;
+    z-index: 2;
+    background-color: black;
+    background-image: url(/MiduArkanoid.webp);
+    background-size: cover;
+    background-position: center bottom;
+    pointer-events: none;
+    opacity:0;
+    transition: opacity 500ms ease-in-out;
+    padding: 0;
+    button{
+      display:none;
+    }
+  }
+  .gameOverScreen.active{
+    pointer-events: all;
+    transition: opacity 500ms ease-in-out;
+    opacity:1;
+    button{display:flex;}
+  }
+
+
+
 </style>
+<link rel="stylesheet" href="./button.css">
+</head>
+<body>
+  <!-- image generated with bing images ai -->
+<div class="gameOverScreen" > 
 
-<canvas></canvas>
+  
+    <!-- button from https://codepen.io/Ks145/pen/MWGxbYr   -->
+    <button class='glowing-btn' onClick="restart()"><span class='glowing-txt'><span class='faulty-letter'>Re</span>iniciar</span></button>
 
-<img hidden id="sprite" src="./sprite.png" alt="Sprite Arkanoid" />
+</div>
+
+  <canvas></canvas>
+
+
+
+<img hidden id="sprite" src="./Sprites.webp" alt="Sprite Arkanoid" />
 <img hidden id="bricks" src="./bricks.png" alt="Sprite Bricks Arkanoid" />
+
+<script>
+  class vec2 {
+    constructor(param1, param2) {
+      if (param1 instanceof vec2) {
+        this._vec = [param1.x, param1.y]
+      } else {
+        this._vec = [param1, param2]
+      }
+    }
+    get x() {
+      return this._vec[0]
+    }
+    get y() {
+      return this._vec[1]
+    }
+    set x(num) {
+      if (typeof num === 'number')
+        this._vec[0] = num
+
+    }
+    set y(num) {
+      if (typeof num === 'number')
+        this._vec[1] = num
+    }
+    set vec([param1, param2]) {
+      this._vec = [param1, param2]
+    }
+    get vec() {
+      return this._vec
+    }
+    get xy() {
+      return { x: this._vec[0], y: this._vec[1] }
+    }
+    set xy({ x, y }) {
+      this._vec = [x, y]
+    }
+    sumV2(vector) {
+      if (vector instanceof vec2)
+        this._vec = this._vec.map((val, index) => val + vector.vec[index])
+      return this
+    }
+    subV2(vector) {
+      if (vector instanceof vec2)
+        this._vec = this._vec.map((val, index) => val - vector.vec[index])
+      return this
+    }
+    sumV2(vector) {
+      if (vector instanceof vec2)
+        this._vec = this._vec.map((val, index) => val + vector.vec[index])
+      return this
+    }
+    mulNum(num) {
+      if (typeof num === "number")
+        this._vec = this._vec.map((val, index) => val * num)
+      return this
+    }
+    divNum(num) {
+      if (typeof num === "number" && num !== 0)
+        this._vec = this._vec.map((val, index) => val / num)
+      return this
+    }
+    rot(ang) {
+      const x = this._vec[0]
+      const y = this._vec[1]
+      const cosA = Math.cos(ang)
+      const sinA = Math.sin(ang)
+      const newX = x * cosA - y * sinA
+      const newY = x * sinA + y * cosA
+
+      this._vec = [newX, newY]
+    }
+    rotDeg(ang) {
+      const angRad = (ang * Math.PI) / 180
+      this.rot(angRad)
+    }
+    ang(vector) {
+      if (!vector instanceof vec2)
+        return 0
+      const dotProduct = this._vec[0] * vector.x + this._vec[1] * vector.y
+      const modProduct = this.mod() * vector.mod()
+
+      // Usar la función arcotangente para calcular el ángulo en radianes
+      return Math.acos(dotProduct / modeProduct)
+    }
+
+    // Método para calcular la mod del vector
+
+    angDeg(vector) {
+      if (!vector instanceof vec2)
+        return 0
+      const rad = this.ang(vector)
+      const angPos = (rad + 2 * Math.PI) % (2 * Math.PI)
+
+      // Convertir a grados
+      return (anguloPositivo * 180) / Math.PI
+    }
+    mod() {
+      const [x, y] = this._vec
+      return Math.sqrt(x * x + y * y)
+    }
+
+  }
+</script>
+
 
 <script>
   const canvas = document.querySelector('canvas')
   const ctx = canvas.getContext('2d')
+  ctx.imageSmoothingEnabled = false
 
   const $sprite = document.querySelector('#sprite')
   const $bricks = document.querySelector('#bricks')
 
   canvas.width = 448
   canvas.height = 400
-
+  
   /* Variables de nuestro juego */
+  let isGameOver=false
+
 
   /* VARIABLES DE LA PELOTA */
-  const ballRadius = 3;
+  const ballRadius = 3
+
   // posicion de la pelota
-  let x = canvas.width / 2
-  let y = canvas.height - 30
-  // velocidad de la pelota
-  let dx = -3
-  let dy = -3
+  const startPosition = new vec2(canvas.width / 2, canvas.height - 30)
+
+  // velocidad inicial
+  const initVel = new vec2(-3, -3)
+
+  // numero de pelotas a lanzar
+  const initialBalls = 2
+
+  // dispersion de las pelotas en grados
+  const dispersion = 10
+
+  // creamos las pelotas 
+  const ballList =createBalls()
 
   /* VARIABLES DE LA PALETA */
   const PADDLE_SENSITIVITY = 8
 
-  const paddleHeight = 10;
-  const paddleWidth = 50;
-
-  let paddleX = (canvas.width - paddleWidth) / 2
-  let paddleY = canvas.height - paddleHeight - 10
-
-  let rightPressed = false
-  let leftPressed = false
-
+  const paddleHeight = 10
+  const paddleWidth = 50
+  const paddleInitPos = new vec2((canvas.width - paddleWidth) / 2, canvas.height - paddleHeight - 10)
+  const player1 = createPaddle()
   /* VARIABLES DE LOS LADRILLOS */
-  const brickRowCount = 6;
-  const brickColumnCount = 13;
-  const brickWidth = 32;
-  const brickHeight = 16;
-  const brickPadding = 0;
-  const brickOffsetTop = 80;
-  const brickOffsetLeft = 16;
-  const bricks = [];
+  const brickRowCount = 6
+  const brickColumnCount = 13
+  const brickWidth = 32
+  const brickHeight = 16
+  const brickPadding = 0
+  const brickOffsetTop = 80
+  const brickOffsetLeft = 16
+    const patternBrick = [
+    '1111111111111',
+    '             ',
+    '  111441111  ',
+    '  111441111  ',
+    ' 22222222222 ',
+    '1111111111111',
+  ]
 
-  const BRICK_STATUS = {
-    ACTIVE: 1,
-    DESTROYED: 0
-  }
+  let bricks =createWall()
 
-  for (let c = 0; c < brickColumnCount; c++) {
-    bricks[c] = [] // inicializamos con un array vacio
-    for (let r = 0; r < brickRowCount; r++) {
-      // calculamos la posicion del ladrillo en la pantalla
-      const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft
-      const brickY = r * (brickHeight + brickPadding) + brickOffsetTop
-      // Asignar un color aleatorio a cada ladrillo
-      const random = Math.floor(Math.random() * 8)
-      // Guardamos la información de cada ladrillo
-      bricks[c][r] = {
-        x: brickX,
-        y: brickY,
-        status: BRICK_STATUS.ACTIVE,
-        color: random
-      }
+  // Creamos los ladrillos usando el patron
+  
+  function createWall() {
+    
+        let brickList = patternBrick.map((row, rowIndex) => [...row].map((character, colIndex) => character !== " "? createBrick(rowIndex, colIndex, character):null)).flat().filter((brick)=>!!brick)
+        console.log(brickList)
+
+    //repintando y limpieza de los ladrillos destruidos para evitar tener que realizar comprobaciones
+    const update = () => {
+      brickList=brickList.filter(brick=>!brick.isDestroyed())
+      brickList.forEach(brick=>brick.draw())
     }
+
+    const wall = {
+      brickList,
+      update
+    }
+    return wall
   }
 
+  //creacion de cada ladrillo
+  function createBrick(row, col, character) {
 
-  function drawBall() {
-    ctx.beginPath() // iniciar el trazado
-    ctx.arc(x, y, ballRadius, 0, Math.PI * 2)
-    ctx.fillStyle = '#fff'
-    ctx.fill()
-    ctx.closePath() // terminar el trazado
-  }
+    const posX = col * (brickWidth + brickPadding) + brickOffsetLeft
+    const posY = row * (brickHeight + brickPadding) + brickOffsetTop
+    const pos=new vec2(posX,posY)
+    const color = Math.floor(Math.random() * 8)
+    // cada ladrillo tiene un posible dureza inicial y sufrira daños
+    // si el daño iguala la dureza el ladrillo de marcara para ser limpiado por la funcion que los actualiza
+    let strength = parseInt(character)-1
+    let damage=0
+    let destroyed=false
+    
+       
+    function calcCollision(posBall, velBall, effectBall) {
+        if(destroyed)
+          return false
+        const isBallSameXAsBrick =
+          posBall.x > pos.x &&
+          posBall.x < pos.x + brickWidth
 
-  function drawPaddle() {
-    ctx.drawImage(
-      $sprite, // imagen
-      29, // clipX: coordenadas de recorte
-      174, // clipY: coordenadas de recorte
-      paddleWidth, // el tamaño del recorte
-      paddleHeight, // tamaño del recorte
-      paddleX, // posición X del dibujo
-      paddleY, // posición Y del dibujo
-      paddleWidth, // ancho del dibujo
-      paddleHeight // alto del dibujo
-    )
-  }
+        const isBallSameYAsBrick =
+          posBall.y > pos.y &&
+          posBall.y < pos.y + brickHeight
+      if (!isBallSameXAsBrick || !isBallSameYAsBrick)
+      {
+       
+       return false  
+      }
+      if(strength===damage)
+        {
+          destroyed=true
+        }
+        damage++
+      
+        return true
 
-  function drawBricks() {
-    for (let c = 0; c < brickColumnCount; c++) {
-      for (let r = 0; r < brickRowCount; r++) {
-        const currentBrick = bricks[c][r]
-        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
-
-        const clipX = currentBrick.color * 32
-
+      
+    }
+    function draw() {
+        
+        const clip = { x: 34 * color, y: damage * 18 }
         ctx.drawImage(
           $bricks,
-          clipX,
-          0,
+          clip.x,
+          clip.y,
           brickWidth, // 31
           brickHeight, // 14
-          currentBrick.x,
-          currentBrick.y,
+          posX,
+          posY,
           brickWidth,
           brickHeight
         )
+
       }
+    const isDestroyed=()=> destroyed
+    const brick = {
+      isDestroyed,
+      calcCollision,
+      draw,
+      
     }
+    return brick
+  }
+  //
+  // Creamos todas las bolas
+    function createBalls() {
+      //array de bolas
+      let ballslive = new Array(initialBalls).fill(0).map(() => createBall(dispersion))
+      
+      const update = () => {
+        //eliminar las bolas destruidas
+        ballslive=ballslive.filter(ball=>!ball.isDestroyed())
+      
+      ballslive.forEach(ball=>ball.update())
+      if(ballslive.length==0)
+      {
+        isGameOver=true
+        document.querySelector('.gameOverScreen').classList.add('active')
+        }
+
+    }
+    //todo añadir creador de bolas que pueda ser invocado como efecto desde los ladrillos
+    const balls = {
+      ballslive,
+      update
+    }
+    return balls
   }
 
+
+
+  
+  // creamos un pelota con sus propias propiedades y funciones para modificar su estao
+  function createBall(dispersion) {
+    const pos = new vec2(startPosition)
+    const vel = new vec2(initVel)
+    let destroyed=false
+    /* effect array es un array que se para a los ladrillos
+       que contendra el momento en que se aplico el efecto la duracion de este
+       y una funcion que modificara propiedades como velocidad,
+        capacidad para ignorar colisiones y atravesar lo ladrillos sin rebotar,
+        destruir ladrillos de un toque incluso spanear nuevas bolas
+    */
+    const effects = []
+
+    const angleDispersion = Math.floor(Math.random() * dispersion) - dispersion / 2
+    vel.rotDeg(angleDispersion)
+
+    const checkBoundary = () => {
+      if (
+        pos.x + vel.x > canvas.width - ballRadius || // la pared derecha
+        pos.x + vel.x < ballRadius // la pared izquierda
+      ) {
+        vel.x *= -1
+      }
+      // rebotar en la parte de arriba
+      if (pos.y + vel.y < ballRadius) {
+        vel.y *= -1
+      }
+      //si se sale de la pantalla se marcara como destroyed y el update del creador la limpiara
+      if(pos.y>canvas.height)
+        destroyed=true
+    }
+    const draw = () => {
+
+      ctx.beginPath() // iniciar el trazado
+      ctx.arc(pos.x, pos.y, ballRadius, 0, Math.PI * 2)
+      ctx.fillStyle = '#fff'
+      ctx.fill()
+      ctx.closePath() // terminar el trazado
+    }
+    const update = () => {
+      checkBoundary()
+      const hitPaddle = player1.calcCollision(pos, vel, effects)
+      const hitBrick=bricks.brickList.reduce((ishit,brick)=> brick.calcCollision(pos, vel, effects)||ishit,false)
+
+      if (hitPaddle || hitBrick)
+        vel.y *= -1
+      pos.sumV2(vel)
+      draw()
+    }
+    const isDestroyed=()=>{return destroyed}
+
+    
+    const ball = {
+      update,
+      draw,
+      isDestroyed
+    }
+    return ball
+  }
+  function gameOver(){
+    document.location.reload()
+  }
+
+
+  //funcion para crear la raqueta
+  function createPaddle() {
+    const pos = new vec2(paddleInitPos)
+    let rightPressed = false
+    let leftPressed = false
+    const box = { corner: pos, width: paddleWidth, height: paddleHeight }
+
+    const draw = () => {
+      ctx.drawImage(
+        $sprite, // imagen
+        0, // clipX: coordenadas de recorte
+        135, // clipY: coordenadas de recorte
+        paddleWidth, // el tamaño del recorte
+        paddleHeight, // tamaño del recorte
+        pos.x, // posición X del dibujo
+        pos.y, // posición Y del dibujo
+        paddleWidth, // ancho del dibujo
+        paddleHeight // alto del dibujo
+      )
+    }
+
+    const update = () => {
+      // segun las teclas presionadas se creara una valor de direccion -1 +1
+      const dirLeft = leftPressed && pos.x > PADDLE_SENSITIVITY ? -1 : 0
+      const dirRight = rightPressed && pos.x < canvas.width - PADDLE_SENSITIVITY - paddleWidth ? 1 : 0
+      const vel = new vec2(PADDLE_SENSITIVITY, 0)
+      // si se presionan ambas teclas el resultado sera 0 al multiplicarlo por el vector velocidad se anulara el movimiento
+      const sum = vel.mulNum(dirLeft + dirRight)
+      pos.sumV2(sum)
+      draw()
+    }
+    function setLeft(isPressed) {
+      leftPressed = isPressed
+    }
+    function setRight(isPressed) {
+      rightPressed = isPressed
+    }
+    // los calculos de colision los invocara cada bola para cada jugador y la paleta
+    // repondera con una posible colision y ajustara su direccion
+    function calcCollision(posBall, velBall, effectBall) {
+      const isBallSameXAsPaddle =
+        posBall.x > pos.x &&
+        posBall.x < pos.x + paddleWidth
+      const isBallTouchingPaddle = posBall.y + velBall.y > pos.y
+      if (isBallSameXAsPaddle && isBallTouchingPaddle)
+        return true
+
+      return false
+    }
+
+    const paddle = {
+      setLeft,
+      setRight,
+      update,
+      calcCollision,
+      draw
+    }
+    return paddle
+  }
+  
   function drawUI() {
     ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
   }
 
-  function collisionDetection() {
-    for (let c = 0; c < brickColumnCount; c++) {
-      for (let r = 0; r < brickRowCount; r++) {
-        const currentBrick = bricks[c][r]
-        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
 
-        const isBallSameXAsBrick =
-          x > currentBrick.x &&
-          x < currentBrick.x + brickWidth
 
-        const isBallSameYAsBrick =
-          y > currentBrick.y &&
-          y < currentBrick.y + brickHeight
-
-        if (isBallSameXAsBrick && isBallSameYAsBrick) {
-          dy = -dy
-          currentBrick.status = BRICK_STATUS.DESTROYED
-        }
-      }
-    }
-  }
-
-  function ballMovement() {
-    // rebotar las pelotas en los laterales
-    if (
-      x + dx > canvas.width - ballRadius || // la pared derecha
-      x + dx < ballRadius // la pared izquierda
-    ) {
-      dx = -dx
-    }
-
-    // rebotar en la parte de arriba
-    if (y + dy < ballRadius) {
-      dy = -dy
-    }
-
-    // la pelota toca la pala
-    const isBallSameXAsPaddle =
-      x > paddleX &&
-      x < paddleX + paddleWidth
-
-    const isBallTouchingPaddle =
-      y + dy > paddleY
-
-    if (isBallSameXAsPaddle && isBallTouchingPaddle) {
-      dy = -dy // cambiamos la dirección de la pelota
-    } else if ( // la pelota toca el suelo
-      y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
-    ) {
-      console.log('Game Over')
-      document.location.reload()
-    }
-
-    // mover la pelota
-    x += dx
-    y += dy
-  }
-
-  function paddleMovement() {
-    if (rightPressed && paddleX < canvas.width - paddleWidth) {
-      paddleX += PADDLE_SENSITIVITY
-    } else if (leftPressed && paddleX > 0) {
-      paddleX -= PADDLE_SENSITIVITY
-    }
-  }
 
   function cleanCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -214,33 +493,35 @@
     function keyDownHandler(event) {
       const { key } = event
       if (key === 'Right' || key === 'ArrowRight' || key.toLowerCase() === 'd') {
-        rightPressed = true
+        player1.setRight(true)
       } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
-        leftPressed = true
+        player1.setLeft(true)
       }
+
     }
 
     function keyUpHandler(event) {
       const { key } = event
       if (key === 'Right' || key === 'ArrowRight' || key.toLowerCase() === 'd') {
-        rightPressed = false
+        player1.setRight(false)
       } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
-        leftPressed = false
+        player1.setLeft(false)
       }
     }
   }
 
   // a que velocidad de fps queremos que renderice nuestro juego
   const fps = 60
-  
+
   let msPrev = window.performance.now()
-  let msFPSPrev = window.performance.now() + 1000;
+  let msFPSPrev = window.performance.now() + 1000
   const msPerFrame = 1000 / fps
   let frames = 0
-  let framesPerSec = fps;
+  let framesPerSec = fps
 
   function draw() {
-    window.requestAnimationFrame(draw)
+    if(!isGameOver)
+        window.requestAnimationFrame(draw)
 
     const msNow = window.performance.now()
     const msPassed = msNow - msPrev
@@ -252,28 +533,30 @@
 
     frames++
 
-    if (msFPSPrev < msNow)
-    {
+    if (msFPSPrev < msNow) {
       msFPSPrev = window.performance.now() + 1000
-      framesPerSec = frames;
-      frames = 0;
+      framesPerSec = frames
+      frames = 0
     }
 
     // ... render code
     cleanCanvas()
     // hay que dibujar los elementos
-    drawBall()
-    drawPaddle()
-    drawBricks()
+    
+    bricks.update()
+    ballList.update()
+    player1.update()
     drawUI()
 
-    // colisiones y movimientos
-    collisionDetection()
-    ballMovement()
-    paddleMovement()
-
+    
   }
 
   draw()
   initEvents()
+function restart(){
+document.location.reload()
+  }
+
 </script>
+</body>
+</html>
