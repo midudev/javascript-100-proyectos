@@ -9,7 +9,7 @@
     place-content: center;
     background-color: #080f29;
     align-items: center;
-    background-image: url(/ArkanoidBG.webp);
+    background-image: url(./ArkanoidBG.webp);
     background-size: cover;
     background-position: bottom bottom;
     min-height:100vh;
@@ -34,7 +34,7 @@
     inset:0;
     z-index: 2;
     background-color: black;
-    background-image: url(/MiduArkanoid.webp);
+    background-image: url(./MiduArkanoid.webp);
     background-size: cover;
     background-position: center bottom;
     pointer-events: none;
@@ -241,7 +241,7 @@
   // Creamos los ladrillos usando el patron
   
   function createWall() {
-    
+
         let brickList = patternBrick.map((row, rowIndex) => [...row].map((character, colIndex) => character !== " "? createBrick(rowIndex, colIndex, character):null)).flat().filter((brick)=>!!brick)
         console.log(brickList)
 
