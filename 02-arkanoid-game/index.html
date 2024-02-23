@@ -58,7 +58,7 @@
 
   let rightPressed = false;
   let leftPressed = false;
-
+  let spacePressed = false;
   /* VARIABLES DE LOS LADRILLOS */
   const brickRowCount = 6;
   const brickColumnCount = 13;
@@ -75,8 +75,13 @@
   };
 
   /*VARIABLES DE LOS POWERUPS*/
-  const g = -0.98;
   let currentPowerUps = [];
+
+  let touchAndSticky = false; //used in sticky power
+  let unstoppable = false; //used in PassThrough power
+  let ballPassThroghStyle = ""; // used in PassThrough power
+
+  const g = -0.98;
   const POWERUPS_TYPES = {
     Speed: 0,
     Sticky: 1,
@@ -120,7 +125,7 @@
   function drawBall() {
     ctx.beginPath(); // iniciar el trazado
     ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = ballPassThroghStyle ? ballPassThroghStyle : "#fff";
     ctx.fill();
     ctx.closePath(); // terminar el trazado
   }
@@ -184,6 +189,67 @@
     }, 3000);
   }
 
+  function powerSticky() {
+    if (POWER_ACTIVED.Sticky) return;
+    else POWER_ACTIVED.Sticky = true;
+  }
+
+  function powerPassThrough() {
+    if (POWER_ACTIVED.PassThrough) return;
+    else POWER_ACTIVED.PassThrough = true;
+    unstoppable = true;
+    ballPassThroghStyle = "#f00";
+    dx *= 2;
+    dy *= 2;
+
+    setTimeout(() => {
+      unstoppable = false;
+      ballPassThroghStyle = "#fff";
+      dx *= 0.5;
+      dy *= 0.5;
+      POWER_ACTIVED.PassThrough = false;
+    }, 1000);
+  }
+
+  function powerConfuse() {
+    if (POWER_ACTIVED.Confuse) return;
+    else POWER_ACTIVED.Confuse = true;
+
+    setTimeout(() => {
+      POWER_ACTIVED.Confuse = false;
+      // restore filter
+      ctx.filter = `saturate(100%) hue-rotate(0deg)`;
+    }, 5000);
+  }
+
+  function powerChaos() {
+    //TODO:
+    if (POWER_ACTIVED.Chaos) return;
+    else POWER_ACTIVED.Chaos = true;
+  }
+
+  function powersLooped(time) {
+    const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth;
+    const isBallTouchingPaddle = y + dy > paddleY;
+
+    //STICKY
+    if (POWER_ACTIVED.Sticky) {
+      if (!touchAndSticky) touchAndSticky = isBallSameXAsPaddle && isBallTouchingPaddle;
+      if (touchAndSticky) {
+        x = paddleX + paddleWidth / 2;
+        y = paddleY;
+        if (spacePressed) {
+          touchAndSticky = false;
+          POWER_ACTIVED.Sticky = false;
+        }
+      }
+    }
+
+    //CONFUSION
+    if (POWER_ACTIVED.Confuse) {
+      ctx.filter = `saturate(200%) hue-rotate(${time}deg)`;
+    }
+  }
   function drawPowerUp() {
     for (const powerup of currentPowerUps) {
       powerup.y -= g;
@@ -198,11 +264,14 @@
             powerup.size,
             powerup.size);
 
+      // powerup touch ground
       const intersect = powerup.x + powerup.size > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
 
+      // powerup touch ground
       let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerup.size > paddleY + paddleHeight;
 
       if (falls) {
+        // remove powerup when touching the ground
         currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
       }
       if (intersect) {
@@ -212,23 +281,19 @@
             powerSpeed();
             break;
           case POWERUPS_TYPES.Sticky:
-            powerPadSizeIncrease();
-
+            powerSticky();
             break;
           case POWERUPS_TYPES.PassThrough:
-            powerPadSizeIncrease();
-
+            powerPassThrough();
             break;
           case POWERUPS_TYPES.PadSizeIncrease:
             powerPadSizeIncrease();
             break;
           case POWERUPS_TYPES.Confuse:
-            powerPadSizeIncrease();
-
+            powerConfuse();
             break;
           case POWERUPS_TYPES.Chaos:
-            powerPadSizeIncrease();
-
+            powerChaos();
             break;
           default:
             continue;
@@ -254,7 +319,7 @@
         const isBallSameYAsBrick = y > currentBrick.y && y < currentBrick.y + brickHeight;
 
         if (isBallSameXAsBrick && isBallSameYAsBrick) {
-          dy = -dy;
+          if (!unstoppable) dy = -dy; // pass through power
           currentBrick.status = BRICK_STATUS.DESTROYED;
 
           if (currentBrick.powerup.has) {
@@ -330,20 +395,24 @@
     document.addEventListener("keyup", keyUpHandler);
 
     function keyDownHandler(event) {
-      const { key } = event;
+      const { key, code } = event;
       if (key === "Right" || key === "ArrowRight" || key.toLowerCase() === "d") {
         rightPressed = true;
       } else if (key === "Left" || key === "ArrowLeft" || key.toLowerCase() === "a") {
         leftPressed = true;
+      } else if (code === "Space") {
+        spacePressed = true;
       }
     }
 
     function keyUpHandler(event) {
-      const { key } = event;
+      const { key, code } = event;
       if (key === "Right" || key === "ArrowRight" || key.toLowerCase() === "d") {
         rightPressed = false;
       } else if (key === "Left" || key === "ArrowLeft" || key.toLowerCase() === "a") {
         leftPressed = false;
+      } else if (code === "Space") {
+        spacePressed = false;
       }
     }
   }
@@ -358,7 +427,7 @@
   let framesPerSec = fps;
 
   function draw() {
-    window.requestAnimationFrame(draw);
+    let time = window.requestAnimationFrame(draw);
 
     const msNow = window.performance.now();
     const msPassed = msNow - msPrev;
@@ -383,6 +452,8 @@
     drawPaddle();
     drawBricks();
     drawPowerUp();
+
+    powersLooped(time);
     drawUI();
 
     // colisiones y movimientos
