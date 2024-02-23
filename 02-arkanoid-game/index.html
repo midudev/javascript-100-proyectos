@@ -48,8 +48,10 @@
   /* VARIABLES DE LA PALETA */
   const PADDLE_SENSITIVITY = 8;
 
+  const paddleTexCoordX = 50;
+  const paddleTexCoordY = 10;
   const paddleHeight = 10;
-  const paddleWidth = 50;
+  let paddleWidth = 50;
 
   let paddleX = (canvas.width - paddleWidth) / 2;
   let paddleY = canvas.height - paddleHeight - 10;
@@ -108,7 +110,7 @@
         status: BRICK_STATUS.ACTIVE,
         color: random,
         powerup: {
-          has: Math.random() < 0.2,
+          has: Math.random() < 1,
           type: POWERUPS_TYPES[randomPowerup],
         },
       };
@@ -128,8 +130,8 @@
       $sprite, // imagen
       29, // clipX: coordenadas de recorte
       174, // clipY: coordenadas de recorte
-      paddleWidth, // el tamaño del recorte
-      paddleHeight, // tamaño del recorte
+      paddleTexCoordX, // el tamaño del recorte
+      paddleTexCoordY, // tamaño del recorte
       paddleX, // posición X del dibujo
       paddleY, // posición Y del dibujo
       paddleWidth, // ancho del dibujo
@@ -171,6 +173,17 @@
     }, 3000);
   }
 
+  function powerPadSizeIncrease() {
+    if (POWER_ACTIVED.PadSizeIncrease) return;
+    else POWER_ACTIVED.PadSizeIncrease = true;
+
+    paddleWidth += 40;
+    setTimeout(() => {
+      paddleWidth -= 40;
+      POWER_ACTIVED.PadSizeIncrease = false;
+    }, 3000);
+  }
+
   function drawPowerUp() {
     for (const powerup of currentPowerUps) {
       powerup.y -= g;
@@ -185,10 +198,9 @@
             powerup.size,
             powerup.size);
 
-      const intersect = powerup.x > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
+      const intersect = powerup.x + powerup.size > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
 
-      // la pelota toca el suelo
-      let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerSpeed.size > paddleY + paddleHeight;
+      let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerup.size > paddleY + paddleHeight;
 
       if (falls) {
         currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
@@ -200,14 +212,23 @@
             powerSpeed();
             break;
           case POWERUPS_TYPES.Sticky:
+            powerPadSizeIncrease();
+
             break;
           case POWERUPS_TYPES.PassThrough:
+            powerPadSizeIncrease();
+
             break;
           case POWERUPS_TYPES.PadSizeIncrease:
+            powerPadSizeIncrease();
             break;
           case POWERUPS_TYPES.Confuse:
+            powerPadSizeIncrease();
+
             break;
           case POWERUPS_TYPES.Chaos:
+            powerPadSizeIncrease();
+
             break;
           default:
             continue;
