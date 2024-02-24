@@ -30,7 +30,6 @@
   const $sprite = document.querySelector("#sprite");
   const $bricks = document.querySelector("#bricks");
   const $powerups = document.querySelector("#powerups");
-
   canvas.width = 448;
   canvas.height = 400;
 
@@ -112,6 +111,8 @@
       bricks[c][r] = {
         x: brickX,
         y: brickY,
+        originX: brickX, //store origin positions
+        originY: brickY,
         status: BRICK_STATUS.ACTIVE,
         color: random,
         powerup: {
@@ -144,12 +145,23 @@
     );
   }
 
-  function drawBricks() {
+  function drawBricks(time) {
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
         const currentBrick = bricks[c][r];
         if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
         const clipX = currentBrick.color * 32;
+
+        if (POWER_ACTIVED.Chaos) {
+          if (c % 2 == 0) {
+            currentBrick.y -= Math.sin(time * 0.1) * 5;
+          } else {
+            currentBrick.y += Math.sin(time * 0.1) * 5;
+          }
+        } else {
+          currentBrick.x = currentBrick.originX;
+          currentBrick.y = currentBrick.originY;
+        }
 
         ctx.drawImage(
           $bricks,
@@ -223,9 +235,18 @@
   }
 
   function powerChaos() {
-    //TODO:
     if (POWER_ACTIVED.Chaos) return;
     else POWER_ACTIVED.Chaos = true;
+
+    canvas.style.background = "radial-gradient(circle, rgba(111,0,0,1) 0%, rgba(0,0,0,1) 70%)";
+    ctx.filter = `opacity(60%) grayscale(0.7)`;
+
+    setTimeout(() => {
+      POWER_ACTIVED.Chaos = false;
+      // restore filter
+      ctx.filter = `opacity(100%) `;
+      canvas.style.background = `url("./bkg.png") repeat`;
+    }, 5000);
   }
 
   function powersLooped(time) {
@@ -450,7 +471,7 @@
     // hay que dibujar los elementos
     drawBall();
     drawPaddle();
-    drawBricks();
+    drawBricks(time);
     drawPowerUp();
 
     powersLooped(time);
