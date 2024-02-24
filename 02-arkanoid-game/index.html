@@ -41,8 +41,8 @@
   let x = canvas.width / 2;
   let y = canvas.height - 30;
   // velocidad de la pelota
-  let dx = -2;
-  let dy = -2;
+  let dx = -2.5;
+  let dy = -2.5;
 
   /* VARIABLES DE LA PALETA */
   const PADDLE_SENSITIVITY = 8;
@@ -116,7 +116,7 @@
         status: BRICK_STATUS.ACTIVE,
         color: random,
         powerup: {
-          has: Math.random() < 1,
+          has: Math.random() < 0.2, // 20% of probability of contain a powerup
           type: POWERUPS_TYPES[randomPowerup],
         },
       };
@@ -152,6 +152,7 @@
         if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
         const clipX = currentBrick.color * 32;
 
+        //CHAOS
         if (POWER_ACTIVED.Chaos) {
           if (c % 2 == 0) {
             currentBrick.y -= Math.sin(time * 0.1) * 5;
@@ -174,6 +175,61 @@
           brickWidth,
           brickHeight
         );
+      }
+    }
+  }
+
+  // POWERUPS
+  function drawPowerUp() {
+    for (const powerup of currentPowerUps) {
+      powerup.y -= g;
+      //prettier-ignore
+      ctx.drawImage(
+            $powerups,
+            powerup.texCoordX,
+            powerup.texCoordY,
+            128,128,
+            powerup.x,
+            powerup.y,
+            powerup.size,
+            powerup.size);
+
+      // powerup touch ground
+      const intersect = powerup.x + powerup.size > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
+
+      // powerup touch ground
+      let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerup.size > paddleY + paddleHeight;
+
+      if (falls) {
+        // remove powerup when touching the ground
+        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
+      }
+      if (intersect) {
+        //activate power
+        switch (powerup.type) {
+          case POWERUPS_TYPES.Speed:
+            powerSpeed();
+            break;
+          case POWERUPS_TYPES.Sticky:
+            powerSticky();
+            break;
+          case POWERUPS_TYPES.PassThrough:
+            powerPassThrough();
+            break;
+          case POWERUPS_TYPES.PadSizeIncrease:
+            powerPadSizeIncrease();
+            break;
+          case POWERUPS_TYPES.Confuse:
+            powerConfuse();
+            break;
+          case POWERUPS_TYPES.Chaos:
+            powerChaos();
+            break;
+          default:
+            continue;
+        }
+        //remove powerup
+        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
       }
     }
   }
@@ -230,7 +286,7 @@
     setTimeout(() => {
       POWER_ACTIVED.Confuse = false;
       // restore filter
-      ctx.filter = `saturate(100%) hue-rotate(0deg)`;
+      canvas.style.filter = ``;
     }, 5000);
   }
 
@@ -240,11 +296,10 @@
 
     canvas.style.background = "radial-gradient(circle, rgba(111,0,0,1) 0%, rgba(0,0,0,1) 70%)";
     ctx.filter = `opacity(60%) grayscale(0.7)`;
-
     setTimeout(() => {
       POWER_ACTIVED.Chaos = false;
       // restore filter
-      ctx.filter = `opacity(100%) `;
+      ctx.filter = `opacity(100%)`;
       canvas.style.background = `url("./bkg.png") repeat`;
     }, 5000);
   }
@@ -268,60 +323,7 @@
 
     //CONFUSION
     if (POWER_ACTIVED.Confuse) {
-      ctx.filter = `saturate(200%) hue-rotate(${time}deg)`;
-    }
-  }
-  function drawPowerUp() {
-    for (const powerup of currentPowerUps) {
-      powerup.y -= g;
-      //prettier-ignore
-      ctx.drawImage(
-            $powerups,
-            powerup.texCoordX,
-            powerup.texCoordY,
-            100,100,
-            powerup.x,
-            powerup.y,
-            powerup.size,
-            powerup.size);
-
-      // powerup touch ground
-      const intersect = powerup.x + powerup.size > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
-
-      // powerup touch ground
-      let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerup.size > paddleY + paddleHeight;
-
-      if (falls) {
-        // remove powerup when touching the ground
-        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
-      }
-      if (intersect) {
-        //activate power
-        switch (powerup.type) {
-          case POWERUPS_TYPES.Speed:
-            powerSpeed();
-            break;
-          case POWERUPS_TYPES.Sticky:
-            powerSticky();
-            break;
-          case POWERUPS_TYPES.PassThrough:
-            powerPassThrough();
-            break;
-          case POWERUPS_TYPES.PadSizeIncrease:
-            powerPadSizeIncrease();
-            break;
-          case POWERUPS_TYPES.Confuse:
-            powerConfuse();
-            break;
-          case POWERUPS_TYPES.Chaos:
-            powerChaos();
-            break;
-          default:
-            continue;
-        }
-        //remove powerup
-        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
-      }
+      canvas.style.filter = `hue-rotate(${time}deg) invert(75%) `;
     }
   }
 
@@ -345,6 +347,13 @@
 
           if (currentBrick.powerup.has) {
             //push powerup
+            let posX = [0, 1, 2, 0, 1, 2];
+
+            texCoordX = 128 * posX[currentBrick.powerup.type];
+            let texCoordY = 0;
+            if (currentBrick.powerup.type > 2) {
+              texCoordY = 128;
+            }
             let powerup = {
               id: crypto.randomUUID(),
 
@@ -352,9 +361,9 @@
               x: currentBrick.x,
               y: currentBrick.y,
               radius: 10,
-              texCoordX: 100 * currentBrick.powerup.type,
-              texCoordY: 100,
-              size: 25,
+              texCoordX,
+              texCoordY,
+              size: 20,
             };
 
             currentPowerUps.push(powerup);
