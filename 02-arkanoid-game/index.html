@@ -210,6 +210,7 @@
   function initEvents() {
     document.addEventListener('keydown', keyDownHandler)
     document.addEventListener('keyup', keyUpHandler)
+    document.onmousemove = moveMousePaddle;
 
     function keyDownHandler(event) {
       const { key } = event
@@ -230,6 +231,15 @@
     }
   }
 
+
+  function moveMousePaddle(event) {
+    const canv = canvas.getBoundingClientRect(); // Posición del canvas
+    const mousePosX = event.pageX - canv.left; // Posición del ratón en el canvas
+    // El 'paddle' solo se moverá si es dentro del canvas
+    if (mousePosX > 0 && mousePosX < (canvas.width - paddleWidth)) {
+      paddleX = mousePosX;
+    }
+  }
   // a que velocidad de fps queremos que renderice nuestro juego
   const fps = 60
   
