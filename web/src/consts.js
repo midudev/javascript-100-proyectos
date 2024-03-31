@@ -25,4 +25,18 @@ export const PROJECTS = [
     ],
     youtube: 'https://www.youtube.com/watch?v=b6du6MvQmuQ'
   },
+  {
+    slug: "03-midu-typing-game",
+    title: "Reto de Mecanografía",
+    description: "Pon a prueba tus habilidades de mecanografía con este reto",
+    learnings: [
+      "DOM",
+      "Eventos de teclado",
+      "Manejo de clases",
+      "Optimización selectores"
+    ],
+    theme: {
+      isDark: true
+    }
+  }
 ]
