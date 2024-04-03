@@ -10,7 +10,7 @@ export const PROJECTS = [
       "Eventos de mouse y touch",
       "Transiciones CSS",
     ],
-    youtube: "https://www.youtube.com/watch?v=u01WD_YNENY",
+    youtube: 'https://www.youtube.com/watch?v=u01WD_YNENY'
   },
   {
     slug: "02-arkanoid-game",
@@ -21,9 +21,9 @@ export const PROJECTS = [
       "Dibujar en Canvas",
       "Eventos de teclado",
       "RequestAnimationFrame",
-      "Sprites",
+      "Sprites"
     ],
-    youtube: "https://www.youtube.com/watch?v=b6du6MvQmuQ",
+    youtube: 'https://www.youtube.com/watch?v=b6du6MvQmuQ'
   },
   {
     slug: "03-midu-typing-game",
@@ -33,11 +33,10 @@ export const PROJECTS = [
       "DOM",
       "Eventos de teclado",
       "Manejo de clases",
-      "Optimización selectores",
+      "Optimización selectores"
     ],
     theme: {
-      isDark: true,
-    },
-    youtube: "https://www.youtube.com/watch?v=157qVlTelOg&t=135s",
-  },
-];
+      isDark: true
+    }
+  }
+]
