@@ -285,9 +285,7 @@
 
         $input.value = [
           ...$prevWord.querySelectorAll('letter.correct, letter.incorrect')
-        ].map($el => {
-          return $el.classList.contains('correct') ? $el.innerText : '*'
-        })
+        ].map($el => $el.innerText)
           .join('')
       }
     }
