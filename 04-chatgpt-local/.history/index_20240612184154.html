@@ -235,7 +235,6 @@
         const content = choice?.delta?.content ?? ""
         reply += content
         $botMessage.textContent = reply
-        $container.scrollTop = $container.scrollHeight
       }
 
       $button.removeAttribute('disabled')
@@ -243,7 +242,7 @@
         role: 'assistant',
         content: reply
       })
-      
+      $container.scrollTop = $container.scrollHeight
     })
 
     function addMessage(text, sender) {
