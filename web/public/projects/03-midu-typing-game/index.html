@@ -177,6 +177,7 @@
 
   let words = []
   let currentTime = INITIAL_TIME
+  let playing
 
   initGame()
   initEvents()
@@ -185,6 +186,8 @@
     $game.style.display = 'flex'
     $results.style.display = 'none'
     $input.value = ''
+
+    playing = false
 
     words = INITIAL_WORDS.toSorted(
       () => Math.random() - 0.5
@@ -208,25 +211,28 @@
     const $firstWord = $paragraph.querySelector('word')
     $firstWord.classList.add('active')
     $firstWord.querySelector('letter').classList.add('active')
-
-    const intervalId = setInterval(() => {
-      currentTime--
-      $time.textContent = currentTime
-
-      if (currentTime === 0) {
-        clearInterval(intervalId)
-        gameOver()
-      }
-    }, 1000)
   }
 
   function initEvents() {
     document.addEventListener('keydown', () => {
       $input.focus()
+      if (!playing) {
+        playing = true
+        const intervalId = setInterval(() => {
+          currentTime--
+          $time.textContent = currentTime
+
+          if (currentTime === 0) {
+            clearInterval(intervalId)
+            gameOver()
+          }
+        }, 1000)
+      }
     })
     $input.addEventListener('keydown', onKeyDown)
     $input.addEventListener('keyup', onKeyUp)
     $button.addEventListener('click', initGame)
+
   }
 
   function onKeyDown(event) {
