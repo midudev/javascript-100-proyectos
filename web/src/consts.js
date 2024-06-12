@@ -38,6 +38,19 @@ export const PROJECTS = [
     theme: {
       isDark: true
     },
-    youtube: 'https://www.youtube.com/watch?v=157qVlTelOg&t=135s'
+    youtube: 'https://www.youtube.com/watch?v=157qVlTelOg'
+  },
+  {
+    slug: "04-chatgpt-local",
+    title: "ChatGPT local",
+    description: "Usa IA de forma local y gratis. 100% privacidad.",
+    learnings: [
+      "Web Workers",
+      "IA",
+      "ESModules"
+    ],
+    theme: {
+      isDark: false
+    }
   }
 ]
