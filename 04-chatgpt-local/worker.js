@@ -1,4 +1,4 @@
-import { MLCEngineWorkerHandler, MLCEngine } from "https://esm.run/@mlc-ai/web-llm"
+import { WebWorkerMLCEngineHandler, MLCEngine } from "https://esm.run/@mlc-ai/web-llm"
 
 const engine = new MLCEngine()
 const handler = new MLCEngineWorkerHandler(engine)
