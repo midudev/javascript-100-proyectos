@@ -191,7 +191,7 @@
       SELECTED_MODEL,
       {
         initProgressCallback: (info) => {
-          $info.textContent = `${info.text}%`
+          $info.textContent = info.text
           if (info.progress === 1) {
             $loading.parentNode.removeChild($loading)
             $button.removeAttribute('disabled')
