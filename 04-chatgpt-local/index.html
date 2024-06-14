@@ -167,7 +167,12 @@
   </style>
 
   <script type="module">
-    import { CreateWebWorkerMLCEngine } from "https://esm.run/@mlc-ai/web-llm"
+    /* 
+    en el vídeo usamos "https://esm.run/@mlc-ai/web-llm"
+    el problema es que eso siempre es la versión más reciente
+    en el código usamos https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.46/+esm
+    para fijar la versión */
+    import { CreateWebWorkerMLCEngine } from "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.46/+esm"
 
     const $ = el => document.querySelector(el)
 
@@ -183,6 +188,7 @@
     const $loading = $('.loading')
 
     let messages = []
+    let end = false
 
     const SELECTED_MODEL = 'Llama-3-8B-Instruct-q4f32_1-MLC-1k'
 
@@ -192,8 +198,9 @@
       {
         initProgressCallback: (info) => {
           $info.textContent = info.text
-          if (info.progress === 1) {
-            $loading.parentNode.removeChild($loading)
+          if (info.progress === 1 && !end) {
+            end = true
+            $loading?.parentNode?.removeChild($loading)
             $button.removeAttribute('disabled')
             addMessage("¡Hola! Soy un ChatGPT que se ejecuta completamente en tu navegador. ¿En qué puedo ayudarte hoy?", 'bot')
             $input.focus()
