@@ -1,7 +1,7 @@
 ---
 import { PROJECTS } from "../consts"
 
-const finalProjects = PROJECTS.filter((project) => !project.hidden).toReversed()
+const finalProjects = PROJECTS.filter((project) => !project.hidden).slice().reverse()
 ---
 
 <div
