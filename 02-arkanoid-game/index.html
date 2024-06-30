@@ -9,7 +9,7 @@
   canvas {
     border: 4px solid #000;
     border-bottom: transparent;
-    background: url('./bkg.png') repeat;
+    background: url("./bkg.png") repeat;
     margin: 0 auto;
     display: block;
     box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.4);
@@ -21,39 +21,43 @@
 <img hidden id="sprite" src="./sprite.png" alt="Sprite Arkanoid" />
 <img hidden id="bricks" src="./bricks.png" alt="Sprite Bricks Arkanoid" />
 
+<img hidden id="powerups" src="./powerups.png" alt="Sprite Powerups Arkanoid" />
+
 <script>
-  const canvas = document.querySelector('canvas')
-  const ctx = canvas.getContext('2d')
+  const canvas = document.querySelector("canvas");
+  const ctx = canvas.getContext("2d");
 
-  const $sprite = document.querySelector('#sprite')
-  const $bricks = document.querySelector('#bricks')
-
-  canvas.width = 448
-  canvas.height = 400
+  const $sprite = document.querySelector("#sprite");
+  const $bricks = document.querySelector("#bricks");
+  const $powerups = document.querySelector("#powerups");
+  canvas.width = 448;
+  canvas.height = 400;
 
   /* Variables de nuestro juego */
 
   /* VARIABLES DE LA PELOTA */
   const ballRadius = 3;
   // posicion de la pelota
-  let x = canvas.width / 2
-  let y = canvas.height - 30
+  let x = canvas.width / 2;
+  let y = canvas.height - 30;
   // velocidad de la pelota
-  let dx = -3
-  let dy = -3
+  let dx = -2.5;
+  let dy = -2.5;
 
   /* VARIABLES DE LA PALETA */
-  const PADDLE_SENSITIVITY = 8
+  const PADDLE_SENSITIVITY = 8;
 
+  const paddleTexCoordX = 50;
+  const paddleTexCoordY = 10;
   const paddleHeight = 10;
-  const paddleWidth = 50;
+  let paddleWidth = 50;
 
-  let paddleX = (canvas.width - paddleWidth) / 2
-  let paddleY = canvas.height - paddleHeight - 10
+  let paddleX = (canvas.width - paddleWidth) / 2;
+  let paddleY = canvas.height - paddleHeight - 10;
 
-  let rightPressed = false
-  let leftPressed = false
-
+  let rightPressed = false;
+  let leftPressed = false;
+  let spacePressed = false;
   /* VARIABLES DE LOS LADRILLOS */
   const brickRowCount = 6;
   const brickColumnCount = 13;
@@ -66,34 +70,65 @@
 
   const BRICK_STATUS = {
     ACTIVE: 1,
-    DESTROYED: 0
-  }
+    DESTROYED: 0,
+  };
+
+  /*VARIABLES DE LOS POWERUPS*/
+  let currentPowerUps = [];
+
+  let touchAndSticky = false; //used in sticky power
+  let unstoppable = false; //used in PassThrough power
+  let ballPassThroghStyle = ""; // used in PassThrough power
+
+  const g = -0.98;
+  const POWERUPS_TYPES = {
+    Speed: 0,
+    Sticky: 1,
+    PassThrough: 2,
+    PadSizeIncrease: 3,
+    Confuse: 4,
+    Chaos: 5,
+  };
+  const POWER_ACTIVED = {
+    Speed: false,
+    Sticky: false,
+    PassThrough: false,
+    PadSizeIncrease: false,
+    Confuse: false,
+    Chaos: false,
+  };
 
   for (let c = 0; c < brickColumnCount; c++) {
-    bricks[c] = [] // inicializamos con un array vacio
+    bricks[c] = []; // inicializamos con un array vacio
     for (let r = 0; r < brickRowCount; r++) {
       // calculamos la posicion del ladrillo en la pantalla
-      const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft
-      const brickY = r * (brickHeight + brickPadding) + brickOffsetTop
+      const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+      const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
       // Asignar un color aleatorio a cada ladrillo
-      const random = Math.floor(Math.random() * 8)
+      const random = Math.floor(Math.random() * 8);
+      const randomPowerup = Object.keys(POWERUPS_TYPES)[Math.floor(Math.random() * 6)];
       // Guardamos la información de cada ladrillo
       bricks[c][r] = {
         x: brickX,
         y: brickY,
+        originX: brickX, //store origin positions
+        originY: brickY,
         status: BRICK_STATUS.ACTIVE,
-        color: random
-      }
+        color: random,
+        powerup: {
+          has: Math.random() < 0.2, // 20% of probability of contain a powerup
+          type: POWERUPS_TYPES[randomPowerup],
+        },
+      };
     }
   }
 
-
   function drawBall() {
-    ctx.beginPath() // iniciar el trazado
-    ctx.arc(x, y, ballRadius, 0, Math.PI * 2)
-    ctx.fillStyle = '#fff'
-    ctx.fill()
-    ctx.closePath() // terminar el trazado
+    ctx.beginPath(); // iniciar el trazado
+    ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+    ctx.fillStyle = ballPassThroghStyle ? ballPassThroghStyle : "#fff";
+    ctx.fill();
+    ctx.closePath(); // terminar el trazado
   }
 
   function drawPaddle() {
@@ -101,22 +136,33 @@
       $sprite, // imagen
       29, // clipX: coordenadas de recorte
       174, // clipY: coordenadas de recorte
-      paddleWidth, // el tamaño del recorte
-      paddleHeight, // tamaño del recorte
+      paddleTexCoordX, // el tamaño del recorte
+      paddleTexCoordY, // tamaño del recorte
       paddleX, // posición X del dibujo
       paddleY, // posición Y del dibujo
       paddleWidth, // ancho del dibujo
       paddleHeight // alto del dibujo
-    )
+    );
   }
 
-  function drawBricks() {
+  function drawBricks(time) {
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
-        const currentBrick = bricks[c][r]
+        const currentBrick = bricks[c][r];
         if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
+        const clipX = currentBrick.color * 32;
 
-        const clipX = currentBrick.color * 32
+        //CHAOS
+        if (POWER_ACTIVED.Chaos) {
+          if (c % 2 == 0) {
+            currentBrick.y -= Math.sin(time * 0.1) * 5;
+          } else {
+            currentBrick.y += Math.sin(time * 0.1) * 5;
+          }
+        } else {
+          currentBrick.x = currentBrick.originX;
+          currentBrick.y = currentBrick.originY;
+        }
 
         ctx.drawImage(
           $bricks,
@@ -128,32 +174,200 @@
           currentBrick.y,
           brickWidth,
           brickHeight
-        )
+        );
       }
     }
   }
 
+  // POWERUPS
+  function drawPowerUp() {
+    for (const powerup of currentPowerUps) {
+      powerup.y -= g;
+      //prettier-ignore
+      ctx.drawImage(
+            $powerups,
+            powerup.texCoordX,
+            powerup.texCoordY,
+            128,128,
+            powerup.x,
+            powerup.y,
+            powerup.size,
+            powerup.size);
+
+      // powerup touch ground
+      const intersect = powerup.x + powerup.size > paddleX && powerup.x < paddleX + paddleWidth && powerup.y + powerup.size > paddleY;
+
+      // powerup touch ground
+      let falls = powerup.y + powerup.size > canvas.height || powerup.y + powerup.size > paddleY + paddleHeight;
+
+      if (falls) {
+        // remove powerup when touching the ground
+        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
+      }
+      if (intersect) {
+        //activate power
+        switch (powerup.type) {
+          case POWERUPS_TYPES.Speed:
+            powerSpeed();
+            break;
+          case POWERUPS_TYPES.Sticky:
+            powerSticky();
+            break;
+          case POWERUPS_TYPES.PassThrough:
+            powerPassThrough();
+            break;
+          case POWERUPS_TYPES.PadSizeIncrease:
+            powerPadSizeIncrease();
+            break;
+          case POWERUPS_TYPES.Confuse:
+            powerConfuse();
+            break;
+          case POWERUPS_TYPES.Chaos:
+            powerChaos();
+            break;
+          default:
+            continue;
+        }
+        //remove powerup
+        currentPowerUps = currentPowerUps.filter((p) => p.id !== powerup.id);
+      }
+    }
+  }
+
+  function powerSpeed() {
+    if (POWER_ACTIVED.Speed) return;
+    else POWER_ACTIVED.Speed = true;
+    dx *= 2;
+    dy *= 2;
+    setTimeout(() => {
+      dx *= 0.5;
+      dy *= 0.5;
+      POWER_ACTIVED.Speed = false;
+    }, 3000);
+  }
+
+  function powerPadSizeIncrease() {
+    if (POWER_ACTIVED.PadSizeIncrease) return;
+    else POWER_ACTIVED.PadSizeIncrease = true;
+
+    paddleWidth += 40;
+    setTimeout(() => {
+      paddleWidth -= 40;
+      POWER_ACTIVED.PadSizeIncrease = false;
+    }, 3000);
+  }
+
+  function powerSticky() {
+    if (POWER_ACTIVED.Sticky) return;
+    else POWER_ACTIVED.Sticky = true;
+  }
+
+  function powerPassThrough() {
+    if (POWER_ACTIVED.PassThrough) return;
+    else POWER_ACTIVED.PassThrough = true;
+    unstoppable = true;
+    ballPassThroghStyle = "#f00";
+    dx *= 2;
+    dy *= 2;
+
+    setTimeout(() => {
+      unstoppable = false;
+      ballPassThroghStyle = "#fff";
+      dx *= 0.5;
+      dy *= 0.5;
+      POWER_ACTIVED.PassThrough = false;
+    }, 1000);
+  }
+
+  function powerConfuse() {
+    if (POWER_ACTIVED.Confuse) return;
+    else POWER_ACTIVED.Confuse = true;
+
+    setTimeout(() => {
+      POWER_ACTIVED.Confuse = false;
+      // restore filter
+      canvas.style.filter = ``;
+    }, 5000);
+  }
+
+  function powerChaos() {
+    if (POWER_ACTIVED.Chaos) return;
+    else POWER_ACTIVED.Chaos = true;
+
+    canvas.style.background = "radial-gradient(circle, rgba(111,0,0,1) 0%, rgba(0,0,0,1) 70%)";
+    ctx.filter = `opacity(60%) grayscale(0.7)`;
+    setTimeout(() => {
+      POWER_ACTIVED.Chaos = false;
+      // restore filter
+      ctx.filter = `opacity(100%)`;
+      canvas.style.background = `url("./bkg.png") repeat`;
+    }, 5000);
+  }
+
+  function powersLooped(time) {
+    const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth;
+    const isBallTouchingPaddle = y + dy > paddleY;
+
+    //STICKY
+    if (POWER_ACTIVED.Sticky) {
+      if (!touchAndSticky) touchAndSticky = isBallSameXAsPaddle && isBallTouchingPaddle;
+      if (touchAndSticky) {
+        x = paddleX + paddleWidth / 2;
+        y = paddleY;
+        if (spacePressed) {
+          touchAndSticky = false;
+          POWER_ACTIVED.Sticky = false;
+        }
+      }
+    }
+
+    //CONFUSION
+    if (POWER_ACTIVED.Confuse) {
+      canvas.style.filter = `hue-rotate(${time}deg) invert(75%) `;
+    }
+  }
+
   function drawUI() {
-    ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
+    ctx.fillText(`FPS: ${framesPerSec}`, 5, 10);
   }
 
   function collisionDetection() {
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
-        const currentBrick = bricks[c][r]
+        const currentBrick = bricks[c][r];
         if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
 
-        const isBallSameXAsBrick =
-          x > currentBrick.x &&
-          x < currentBrick.x + brickWidth
+        const isBallSameXAsBrick = x > currentBrick.x && x < currentBrick.x + brickWidth;
 
-        const isBallSameYAsBrick =
-          y > currentBrick.y &&
-          y < currentBrick.y + brickHeight
+        const isBallSameYAsBrick = y > currentBrick.y && y < currentBrick.y + brickHeight;
 
         if (isBallSameXAsBrick && isBallSameYAsBrick) {
-          dy = -dy
-          currentBrick.status = BRICK_STATUS.DESTROYED
+          if (!unstoppable) dy = -dy; // pass through power
+          currentBrick.status = BRICK_STATUS.DESTROYED;
+
+          if (currentBrick.powerup.has) {
+            //push powerup
+            let posX = [0, 1, 2, 0, 1, 2];
+
+            texCoordX = 128 * posX[currentBrick.powerup.type];
+            let texCoordY = 0;
+            if (currentBrick.powerup.type > 2) {
+              texCoordY = 128;
+            }
+            let powerup = {
+              id: crypto.randomUUID(),
+
+              type: currentBrick.powerup.type,
+              x: currentBrick.x,
+              y: currentBrick.y,
+              radius: 10,
+              texCoordX,
+              texCoordY,
+              size: 20,
+            };
+
+            currentPowerUps.push(powerup);
+          }
         }
       }
     }
@@ -165,115 +379,119 @@
       x + dx > canvas.width - ballRadius || // la pared derecha
       x + dx < ballRadius // la pared izquierda
     ) {
-      dx = -dx
+      dx = -dx;
     }
 
     // rebotar en la parte de arriba
     if (y + dy < ballRadius) {
-      dy = -dy
+      dy = -dy;
     }
 
     // la pelota toca la pala
-    const isBallSameXAsPaddle =
-      x > paddleX &&
-      x < paddleX + paddleWidth
+    const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth;
 
-    const isBallTouchingPaddle =
-      y + dy > paddleY
+    const isBallTouchingPaddle = y + dy > paddleY;
 
     if (isBallSameXAsPaddle && isBallTouchingPaddle) {
-      dy = -dy // cambiamos la dirección de la pelota
-    } else if ( // la pelota toca el suelo
-      y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
+      dy = -dy; // cambiamos la dirección de la pelota
+    } else if (
+      // la pelota toca el suelo
+      y + dy > canvas.height - ballRadius ||
+      y + dy > paddleY + paddleHeight
     ) {
-      console.log('Game Over')
-      document.location.reload()
+      console.log("Game Over");
+      document.location.reload();
     }
 
     // mover la pelota
-    x += dx
-    y += dy
+    x += dx;
+    y += dy;
   }
 
   function paddleMovement() {
     if (rightPressed && paddleX < canvas.width - paddleWidth) {
-      paddleX += PADDLE_SENSITIVITY
+      paddleX += PADDLE_SENSITIVITY;
     } else if (leftPressed && paddleX > 0) {
-      paddleX -= PADDLE_SENSITIVITY
+      paddleX -= PADDLE_SENSITIVITY;
     }
   }
 
   function cleanCanvas() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 
   function initEvents() {
-    document.addEventListener('keydown', keyDownHandler)
-    document.addEventListener('keyup', keyUpHandler)
+    document.addEventListener("keydown", keyDownHandler);
+    document.addEventListener("keyup", keyUpHandler);
 
     function keyDownHandler(event) {
-      const { key } = event
-      if (key === 'Right' || key === 'ArrowRight' || key.toLowerCase() === 'd') {
-        rightPressed = true
-      } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
-        leftPressed = true
+      const { key, code } = event;
+      if (key === "Right" || key === "ArrowRight" || key.toLowerCase() === "d") {
+        rightPressed = true;
+      } else if (key === "Left" || key === "ArrowLeft" || key.toLowerCase() === "a") {
+        leftPressed = true;
+      } else if (code === "Space") {
+        spacePressed = true;
       }
     }
 
     function keyUpHandler(event) {
-      const { key } = event
-      if (key === 'Right' || key === 'ArrowRight' || key.toLowerCase() === 'd') {
-        rightPressed = false
-      } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
-        leftPressed = false
+      const { key, code } = event;
+      if (key === "Right" || key === "ArrowRight" || key.toLowerCase() === "d") {
+        rightPressed = false;
+      } else if (key === "Left" || key === "ArrowLeft" || key.toLowerCase() === "a") {
+        leftPressed = false;
+      } else if (code === "Space") {
+        spacePressed = false;
       }
     }
   }
 
   // a que velocidad de fps queremos que renderice nuestro juego
-  const fps = 60
-  
-  let msPrev = window.performance.now()
+  const fps = 60;
+
+  let msPrev = window.performance.now();
   let msFPSPrev = window.performance.now() + 1000;
-  const msPerFrame = 1000 / fps
-  let frames = 0
+  const msPerFrame = 1000 / fps;
+  let frames = 0;
   let framesPerSec = fps;
 
   function draw() {
-    window.requestAnimationFrame(draw)
+    let time = window.requestAnimationFrame(draw);
 
-    const msNow = window.performance.now()
-    const msPassed = msNow - msPrev
+    const msNow = window.performance.now();
+    const msPassed = msNow - msPrev;
 
-    if (msPassed < msPerFrame) return
+    if (msPassed < msPerFrame) return;
 
-    const excessTime = msPassed % msPerFrame
-    msPrev = msNow - excessTime
+    const excessTime = msPassed % msPerFrame;
+    msPrev = msNow - excessTime;
 
-    frames++
+    frames++;
 
-    if (msFPSPrev < msNow)
-    {
-      msFPSPrev = window.performance.now() + 1000
+    if (msFPSPrev < msNow) {
+      msFPSPrev = window.performance.now() + 1000;
       framesPerSec = frames;
       frames = 0;
     }
 
     // ... render code
-    cleanCanvas()
+    cleanCanvas();
     // hay que dibujar los elementos
-    drawBall()
-    drawPaddle()
-    drawBricks()
-    drawUI()
+    drawBall();
+    drawPaddle();
+    drawBricks(time);
+    drawPowerUp();
+
+    powersLooped(time);
+    drawUI();
 
     // colisiones y movimientos
-    collisionDetection()
-    ballMovement()
-    paddleMovement()
-
+    collisionDetection();
+    ballMovement();
+    paddleMovement();
   }
 
-  draw()
-  initEvents()
+  draw();
+  initEvents();
 </script>
