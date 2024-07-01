@@ -2,6 +2,7 @@ export const PROJECTS = [
   {
     slug: "01-tinder-swipe",
     title: "Tinder Swipe",
+    hidden: false,
     description:
       "Aprende a crear el efecto de swipe de Tinder con HTML, CSS y JavaScript.",
     learnings: [
@@ -67,5 +68,19 @@ export const PROJECTS = [
       isDark: true
     },
     youtube: "https://www.youtube.com/watch?v=6AMKwVcpYTk"
+  },
+  {
+    slug: "06-tetris-canvas",
+    title: "Tetris en Canvas",
+    description: "Resolvemos una prueba técnica que te propone crear el Tetris en 40 minutos",
+    learnings: [
+      "Canvas",
+      "Eventos de teclado",
+      "Lógica de programación"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: "https://www.youtube.com/watch?v=pNiyz0sl1no"
   },
 ]
