@@ -14,7 +14,7 @@
     "@astrojs/check": "0.7.0",
     "@astrojs/tailwind": "5.1.0",
     "@midudev/tailwind-animations": "0.0.7",
-    "astro": "4.10.2",
+    "astro": "4.11.3",
     "tailwindcss": "3.4.4",
     "typescript": "5.4.5"
   }

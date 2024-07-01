@@ -55,17 +55,16 @@ export const PROJECTS = [
     youtube: "https://www.youtube.com/watch?v=HvoiF1MCPGs"
   },
   {
-    slug: "XX-api-geo-ip",
-    hidden: true,
+    slug: "05-api-geo-ip",
     title: "Buscar info de IP",
-    description: "Llama a una API para obtener información de IP",
+    description: "Llama a una API para obtener información de cualquier IP y muestra la información en pantalla",
     learnings: [
       "Fetch API",
       "Formularios",
       "Asincronía"
     ],
     theme: {
-      isDark: false
+      isDark: true
     },
     youtube: "https://www.youtube.com/watch?v=6AMKwVcpYTk"
   },

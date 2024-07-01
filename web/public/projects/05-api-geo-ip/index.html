@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IP Geolocation</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="module">
+    const OPTIONS = {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': 'XXX',
+        'X-RapidAPI-Host': 'YYY'
+      }
+    }
+
+    const fetchIpInfo = ip => {
+      return fetch(`https://freeipapi.com/api/json/${ip}`, OPTIONS)
+        .then(res => res.json())
+        .catch(err => console.error(err))
+    }
+
+    const $ = selector => document.querySelector(selector)
+
+    const $form = $('#form')
+    const $input = $('#input')
+    const $submit = $('#submit')
+    const $results = $('#results')
+
+    $form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const {value} = $input
+      if (!value) return
+
+      $submit.setAttribute('disabled', '')
+      $submit.setAttribute('aria-busy', 'true')
+
+      const ipInfo = await fetchIpInfo(value)
+
+      if (ipInfo) {
+        $results.innerHTML = JSON.stringify(ipInfo, null, 2)
+      }
+
+      $submit.removeAttribute('disabled')
+      $submit.removeAttribute('aria-busy')
+
+    })
+  </script>
+</head>
+
+<body>
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
+
+  <main class="container">
+    <form id="form">
+      <label>
+        IP del usuario
+        <input required id="input" type="text" placeholder="Introduce aquí la IP">
+        <small>Por ejemplo: 54.85.132.205</small>
+      </label>
+
+      <button type="submit" id="submit">
+        Buscar información de esta IP
+      </button>
+
+    </form>
+
+    <div>
+      <pre id="results"></pre>
+    </div>
+  </main>
+
+</body>
+
+</html>
