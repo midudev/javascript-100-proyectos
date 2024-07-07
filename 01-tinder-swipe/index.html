@@ -8,20 +8,7 @@
     </header>
 
     <div class="cards">
-      <article>
-        <img src="./photos/2.webp" alt="Álex, brown hair man, 25 years old" />
-        <h2>Álex <span>25</span></h2>
-        <div class="choice nope">NOPE</div>
-        <div class="choice like">LIKE</div>
-      </article>
-
-      <article>
-        <img src="./photos/1.webp" alt="Leila, redhead, 25 years old" />
-        <h2>Leila <span>27</span></h2>
-        <div class="choice nope">NOPE</div>
-        <div class="choice like">LIKE</div>
-      </article>
-
+      <div id="cardsContainer"></div>
       <span>
         No hay más personas cerca de ti...<br />
         Vuelve a intentarlo más tarde
@@ -29,7 +16,7 @@
     </div>
 
     <footer>
-      <button class="is-undo" aria-label="undo"></button>
+      <button class="is-undo" aria-label="undo" id="restart"></button>
       <button class="is-remove is-big" aria-label="remove"></button>
       <button class="is-star" aria-label="star"></button>
       <button class="is-fav is-big" aria-label="fav"></button>
@@ -250,7 +237,20 @@
 </style>
 
 <script>
+  const PEOPLE = [
+    {
+      name: 'Álex',
+      age: 25,
+      photo: './photos/2.webp'
+    },
+    {
+      name: 'Leila',
+      age: 27,
+      photo: './photos/1.webp'
+    }]
   const DECISION_THRESHOLD = 75
+  const $resetBtn = document.getElementById('restart') // Para una mejor UX el usuario puede reiniciar
+  const $cardsContainer = document.getElementById('cardsContainer')
 
   let isAnimating = false
   let pullDeltaX = 0 // distance from the card being dragged
@@ -341,14 +341,29 @@
         pullDeltaX = 0
         isAnimating = false
       })
-
-      // reset the choice info opacity
-      actualCard
-        .querySelectorAll(".choice")
-        .forEach((el) => (el.style.opacity = 0));
     }
+  }
+
+  function drawCards(listOfPeople) {
+    listOfPeople.forEach(person => {
+      const card = document.createElement('article')
+      card.innerHTML = `
+        <img src="${person.photo}" alt="${person.name}, ${person.age} years old" />
+        <h2>${person.name} <span>${person.age}</span></h2>
+        <div class="choice nope">NOPE</div>
+        <div class="choice like">LIKE</div>
+      `
+      $cardsContainer.appendChild(card)
+    })
   }
 
   document.addEventListener('mousedown', startDrag)
   document.addEventListener('touchstart', startDrag, { passive: true })
+  $resetBtn.addEventListener('click', () => {
+    $cardsContainer.innerHTML = ''
+    drawCards(PEOPLE)
+  
+  })
+
+  drawCards(PEOPLE)
 </script>
