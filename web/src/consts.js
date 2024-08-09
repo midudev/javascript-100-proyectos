@@ -83,4 +83,17 @@ export const PROJECTS = [
     },
     youtube: "https://www.youtube.com/watch?v=pNiyz0sl1no"
   },
+  {
+    slug: "07-tier-maker",
+    title: "Tier Maker con JavaScript",
+    description: "Arrastra y suelta las imágenes para crear tus propias listas de niveles",
+    learnings: [
+      "Drag & Drop",
+      "Input de imágenes",
+      "CSS Custom Properties"
+    ],
+    theme: {
+      isDark: true
+    }
+  },
 ]
