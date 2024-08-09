@@ -312,6 +312,18 @@
           })
         })
     })
+
+    window.checkContent = function (element) {
+      if (!element.textContent.trim()) {
+        element.textContent = element.dataset.originalContent
+      }
+    }
+
+    const spans = $$('.label [contenteditable]')
+    spans.forEach((span) => {
+      span.dataset.originalContent = span.textContent
+    })
+
   </script>
 </head>
 
@@ -323,37 +335,37 @@
   <section class="tier">
     <div class="row">
       <aside class="label" style="--level: var(--color-s)">
-        <span contenteditable="true">S</span>
+        <span contenteditable="true", onblur=checkContent(this)>S</span>
       </aside>
     </div>
 
     <div class="row">
       <aside class="label" style="--level: var(--color-a)">
-        <span contenteditable="true">A</span>
+        <span contenteditable="true", onblur=checkContent(this)>A</span>
       </aside>
     </div>
 
     <div class="row">
       <aside class="label" style="--level: var(--color-b)">
-        <span contenteditable="true">B</span>
+        <span contenteditable="true", onblur=checkContent(this)>B</span>
       </aside>
     </div>
 
     <div class="row">
       <aside class="label" style="--level: var(--color-c)">
-        <span contenteditable="true">C</span>
+        <span contenteditable="true", onblur=checkContent(this)>C</span>
       </aside>
     </div>
 
     <div class="row">
       <aside class="label" style="--level: var(--color-d)">
-        <span contenteditable="true">D</span>
+        <span contenteditable="true", onblur=checkContent(this)>D</span>
       </aside>
     </div>
 
     <div class="row">
       <aside class="label" style="--level: var(--color-e)">
-        <span contenteditable="true">E</span>
+        <span contenteditable="true", onblur=checkContent(this)>E</span>
       </aside>
     </div>
   </section>
