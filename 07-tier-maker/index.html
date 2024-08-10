@@ -222,6 +222,7 @@
 
     function handleDropFromDesktop(event) {
       event.preventDefault()
+      if (sourceContainer) return
       const { currentTarget, dataTransfer } = event
 
       if (dataTransfer.types.includes('Files')) {
