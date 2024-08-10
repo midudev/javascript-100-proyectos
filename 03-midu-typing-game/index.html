@@ -246,11 +246,10 @@
     $input.addEventListener("keydown", onKeyDown);
     $input.addEventListener("keyup", onKeyUp);
     $button.addEventListener("click", initGame);
+    document.addEventListener("mousemove", onMouseMove);
   }
 
   function onKeyDown(event) {
-    document.addEventListener("mousemove", onMouseMove);
-
     // Desaparece el cursor cuando el usuario empieza a escribir
     document.body.style.cursor = "none";
 
