@@ -218,7 +218,7 @@
 
       if (dataTransfer.types.includes('Files')) {
         currentTarget.classList.add('drag-files')
-      } 
+      }
     }
 
     function handleDropFromDesktop(event) {
@@ -229,7 +229,7 @@
         currentTarget.classList.remove('drag-files')
         const { files } = dataTransfer
         useFilesToCreateItems(files)
-      } 
+      }
     }
 
     function handleDrop(event) {
@@ -273,7 +273,7 @@
 
       const { currentTarget } = event
       currentTarget.classList.remove('drag-over')
-      currentTarget.classList.remove('drag-files');
+      currentTarget.classList.remove('drag-files')
       currentTarget.querySelector('.drag-preview')?.remove()
     }
 
