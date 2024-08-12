@@ -174,6 +174,7 @@
     }
 
     function useFilesToCreateItems(files) {
+      if (draggedElement) return
       if (files && files.length > 0) {
         Array.from(files).forEach(file => {
           const reader = new FileReader()
@@ -217,7 +218,7 @@
 
       if (dataTransfer.types.includes('Files')) {
         currentTarget.classList.add('drag-files')
-      }
+      } 
     }
 
     function handleDropFromDesktop(event) {
@@ -228,7 +229,7 @@
         currentTarget.classList.remove('drag-files')
         const { files } = dataTransfer
         useFilesToCreateItems(files)
-      }
+      } 
     }
 
     function handleDrop(event) {
@@ -272,6 +273,7 @@
 
       const { currentTarget } = event
       currentTarget.classList.remove('drag-over')
+      currentTarget.classList.remove('drag-files');
       currentTarget.querySelector('.drag-preview')?.remove()
     }
 
