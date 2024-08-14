@@ -186,6 +186,7 @@
     } else if ( // la pelota toca el suelo
       y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
     ) {
+      gameOver = true
       console.log('Game Over')
       document.location.reload()
     }
@@ -239,7 +240,11 @@
   let frames = 0
   let framesPerSec = fps;
 
+  let gameOver = false;
+
   function draw() {
+    if (gameOver) return
+    
     window.requestAnimationFrame(draw)
 
     const msNow = window.performance.now()
