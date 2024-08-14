@@ -97,4 +97,17 @@ export const PROJECTS = [
     },
     youtube: 'https://www.youtube.com/watch?v=LPzG0PnOzgA'
   },
+  {
+    slug: "08-excel-js",
+    title: "Hojas de cálculo con JavaScript",
+    description: "Crea tu propio Excel sin dependencias y funcional",
+    learnings: [
+      "Tablas",
+      "Eventos de Input: focus y blur",
+      "Eval"
+    ],
+    theme: {
+      isDark: true
+    }
+  },
 ]
