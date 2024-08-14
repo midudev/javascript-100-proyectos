@@ -107,7 +107,7 @@ export const PROJECTS = [
       "Eval"
     ],
     theme: {
-      isDark: true
+      isDark: false
     }
   },
 ]
