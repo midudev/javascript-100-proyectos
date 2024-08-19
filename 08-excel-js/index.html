@@ -111,7 +111,7 @@
 
       newState[x][y] = cell
 
-      computeAllCells(newState, generateCellsConstants(newState))
+      computeAllCells(newState)
 
       STATE = newState
 
@@ -128,10 +128,11 @@
       }).join('\n')
     }
 
-    function computeAllCells(cells, constants) {
+    function computeAllCells(cells) {
       console.log('computeAllCells')
       cells.forEach((rows, x) => {
         rows.forEach((cell, y) => {
+          const constants = generateCellsConstants(cells)
           const computedValue = computeValue(cell.value, constants)
           cell.computedValue = computedValue
         })
