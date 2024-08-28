@@ -106,10 +106,10 @@
         &[disabled] {
           background: #ccc;
           opacity: .6;
-          pointer-events: none;
+          cursor: not-allowed;
         }
 
-        &:hover {
+        &:not(:disabled):hover {
           background: rgb(0, 104, 173);
         }
       }
