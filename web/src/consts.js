@@ -108,6 +108,20 @@ export const PROJECTS = [
     ],
     theme: {
       isDark: false
+    },
+    youtube: 'https://www.youtube.com/watch?v=z5CRFM2SlUU'
+  },
+  {
+    slug: "09-paint-win-95",
+    title: "Paint con Canvas",
+    description: "Crea un editor de imágenes clásico con <canvas>",
+    learnings: [
+      "Grid Area",
+      "Canvas",
+      "EyeDropper API"
+    ],
+    theme: {
+      isDark: true
     }
   },
 ]
