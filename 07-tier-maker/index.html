@@ -240,6 +240,7 @@
         sourceContainer.removeChild(draggedElement)
       }
 
+      if (sourceContainer === currentTarget && sourceContainer.id === 'selector-items') return
       if (draggedElement) {
         const src = dataTransfer.getData('text/plain')
         const imgElement = createItem(src)
