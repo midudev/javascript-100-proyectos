@@ -28,7 +28,7 @@
   }
 
   time {
-    color: var(--yellow)
+    color: var(--yellow);
   }
 
   input {
@@ -52,7 +52,7 @@
     position: relative;
 
     &.active::before {
-      content: '|';
+      content: "|";
       color: var(--yellow);
       font-size: 14px;
       position: absolute;
@@ -83,7 +83,6 @@
   }
 
   @keyframes blink {
-
     0%,
     25% {
       opacity: 1;
@@ -104,7 +103,7 @@
 
   h2 {
     font-weight: 400;
-    opacity: .4;
+    opacity: 0.4;
     margin: 0;
     font-size: 16px;
   }
@@ -121,7 +120,7 @@
     border: 0;
     margin-top: 32px;
     padding: 8px;
-    opacity: .4;
+    opacity: 0.4;
     display: inline-block;
     transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
     cursor: pointer;
@@ -133,14 +132,35 @@
       scale: 110%;
     }
   }
+  #language {
+    display: flex;
+    align-items: center;
+    color: var(--gray);
+  }
+  #select-language {
+    width: 135px;
+    background-color: var(--black);
+    color: var(--gray);
+    option {
+      background-color: var(--black);
+      color: var(--gray);
+    }
+  }
 </style>
 
 <body>
   <main>
+    <section id="language">
+      <label>Language</label>
+      <select title="Language" id="select-language">
+        <option selected value="english">English</option>
+        <option value="spanish">Spanish</option>
+      </select>
+    </section>
     <section id="game">
       <time></time>
       <p></p>
-      <input autofocus>
+      <input autofocus />
     </section>
     <section id="results">
       <h2>wpm</h2>
@@ -150,10 +170,20 @@
       <h3 id="results-accuracy"></h3>
 
       <button id="reload-button">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-          stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-          <path d="M19.933 13.041a8 8 0 1 1 -9.925 -8.788c3.899 -1 7.935 1.007 9.425 4.747" />
+          <path
+            d="M19.933 13.041a8 8 0 1 1 -9.925 -8.788c3.899 -1 7.935 1.007 9.425 4.747"
+          />
           <path d="M20 4v5h-5" />
         </svg>
       </button>
@@ -162,186 +192,203 @@
 </body>
 
 <script type="module">
-  import { words as INITIAL_WORDS } from './data.js'
+  import { words as w } from "./data.js";
+  import { palabras as p } from "./datos.js";
 
-  const $time = document.querySelector('time');
-  const $paragraph = document.querySelector('p');
-  const $input = document.querySelector('input');
-  const $game = document.querySelector('#game')
-  const $results = document.querySelector('#results')
-  const $wpm = $results.querySelector('#results-wpm')
-  const $accuracy = $results.querySelector('#results-accuracy')
-  const $button = document.querySelector('#reload-button')
+  const $time = document.querySelector("time");
+  const $paragraph = document.querySelector("p");
+  const $input = document.querySelector("input");
+  const $game = document.querySelector("#game");
+  const $results = document.querySelector("#results");
+  const $wpm = $results.querySelector("#results-wpm");
+  const $accuracy = $results.querySelector("#results-accuracy");
+  const $button = document.querySelector("#reload-button");
 
   const INITIAL_TIME = 30;
 
-  let words = []
-  let currentTime = INITIAL_TIME
-  let playing
+  let words = [];
+  let currentTime = INITIAL_TIME;
+  let playing;
 
-  initGame()
-  initEvents()
+  var INITIAL_WORDS = w;
+  initGame();
+  initEvents();
+
+  var yourSelect = document.getElementById("select-language");
+
+  function onChange() {
+    gameOver();
+    var value = yourSelect.value;
+    var text = yourSelect.options[yourSelect.selectedIndex].text;
+    if (text.toLowerCase() == "english") {
+      INITIAL_WORDS = w;
+    } else if (text.toLowerCase() == "spanish") {
+      INITIAL_WORDS = p;
+    }
+    initGame();
+  }
+  yourSelect.onchange = onChange;
+  onChange();
 
   function initGame() {
-    $game.style.display = 'flex'
-    $results.style.display = 'none'
-    $input.value = ''
+    $game.style.display = "flex";
+    $results.style.display = "none";
+    $input.value = "";
 
-    playing = false
+    playing = false;
 
-    words = INITIAL_WORDS.toSorted(
-      () => Math.random() - 0.5
-    ).slice(0, 50)
-    currentTime = INITIAL_TIME
+    words = INITIAL_WORDS.toSorted(() => Math.random() - 0.5).slice(0, 50);
+    currentTime = INITIAL_TIME;
 
-    $time.textContent = currentTime
+    $time.textContent = currentTime;
 
-    $paragraph.innerHTML = words.map((word, index) => {
-      const letters = word.split('')
+    $paragraph.innerHTML = words
+      .map((word, index) => {
+        const letters = word.split("");
 
-      return `<word>
-        ${letters
-          .map(letter => `<letter>${letter}</letter>`)
-          .join('')
-        }
+        return `<word>
+        ${letters.map((letter) => `<letter>${letter}</letter>`).join("")}
       </word>
-      `
-    }).join('')
+      `;
+      })
+      .join("");
 
-    const $firstWord = $paragraph.querySelector('word')
-    $firstWord.classList.add('active')
-    $firstWord.querySelector('letter').classList.add('active')
+    const $firstWord = $paragraph.querySelector("word");
+    $firstWord.classList.add("active");
+    $firstWord.querySelector("letter").classList.add("active");
   }
 
   function initEvents() {
-    document.addEventListener('keydown', () => {
-      $input.focus()
+    document.addEventListener("keydown", () => {
+      $input.focus();
       if (!playing) {
-        playing = true
+        playing = true;
         const intervalId = setInterval(() => {
-          currentTime--
-          $time.textContent = currentTime
+          currentTime--;
+          $time.textContent = currentTime;
 
           if (currentTime === 0) {
-            clearInterval(intervalId)
-            gameOver()
+            clearInterval(intervalId);
+            gameOver();
           }
-        }, 1000)
+        }, 1000);
       }
-    })
-    $input.addEventListener('keydown', onKeyDown)
-    $input.addEventListener('keyup', onKeyUp)
-    $button.addEventListener('click', initGame)
-
+    });
+    $input.addEventListener("keydown", onKeyDown);
+    $input.addEventListener("keyup", onKeyUp);
+    $button.addEventListener("click", initGame);
   }
 
   function onKeyDown(event) {
-    const $currentWord = $paragraph.querySelector('word.active')
-    const $currentLetter = $currentWord.querySelector('letter.active')
+    const $currentWord = $paragraph.querySelector("word.active");
+    const $currentLetter = $currentWord.querySelector("letter.active");
 
-    const { key } = event
-    if (key === ' ') {
-      event.preventDefault()
+    const { key } = event;
+    if (key === " ") {
+      event.preventDefault();
 
-      const $nextWord = $currentWord.nextElementSibling
-      const $nextLetter = $nextWord.querySelector('letter')
+      const $nextWord = $currentWord.nextElementSibling;
+      const $nextLetter = $nextWord.querySelector("letter");
 
-      $currentWord.classList.remove('active', 'marked')
-      $currentLetter.classList.remove('active')
+      $currentWord.classList.remove("active", "marked");
+      $currentLetter.classList.remove("active");
 
-      $nextWord.classList.add('active')
-      $nextLetter.classList.add('active')
+      $nextWord.classList.add("active");
+      $nextLetter.classList.add("active");
 
-      $input.value = ''
+      $input.value = "";
 
-      const hasMissedLetters = $currentWord
-        .querySelectorAll('letter:not(.correct)').length > 0
+      const hasMissedLetters =
+        $currentWord.querySelectorAll("letter:not(.correct)").length > 0;
 
-      const classToAdd = hasMissedLetters ? 'marked' : 'correct'
-      $currentWord.classList.add(classToAdd)
+      const classToAdd = hasMissedLetters ? "marked" : "correct";
+      $currentWord.classList.add(classToAdd);
 
-      return
+      return;
     }
 
-    if (key === 'Backspace') {
-      const $prevWord = $currentWord.previousElementSibling
-      const $prevLetter = $currentLetter.previousElementSibling
+    if (key === "Backspace") {
+      const $prevWord = $currentWord.previousElementSibling;
+      const $prevLetter = $currentLetter.previousElementSibling;
 
       if (!$prevWord && !$prevLetter) {
-        event.preventDefault()
-        return
+        event.preventDefault();
+        return;
       }
 
-      const $wordMarked = $paragraph.querySelector('word.marked')
+      const $wordMarked = $paragraph.querySelector("word.marked");
       if ($wordMarked && !$prevLetter) {
-        event.preventDefault()
-        $prevWord.classList.remove('marked')
-        $prevWord.classList.add('active')
+        event.preventDefault();
+        $prevWord.classList.remove("marked");
+        $prevWord.classList.add("active");
 
-        const $letterToGo = $prevWord.querySelector('letter:last-child')
+        const $letterToGo = $prevWord.querySelector("letter:last-child");
 
-        $currentLetter.classList.remove('active')
-        $letterToGo.classList.add('active')
+        $currentLetter.classList.remove("active");
+        $letterToGo.classList.add("active");
 
         $input.value = [
-          ...$prevWord.querySelectorAll('letter.correct, letter.incorrect')
-        ].map($el => {
-          return $el.classList.contains('correct') ? $el.innerText : '*'
-        })
-          .join('')
+          ...$prevWord.querySelectorAll("letter.correct, letter.incorrect"),
+        ]
+          .map(($el) => {
+            return $el.classList.contains("correct") ? $el.innerText : "*";
+          })
+          .join("");
       }
     }
   }
 
   function onKeyUp() {
     // recuperamos los elementos actuals
-    const $currentWord = $paragraph.querySelector('word.active')
-    const $currentLetter = $currentWord.querySelector('letter.active')
+    const $currentWord = $paragraph.querySelector("word.active");
+    const $currentLetter = $currentWord.querySelector("letter.active");
 
-    const currentWord = $currentWord.innerText.trim()
-    $input.maxLength = currentWord.length
+    const currentWord = $currentWord.innerText.trim();
+    $input.maxLength = currentWord.length;
 
-    const $allLetters = $currentWord.querySelectorAll('letter')
+    const $allLetters = $currentWord.querySelectorAll("letter");
 
-    $allLetters.forEach($letter => $letter.classList.remove('correct', 'incorrect'))
+    $allLetters.forEach(($letter) =>
+      $letter.classList.remove("correct", "incorrect")
+    );
 
-    $input.value.split('').forEach((char, index) => {
-      const $letter = $allLetters[index]
-      const letterToCheck = currentWord[index]
+    $input.value.split("").forEach((char, index) => {
+      const $letter = $allLetters[index];
+      const letterToCheck = currentWord[index];
 
-      const isCorrect = char === letterToCheck
-      const letterClass = isCorrect ? 'correct' : 'incorrect'
-      $letter.classList.add(letterClass)
-    })
+      const isCorrect = char === letterToCheck;
+      const letterClass = isCorrect ? "correct" : "incorrect";
+      $letter.classList.add(letterClass);
+    });
 
-    $currentLetter.classList.remove('active', 'is-last')
-    const inputLength = $input.value.length
-    const $nextActiveLetter = $allLetters[inputLength]
+    $currentLetter.classList.remove("active", "is-last");
+    const inputLength = $input.value.length;
+    const $nextActiveLetter = $allLetters[inputLength];
 
     if ($nextActiveLetter) {
-      $nextActiveLetter.classList.add('active')
+      $nextActiveLetter.classList.add("active");
     } else {
-      $currentLetter.classList.add('active', 'is-last')
+      $currentLetter.classList.add("active", "is-last");
       // TODO: gameover si no hay próxima palabra
     }
   }
 
   function gameOver() {
-    $game.style.display = 'none'
-    $results.style.display = 'flex'
+    $game.style.display = "none";
+    $results.style.display = "flex";
 
-    const correctWords = $paragraph.querySelectorAll('word.correct').length
-    const correctLetter = $paragraph.querySelectorAll('letter.correct').length
-    const incorrectLetter = $paragraph.querySelectorAll('letter.incorrect').length
+    const correctWords = $paragraph.querySelectorAll("word.correct").length;
+    const correctLetter = $paragraph.querySelectorAll("letter.correct").length;
+    const incorrectLetter =
+      $paragraph.querySelectorAll("letter.incorrect").length;
 
-    const totalLetters = correctLetter + incorrectLetter
+    const totalLetters = correctLetter + incorrectLetter;
 
-    const accuracy = totalLetters > 0
-      ? (correctLetter / totalLetters) * 100
-      : 0
+    const accuracy =
+      totalLetters > 0 ? (correctLetter / totalLetters) * 100 : 0;
 
-    const wpm = correctWords * 60 / INITIAL_TIME
-    $wpm.textContent = wpm
-    $accuracy.textContent = `${accuracy.toFixed(2)}%`
+    const wpm = (correctWords * 60) / INITIAL_TIME;
+    $wpm.textContent = wpm;
+    $accuracy.textContent = `${accuracy.toFixed(2)}%`;
   }
 </script>
