@@ -154,6 +154,29 @@
   <script type="module">
     const $ = el => document.querySelector(el)
     const $$ = el => document.querySelectorAll(el)
+    const INITIAL_ROWS = [
+      "s",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e"
+    ]
+    const tierContainer = $('.tier')
+    addInitialRows(INITIAL_ROWS)
+
+    function addInitialRows(rows) {
+      rows.forEach(letter => {
+        const row = document.createElement('div')
+        row.className = 'row'
+        const aside = document.createElement('aside')
+        aside.className = 'label'
+        aside.style.setProperty('--level', `var(--color-${letter})`)
+        aside.innerHTML = `<span contenteditable="true">${letter.toUpperCase()}</span>`
+        row.appendChild(aside)
+        tierContainer.appendChild(row)
+      })
+    }
 
     const imageInput = $('#image-input')
     const itemsSection = $('#selector-items')
@@ -320,43 +343,7 @@
     <img src="https://tiermaker.com/images/tiermaker-logo.png" />
   </header>
 
-  <section class="tier">
-    <div class="row">
-      <aside class="label" style="--level: var(--color-s)">
-        <span contenteditable="true">S</span>
-      </aside>
-    </div>
-
-    <div class="row">
-      <aside class="label" style="--level: var(--color-a)">
-        <span contenteditable="true">A</span>
-      </aside>
-    </div>
-
-    <div class="row">
-      <aside class="label" style="--level: var(--color-b)">
-        <span contenteditable="true">B</span>
-      </aside>
-    </div>
-
-    <div class="row">
-      <aside class="label" style="--level: var(--color-c)">
-        <span contenteditable="true">C</span>
-      </aside>
-    </div>
-
-    <div class="row">
-      <aside class="label" style="--level: var(--color-d)">
-        <span contenteditable="true">D</span>
-      </aside>
-    </div>
-
-    <div class="row">
-      <aside class="label" style="--level: var(--color-e)">
-        <span contenteditable="true">E</span>
-      </aside>
-    </div>
-  </section>
+  <section class="tier"></section>
 
   <footer id="selector">
 
