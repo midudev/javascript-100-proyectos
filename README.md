@@ -1,3 +1,4 @@
+<!-- solo comentarios -->
 <div align="center">
     <a href="https://www.javascript100.dev">
     <img src="./web/public/readme.jpg" /> 
