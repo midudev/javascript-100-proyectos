@@ -136,6 +136,7 @@ export const PROJECTS = [
     ],
     theme: {
       isDark: true
-    }
+    },
+    youtube: 'https://www.youtube.com/watch?v=IEwL-TZBeqQ'
   },
 ]
