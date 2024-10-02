@@ -125,4 +125,17 @@ export const PROJECTS = [
     },
     youtube: 'https://www.youtube.com/watch?v=-0UYMmplimA'
   },
+  {
+    slug: "10-stack-game",
+    title: "Stack Game",
+    description: "Juego donde hay que apilar las piezas verticalmente",
+    learnings: [
+      "Canvas",
+      "Lógica de programación",
+      "Eventos de teclado"
+    ],
+    theme: {
+      isDark: true
+    }
+  },
 ]
