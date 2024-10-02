@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dado 3D</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #282c34;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    .scene {
+      width: 200px;
+      height: 200px;
+      perspective: 600px;
+    }
+
+    .cube {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transform: rotateX(0deg) rotateY(0deg);
+      transition: transform 1s;
+    }
+
+    .face {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background-color: white;
+      border: 2px solid #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 50px;
+      color: black;
+    }
+
+    .front {
+      transform: rotateY(0deg) translateZ(100px);
+    }
+
+    .back {
+      transform: rotateY(180deg) translateZ(100px);
+    }
+
+    .right {
+      transform: rotateY(90deg) translateZ(100px);
+    }
+
+    .left {
+      transform: rotateY(-90deg) translateZ(100px);
+    }
+
+    .top {
+      transform: rotateX(90deg) translateZ(100px);
+    }
+
+    .bottom {
+      transform: rotateX(-90deg) translateZ(100px);
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+
+  <script type="module">
+    const button = document.querySelector('button')
+    const cube = document.getElementById('cube');
+
+    button.addEventListener('click', () => {
+      const randomFace = Math.floor(Math.random() * 6) + 1;
+
+      // Los ángulos de rotación para cada cara
+      const rotations = {
+        1: 'rotateX(0deg) rotateY(0deg)',
+        2: 'rotateX(90deg) rotateY(0deg)',
+        3: 'rotateX(0deg) rotateY(-90deg)',
+        4: 'rotateX(0deg) rotateY(90deg)',
+        5: 'rotateX(-90deg) rotateY(0deg)',
+        6: 'rotateX(0deg) rotateY(180deg)',
+      };
+
+      let currentRotationX = Math.floor(Math.random() * 360);
+      let currentRotationY = Math.floor(Math.random() * 360);
+
+      let rotationInterval = setInterval(() => {
+        currentRotationX += Math.floor(Math.random() * 20) + 10; // Aumenta rotación X
+        currentRotationY += Math.floor(Math.random() * 20) + 10; // Aumenta rotación Y
+
+        cube.style.transform = `rotateX(${currentRotationX}deg) rotateY(${currentRotationY}deg)`;
+      }, 100);
+
+      // Detener rotación y aplicar la rotación final con desaceleración
+      setTimeout(() => {
+        clearInterval(rotationInterval);
+
+        cube.style.transition = 'transform 1.5s cubic-bezier(0.25, 1, 0.5, 1)';
+        cube.style.transform = rotations[randomFace];
+      }, 1000); // La rotación dura 2 segundos antes de desacelerar y detenerse en la cara final
+    })
+  </script>
+</head>
+
+<body>
+  <div class="scene">
+    <div id="cube" class="cube">
+      <div class="face front">1</div>
+      <div class="face back">6</div>
+      <div class="face right">3</div>
+      <div class="face left">4</div>
+      <div class="face top">5</div>
+      <div class="face bottom">2</div>
+    </div>
+  </div>
+  <button onclick="rollDice()">Lanzar Dado</button>
+</body>
+
+</html>
