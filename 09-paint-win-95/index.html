@@ -137,6 +137,10 @@
       background-image: url('./icons/trash.png');
       background-size: 18px;
     }
+
+    #save-btn {
+      background-image: url('./icons/save.png');
+    }
   </style>
   <script type="module">
     // CONSTANTS
@@ -145,7 +149,8 @@
       ERASE: 'erase',
       RECTANGLE: 'rectangle',
       ELLIPSE: 'ellipse',
-      PICKER: 'picker'
+      PICKER: 'picker',
+      SAVE: 'save'
     }
 
     // UTILITIES
@@ -160,6 +165,7 @@
     const $eraseBtn = $('#erase-btn')
     const $rectangleBtn = $('#rectangle-btn')
     const $pickerBtn = $('#picker-btn')
+    const $saveBtn = $('#save-btn')
 
     const ctx = $canvas.getContext('2d')
 
@@ -200,6 +206,9 @@
       setMode(MODES.DRAW)
     })
 
+    $saveBtn.addEventListener('click', () => {
+      setMode(MODES.SAVE)
+    })
 
     // METHODS
     function startDrawing(event) {
@@ -324,6 +333,19 @@
 
         return
       }
+
+      if (mode === MODES.SAVE) {
+        ctx.globalCompositeOperation='destination-over';
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL()
+        link.download = 'my-paint.png';
+        link.click()
+        setMode(previousMode)
+        return
+      }
     }
 
     function handleKeyDown({ key }) {
@@ -371,6 +393,7 @@
         <button id="ellipse-btn" title="Elipse"></button>
         <button disabled id="picker-btn" title="Capturar Color"></button>
         <button id="clear-btn" title="Limpiar dibujo"></button>
+        <button id="save-btn" title="Guardar dibujo"></button>
       </nav>
     </aside>
 
