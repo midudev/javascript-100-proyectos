@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>11 - JS Perf Benchmark</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background: #1e1e1e;
+      color: #fff;
+      margin: 0;
+      padding: 16px;
+      display: grid;
+      place-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+
+      h2 {
+        font-size: 12px;
+        opacity: .5;
+        font-weight: 500;
+        margin: 0;
+        padding: 0;
+      }
+    }
+
+    .code {
+      background: #141414;
+      border-radius: 6px;
+      border: 0;
+      color: #d4d4d4;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 8px;
+      resize: none;
+      width: 100%;
+      field-sizing: content;
+    }
+
+    .test-cases {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .test-case {
+      background: #2a2a2a;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 8px;
+        align-items: center;
+
+        .test-id {
+          border-radius: 50%;
+          background: #141414;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          color: rgba(255, 255, 255, .7);
+        }
+
+        .ops {
+          opacity: .5;
+          font-size: 9px;
+        }
+      }
+
+      .code {
+        border-radius: 0 0 6px 6px;
+      }
+    }
+
+    .send-button {
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .3);
+      border: 0;
+      color: white;
+      cursor: pointer;
+      padding: 6px 12px;
+      transition: background .3s ease;
+      width: fit-content;
+
+      &:hover {
+        background: rgba(255, 255, 255, .5);
+      }
+    }
+
+    .chart-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .chart {
+        width: 200px;
+        height: 300px;
+      }
+
+      .bar {
+        transform: scale(1, -1);
+        transition: height .5s ease;
+      }
+
+      .percentages {
+        opacity: .5;
+        display: flex;
+        font-size: 10px;
+        justify-content: space-between;
+        gap: 32px;
+        margin-top: 16px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $globalCode = document.querySelector('#global')
+    const $sendButton = document.querySelector('.send-button')
+    const $bars = document.querySelectorAll('.bar')
+    const $percentages = document.querySelectorAll('.percentage')
+
+    const COLORS = ['green', 'yellow', 'orange', 'red', 'purple']
+
+    async function runTest({ code, data }) {
+      const worker = new Worker('worker.js')
+      worker.postMessage({ code, data, duration: 1000 })
+
+      // return new Promise(resolve => {
+      //   worker.onmessage = event => {
+      //     resolve(event.data)
+      //   }
+      // })
+
+      const { resolve, promise } = Promise.withResolvers()
+      worker.onmessage = event => { resolve(event.data) }
+      return promise
+    }
+
+    async function runTestCases() {
+      const $testCases = document.querySelectorAll('.test-case')
+
+      $bars.forEach(bar => bar.setAttribute('height', 0))
+      $percentages.forEach(percentage => percentage.textContent = '')
+
+      const globalCode = $globalCode.value
+
+      const promises = Array.from($testCases).map(async (testCase, index) => {
+        const $code = testCase.querySelector('.code')
+        const $ops = testCase.querySelector('.ops')
+
+        const codeValue = $code.value
+        $ops.textContent = 'Loading...'
+
+        const result = await runTest({ code: codeValue, data: globalCode })
+
+        $ops.textContent = `${result.toLocaleString()} ops/s`
+
+        return result
+      })
+
+      const results = await Promise.all(promises)
+
+      const maxOps = Math.max(...results)
+
+      const sortedResults = results
+        .map((result, index) => ({ result, index }))
+        .sort((a, b) => b.result - a.result)
+
+      console.log({ sortedResults })
+
+      results.forEach((result, index) => {
+        const bar = $bars[index]
+        const percentage = $percentages[index]
+
+        const indexColor = sortedResults.findIndex(x => x.index === index)
+        const color = COLORS[indexColor]
+
+        const height = result / maxOps * 300 // 300 is the height of the chart
+        bar.setAttribute('height', height)
+        bar.setAttribute('fill', color)
+
+        const percentageValue = Math.round(result / maxOps * 100)
+        percentage.textContent = `${percentageValue}%`
+      })
+    }
+
+    // run test cases on init
+    runTestCases()
+
+    $sendButton.addEventListener('click', () => {
+      runTestCases()
+    })
+  </script>
+</head>
+
+<body>
+  <main class="container">
+    <div class="content">
+      <h2>Global</h2>
+
+      <textarea id="global" class="code" rows="1">const data = [...Array(1000).keys()]</textarea>
+
+      <h2>Test cases</h2>
+      <div class="test-cases">
+        <article class="test-case">
+          <header>
+            <span class="test-id">1</span>
+            <span class="ops"></span>
+          </header>
+
+          <textarea class="code" rows="1">data.find(x => x == 100)</textarea>
+        </article>
+
+        <article class="test-case">
+          <header>
+            <span class="test-id">2</span>
+            <span class="ops"></span>
+          </header>
+
+          <textarea class="code" rows="1">data.find(x => x == 200)</textarea>
+        </article>
+
+        <article class="test-case">
+          <header>
+            <span class="test-id">3</span>
+            <span class="ops"></span>
+          </header>
+
+          <textarea class="code" rows="1">data.find(x => x == 400)</textarea>
+        </article>
+
+        <article class="test-case">
+          <header>
+            <span class="test-id">4</span>
+            <span class="ops"></span>
+          </header>
+
+          <textarea class="code" rows="1">data.find(x => x == 800)</textarea>
+        </article>
+      </div>
+
+      <button class="send-button">Benchmark code! 🚀</button>
+
+    </div>
+    <div class="chart-container">
+      <svg class="chart" viewBox="0 0 200 300">
+        <rect class="bar" x="20" y="-300" width="2" height="300" fill="green"></rect>
+        <rect class="bar" x="70" y="-300" width="2" height="50" fill="yellow"></rect>
+        <rect class="bar" x="120" y="-300" width="2" height="80" fill="orange"></rect>
+        <rect class="bar" x="170" y="-300" width="2" height="100" fill="red"></rect>
+      </svg>
+
+      <div class="percentages">
+        <span class="percentage">100%</span>
+        <span class="percentage">40%</span>
+        <span class="percentage">60%</span>
+        <span class="percentage">80%</span>
+      </div>
+    </div>
+  </main>
+</body>
+
+</html>

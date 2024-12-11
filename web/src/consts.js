@@ -83,4 +83,74 @@ export const PROJECTS = [
     },
     youtube: "https://www.youtube.com/watch?v=pNiyz0sl1no"
   },
+  {
+    slug: "07-tier-maker",
+    title: "Tier Maker",
+    description: "Arrastra y suelta las imágenes para crear tus propias listas de niveles",
+    learnings: [
+      "Drag & Drop",
+      "Input de imágenes",
+      "CSS Custom Properties"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: 'https://www.youtube.com/watch?v=LPzG0PnOzgA'
+  },
+  {
+    slug: "08-excel-js",
+    title: "Hojas de cálculo",
+    description: "Crea tu propio Excel sin dependencias y funcional",
+    learnings: [
+      "Tablas",
+      "Eventos de Input: focus y blur",
+      "Eval"
+    ],
+    theme: {
+      isDark: false
+    },
+    youtube: 'https://www.youtube.com/watch?v=z5CRFM2SlUU'
+  },
+  {
+    slug: "09-paint-win-95",
+    title: "Paint con Canvas",
+    description: "Crea un editor de imágenes clásico con <canvas>",
+    learnings: [
+      "Grid Area",
+      "Canvas",
+      "EyeDropper API"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: 'https://www.youtube.com/watch?v=-0UYMmplimA'
+  },
+  {
+    slug: "10-stack-game",
+    title: "Stack Game",
+    description: "Juego donde hay que apilar las piezas verticalmente",
+    learnings: [
+      "Canvas",
+      "Lógica de programación",
+      "Eventos de teclado"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: 'https://www.youtube.com/watch?v=IEwL-TZBeqQ'
+  },
+  {
+    slug: "11-js-perf-benchmark",
+    title: "JS Perf Benchmark",
+    description: "App para revisar el rendimiento de tu código JavaScript",
+    learnings: [
+      "Web Workers",
+      "Eval",
+      "Promises"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: null
+  },
 ]
