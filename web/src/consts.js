@@ -139,4 +139,18 @@ export const PROJECTS = [
     },
     youtube: 'https://www.youtube.com/watch?v=IEwL-TZBeqQ'
   },
+  {
+    slug: "11-js-perf-benchmark",
+    title: "JS Perf Benchmark",
+    description: "App para revisar el rendimiento de tu código JavaScript",
+    learnings: [
+      "Web Workers",
+      "Eval",
+      "Promises"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: null
+  },
 ]
