@@ -322,7 +322,10 @@
       $nextActiveLetter.classList.add('active')
     } else {
       $currentLetter.classList.add('active', 'is-last')
-      // TODO: gameover si no hay próxima palabra
+      const isLastWord = !$currentWord.nextElementSibling
+      if(isLastWord){
+        gameOver()
+      }
     }
   }
 
