@@ -153,4 +153,18 @@ export const PROJECTS = [
     },
     youtube: 'https://www.youtube.com/watch?v=VuOcLnzhbDw'
   },
+  {
+    slug: "12-moto-scroll",
+    title: "Animación por Scroll",
+    description: "Anima el fondo de una web a través del scroll",
+    learnings: [
+      "Scroll",
+      "Animaciones",
+      "Performance"
+    ],
+    theme: {
+      isDark: true
+    },
+    youtube: 'https://www.youtube.com/watch?v=8EA-WNFMYwI'
+  },
 ]
