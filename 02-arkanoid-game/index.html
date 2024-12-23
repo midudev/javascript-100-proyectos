@@ -211,6 +211,8 @@
   function initEvents() {
     document.addEventListener('keydown', keyDownHandler)
     document.addEventListener('keyup', keyUpHandler)
+    document.addEventListener('touchstart', touchStartHandler, { passive: true });
+    document.addEventListener('touchend', touchEndHandler, { passive: true });
 
     function keyDownHandler(event) {
       const { key } = event
@@ -228,6 +230,20 @@
       } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
         leftPressed = false
       }
+    }
+
+    function touchStartHandler(e) {
+      const touchX = e.touches[0].clientX;
+      if (touchX > canvas.width / 2) {
+        rightPressed = true;
+      } else {
+        leftPressed = true;
+      }
+    }
+
+    function touchEndHandler() {
+      rightPressed = false;
+      leftPressed = false;
     }
   }
 
