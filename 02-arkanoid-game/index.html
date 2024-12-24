@@ -53,7 +53,7 @@
 
   let rightPressed = false
   let leftPressed = false
-
+  let spacePressed = false
   /* VARIABLES DE LOS LADRILLOS */
   const brickRowCount = 6;
   const brickColumnCount = 13;
@@ -86,7 +86,6 @@
       }
     }
   }
-
 
   function drawBall() {
     ctx.beginPath() // iniciar el trazado
@@ -144,12 +143,10 @@
         if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
 
         const isBallSameXAsBrick =
-          x > currentBrick.x &&
-          x < currentBrick.x + brickWidth
+          x > currentBrick.x && x < currentBrick.x + brickWidth
 
         const isBallSameYAsBrick =
-          y > currentBrick.y &&
-          y < currentBrick.y + brickHeight
+          y > currentBrick.y && y < currentBrick.y + brickHeight
 
         if (isBallSameXAsBrick && isBallSameYAsBrick) {
           dy = -dy
@@ -167,24 +164,47 @@
     ) {
       dx = -dx
     }
-
+    if (!spacePressed) {
+      // si la pelota no se ha lanzado, la pelota se mueve con la pala
+      dx =
+        leftPressed && paddleX > 0
+          ? -PADDLE_SENSITIVITY
+          : rightPressed && paddleX < canvas.width - paddleWidth
+          ? PADDLE_SENSITIVITY
+          : 0
+      dy = 0
+    } else if (spacePressed && dx === 0 && dy === 0) {
+      dx = 3
+      dy = -3
+    }
     // rebotar en la parte de arriba
     if (y + dy < ballRadius) {
       dy = -dy
     }
 
     // la pelota toca la pala
-    const isBallSameXAsPaddle =
-      x > paddleX &&
-      x < paddleX + paddleWidth
+    const isBallSameXAsPaddle = x > paddleX && x < paddleX + paddleWidth
 
-    const isBallTouchingPaddle =
-      y + dy > paddleY
+    const isBallTouchingPaddle = y + dy > paddleY
+    const centerPaddle = (paddleWidth / 2)
+    //! si la pelota toca la pala del lado izquierdo o derecho la bola va a tomar una dirección diferente
+    if (isBallTouchingPaddle && isBallSameXAsPaddle) {
+      if (x < paddleX + centerPaddle) {
+        dx = -3
+        dy = -3
+      } else {
+        dx = 3
+        dy = -3
+      }
+    } else
 
     if (isBallSameXAsPaddle && isBallTouchingPaddle) {
+      
       dy = -dy // cambiamos la dirección de la pelota
-    } else if ( // la pelota toca el suelo
-      y + dy > canvas.height - ballRadius || y + dy > paddleY + paddleHeight
+    } else if (
+      // la pelota toca el suelo
+      y + dy > canvas.height - ballRadius ||
+      y + dy > paddleY + paddleHeight
     ) {
       gameOver = true
       console.log('Game Over')
@@ -209,8 +229,26 @@
   }
 
   function initEvents() {
+    let keysPressed = {}
     document.addEventListener('keydown', keyDownHandler)
     document.addEventListener('keyup', keyUpHandler)
+    // bloqueo de teclas para que no se puedan pulsar el izquierdo y el derecho a la vez si esta la bola pegada a la pala  (de lo contrario hace cosas raras ;) )
+    document.addEventListener('keydown', (event) => {
+      if (spacePressed === false) {
+        keysPressed[event.key] = true
+        if (keysPressed['ArrowRight'] && keysPressed['ArrowLeft']) {
+          // Ambas teclas están presionadas
+          rightPressed = false
+          leftPressed = false
+        }
+      }
+    })
+    document.addEventListener('keyup', (event) => {
+      if (spacePressed === false) {
+        delete keysPressed[event.key]
+      }
+    })
+
 
     function keyDownHandler(event) {
       const { key } = event
@@ -227,13 +265,15 @@
         rightPressed = false
       } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
         leftPressed = false
+      } else if (key === ' ' || key === 'ArrowUp') {
+        spacePressed = true
       }
     }
   }
 
   // a que velocidad de fps queremos que renderice nuestro juego
   const fps = 60
-  
+
   let msPrev = window.performance.now()
   let msFPSPrev = window.performance.now() + 1000;
   const msPerFrame = 1000 / fps
@@ -257,8 +297,7 @@
 
     frames++
 
-    if (msFPSPrev < msNow)
-    {
+    if (msFPSPrev < msNow) {
       msFPSPrev = window.performance.now() + 1000
       framesPerSec = frames;
       frames = 0;
@@ -276,7 +315,6 @@
     collisionDetection()
     ballMovement()
     paddleMovement()
-
   }
 
   draw()
