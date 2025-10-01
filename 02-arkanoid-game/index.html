@@ -69,6 +69,26 @@
     DESTROYED: 0
   }
 
+  // Efecto de audio colisión bloque pelota
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+  function playBeep() {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.type = 'square';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+  }
+
   for (let c = 0; c < brickColumnCount; c++) {
     bricks[c] = [] // inicializamos con un array vacio
     for (let r = 0; r < brickRowCount; r++) {
@@ -136,7 +156,7 @@
   function drawUI() {
     ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
   }
-
+  //Detección de colisión
   function collisionDetection() {
     for (let c = 0; c < brickColumnCount; c++) {
       for (let r = 0; r < brickRowCount; r++) {
@@ -154,6 +174,7 @@
         if (isBallSameXAsBrick && isBallSameYAsBrick) {
           dy = -dy
           currentBrick.status = BRICK_STATUS.DESTROYED
+          playBeep()
         }
       }
     }
@@ -214,6 +235,7 @@
 
     function keyDownHandler(event) {
       const { key } = event
+      audioContext.resume() // Reiniciamos evento de audio en la interacción del usuario
       if (key === 'Right' || key === 'ArrowRight' || key.toLowerCase() === 'd') {
         rightPressed = true
       } else if (key === 'Left' || key === 'ArrowLeft' || key.toLowerCase() === 'a') {
