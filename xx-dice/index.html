@@ -75,14 +75,30 @@
       font-size: 16px;
       cursor: pointer;
     }
+
+    button:focus-visible {
+      outline: 3px solid #61dafb;
+      outline-offset: 2px;
+    }
+
+    .result {
+      margin-top: 16px;
+      font-size: 18px;
+    }
   </style>
 
   <script type="module">
     const button = document.querySelector('button')
-    const cube = document.getElementById('cube');
+    const cube = document.getElementById('cube')
+    const result = document.getElementById('result')
 
-    button.addEventListener('click', () => {
-      const randomFace = Math.floor(Math.random() * 6) + 1;
+    let isRolling = false
+
+    function rollDice () {
+      if (isRolling) return
+      isRolling = true
+
+      const randomFace = Math.floor(Math.random() * 6) + 1
 
       // Los ángulos de rotación para cada cara
       const rotations = {
@@ -91,26 +107,49 @@
         3: 'rotateX(0deg) rotateY(-90deg)',
         4: 'rotateX(0deg) rotateY(90deg)',
         5: 'rotateX(-90deg) rotateY(0deg)',
-        6: 'rotateX(0deg) rotateY(180deg)',
-      };
+        6: 'rotateX(0deg) rotateY(180deg)'
+      }
 
-      let currentRotationX = Math.floor(Math.random() * 360);
-      let currentRotationY = Math.floor(Math.random() * 360);
+      let currentRotationX = Math.floor(Math.random() * 360)
+      let currentRotationY = Math.floor(Math.random() * 360)
 
-      let rotationInterval = setInterval(() => {
-        currentRotationX += Math.floor(Math.random() * 20) + 10; // Aumenta rotación X
-        currentRotationY += Math.floor(Math.random() * 20) + 10; // Aumenta rotación Y
+      // Reiniciamos la transición para la rotación rápida
+      cube.style.transition = 'none'
 
-        cube.style.transform = `rotateX(${currentRotationX}deg) rotateY(${currentRotationY}deg)`;
-      }, 100);
+      const rotationInterval = setInterval(() => {
+        currentRotationX += Math.floor(Math.random() * 20) + 10
+        currentRotationY += Math.floor(Math.random() * 20) + 10
+
+        cube.style.transform = `rotateX(${currentRotationX}deg) rotateY(${currentRotationY}deg)`
+      }, 100)
 
       // Detener rotación y aplicar la rotación final con desaceleración
       setTimeout(() => {
-        clearInterval(rotationInterval);
+        clearInterval(rotationInterval)
 
-        cube.style.transition = 'transform 1.5s cubic-bezier(0.25, 1, 0.5, 1)';
-        cube.style.transform = rotations[randomFace];
-      }, 1000); // La rotación dura 2 segundos antes de desacelerar y detenerse en la cara final
+        cube.style.transition = 'transform 1.5s cubic-bezier(0.25, 1, 0.5, 1)'
+        cube.style.transform = rotations[randomFace]
+
+        setTimeout(() => {
+          if (result) {
+            result.textContent = `Has sacado un ${randomFace}.`
+          }
+
+          isRolling = false
+        }, 1500)
+      }, 1000)
+    }
+
+    button.addEventListener('click', rollDice)
+
+    document.addEventListener('keydown', event => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        const activeElement = document.activeElement
+        if (activeElement === button) {
+          event.preventDefault()
+          rollDice()
+        }
+      }
     })
   </script>
 </head>
@@ -126,7 +165,10 @@
       <div class="face bottom">2</div>
     </div>
   </div>
-  <button onclick="rollDice()">Lanzar Dado</button>
+  <button>Lanzar Dado</button>
+  <p id="result" class="result" aria-live="polite">
+    Pulsa el botón para lanzar el dado.
+  </p>
 </body>
 
 </html>
