@@ -56,8 +56,9 @@
       color: var(--yellow);
       font-size: 14px;
       position: absolute;
-      left: -65%;
-      animation: 1s blink infinite ease-in-out;
+      left: -35%; 
+      transition: 0.1s;
+      animation: 1s blink infinite ease-in-out, move 0.1s ease-in-out;
     }
 
     &.active.is-last::before {
@@ -91,6 +92,16 @@
 
     75% {
       opacity: 0;
+    }
+  }
+
+  @keyframes move {
+    0% { 
+    left: -65%; 
+    }
+
+    100% { 
+     left: -40%; 
     }
   }
 
