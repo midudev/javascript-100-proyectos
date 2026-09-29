@@ -11,15 +11,15 @@ importers:
       '@astrojs/check':
         specifier: 0.9.10
         version: 0.9.10(@emnapi/runtime@1.11.3)(prettier@3.9.9)(typescript@6.0.3)
-      '@midudev/tailwind-animations':
-        specifier: 1.0.2
-        version: 1.0.2(tailwindcss@4.3.3)
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.1(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       astro:
         specifier: 7.3.5
         version: 7.3.5(jiti@2.7.0)(yaml@2.9.1)
+      tailwind-animations:
+        specifier: 1.0.2
+        version: 1.0.2(tailwindcss@4.3.3)
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
@@ -589,12 +589,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@midudev/tailwind-animations@1.0.2':
-    resolution: {integrity: sha512-t4+GhOTzpVpl+Q/ZYX9HF9QqP1YBJBRHIYu5Gg5H3CviUhsW5ZJfo6Cgq35plJ84yuqG92YAZGfNzMNUdBQk3g==}
-    deprecated: 'Deprecated: use tailwind-animations instead.'
-    peerDependencies:
-      tailwindcss: '4'
 
   '@napi-rs/wasm-runtime@1.2.4':
     resolution: {integrity: sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==}
@@ -2397,11 +2391,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
-
-  '@midudev/tailwind-animations@1.0.2(tailwindcss@4.3.3)':
-    dependencies:
-      tailwind-animations: 1.0.2(tailwindcss@4.3.3)
-      tailwindcss: 4.3.3
 
   '@napi-rs/wasm-runtime@1.2.4(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
