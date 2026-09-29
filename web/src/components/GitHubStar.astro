@@ -1,49 +1,73 @@
 ---
-const response = await fetch(
-  "https://api.github.com/repos/midudev/javascript-100-proyectos"
-)
+const REPO = "midudev/javascript-100-proyectos"
 
-const data = await response.json()
+let stars: number | null = null
 
-const starCounter = data.stargazers_count
+try {
+  const response = await fetch(`https://api.github.com/repos/${REPO}`, {
+    headers: { Accept: "application/vnd.github+json" },
+  })
+  if (response.ok) {
+    const data = await response.json()
+    if (typeof data.stargazers_count === "number") {
+      stars = data.stargazers_count
+    }
+  }
+} catch {
+  // Sin conexión o rate limit de la API: mostramos el botón sin contador
+}
+
+const starLabel =
+  stars != null
+    ? `${new Intl.NumberFormat("es-ES").format(stars)} estrellas`
+    : "Danos una estrella"
 ---
 
 <div
-  class="absolute left-0 right-0 md:top-4 md:mr-4 md:justify-end mx-auto w-full flex justify-center"
+  class="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-4 md:top-4 md:justify-end"
 >
   <a
-    class="flex hover:scale-105 group transition"
-    href="https://github.com/midudev/javascript-100-proyectos"
+    class="group pointer-events-auto relative inline-flex h-9 items-center overflow-hidden rounded-full border border-black/10 bg-white/80 text-sm font-medium text-slate-900 shadow-sm backdrop-blur-sm transition duration-300 before:pointer-events-none before:absolute before:inset-0 before:-translate-x-full before:bg-linear-to-r before:from-transparent before:via-white/70 before:to-transparent hover:-translate-y-0.5 hover:border-yellow-400 hover:shadow-lg hover:shadow-yellow-500/20 hover:before:translate-x-full hover:before:transition-transform hover:before:duration-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black motion-reduce:transition-none motion-reduce:before:hidden"
+    href={`https://github.com/${REPO}`}
     target="_blank"
     rel="noopener noreferrer"
+    aria-label={`Deja tu estrella en GitHub${stars != null ? ` (${starLabel})` : ""}`}
   >
-    <div
-      class="flex h-8 w-8 items-center justify-center space-x-2 rounded-md border"
+    <span
+      class="flex h-full items-center gap-2 border-r border-black/10 px-3 transition-colors duration-300 group-hover:border-yellow-400 group-hover:bg-yellow-300"
     >
-      <svg fill="currentColor" viewBox="0 0 24 24" class="h-5 w-5">
+      <svg fill="currentColor" viewBox="0 0 24 24" class="size-4" aria-hidden="true">
         <path
           d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-        >
-        </path>
+        ></path>
       </svg>
-    </div>
-
-    <div class="flex items-center">
-      <div
-        class="h-4 w-4 border-y-8 border-l-0 border-r-8 border-solid border-gray-100 border-y-transparent group-hover:border-x-yellow-200"
+      GitHub
+    </span>
+    <span class="flex items-center gap-1.5 px-3">
+      <svg
+        viewBox="0 0 24 24"
+        class="size-4 fill-transparent stroke-slate-400 transition duration-700 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:rotate-144 group-hover:scale-125 group-hover:fill-yellow-400 group-hover:stroke-yellow-500 motion-reduce:transition-none"
+        stroke-width="2"
+        stroke-linejoin="round"
+        aria-hidden="true"
       >
-      </div>
-      <div
-        class="overflow-hidden flex flex-col h-8 items-center rounded-md bg-gray-100 px-4 font-medium text-xs justify-center group-hover:bg-yellow-200 transition w-36 relative"
-      >
-        <span class="absolute group-hover:animate-fade-out-up"
-          >{`${starCounter} ⭐️ en GitHub`}</span
-        >
+        <path
+          d="m12 2.5 2.94 5.96 6.56.95-4.75 4.63 1.12 6.54L12 17.49l-5.87 3.09 1.12-6.54L2.5 9.41l6.56-.95L12 2.5Z"
+        ></path>
+      </svg>
+      <span class="grid overflow-hidden tabular-nums">
         <span
-          class="absolute opacity-0 -translate-y-5 group-hover:animate-fade-in-up"
-          >¡Deja tu estrella!</span
+          class="[grid-area:1/1] transition duration-300 ease-out group-hover:-translate-y-full group-hover:opacity-0 motion-reduce:transition-none"
         >
-      </div>
-    </div>
+          {starLabel}
+        </span>
+        <span
+          class="[grid-area:1/1] translate-y-full opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none"
+          aria-hidden="true"
+        >
+          ¡Deja tu estrella!
+        </span>
+      </span>
+    </span>
   </a>
 </div>
