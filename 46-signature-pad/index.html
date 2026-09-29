@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>46 - Firma digital</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --paper: #fffdf8;
+      --text: #1f2328;
+      --muted: #6b6f76;
+      --border: #e2ddd2;
+      --accent: #1d4ed8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      justify-content: center;
+      padding: 20px 16px;
+      background:
+        radial-gradient(circle at 20% 0%, #fff 0, transparent 50%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      width: min(100%, 920px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 8px 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(22px, 4vw, 30px);
+      letter-spacing: -.5px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    .info {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: white;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chip strong {
+      color: var(--text);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 18px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: white;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .colors {
+      display: flex;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .colors input {
+      appearance: none;
+      width: 26px;
+      height: 26px;
+      margin: 0;
+      border-radius: 50%;
+      background: var(--color);
+      border: 3px solid white;
+      box-shadow: 0 0 0 1px var(--border);
+      cursor: pointer;
+      transition: box-shadow .15s, transform .15s;
+    }
+
+    .colors input:checked {
+      box-shadow: 0 0 0 2px var(--color);
+      transform: scale(1.08);
+    }
+
+    .colors input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    input[type="range"] {
+      width: 110px;
+      accent-color: var(--text);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: white;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f6f5f1;
+      border-color: #cfc8b8;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--text);
+      border-color: var(--text);
+      color: white;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: #000;
+    }
+
+    .pad {
+      position: relative;
+      flex: 1;
+      min-height: 240px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      /* El "papel" es solo CSS: no se dibuja en el canvas, así el PNG sale transparente */
+      background:
+        repeating-linear-gradient(to bottom, transparent 0 31px, rgb(0 0 0 / 3%) 31px 32px),
+        var(--paper);
+      box-shadow: 0 20px 40px -24px rgb(60 40 10 / 35%), 0 1px 0 white inset;
+      overflow: hidden;
+    }
+
+    .pad canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      /* Sin esto, en móvil el dedo haría scroll o zoom en vez de dibujar */
+      touch-action: none;
+    }
+
+    .baseline {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: 72%;
+      border-top: 2px dashed #d5cebf;
+      pointer-events: none;
+    }
+
+    .baseline::before {
+      content: '✕';
+      position: absolute;
+      left: 0;
+      top: -34px;
+      font-size: 22px;
+      color: #b9b0a0;
+    }
+
+    .baseline span {
+      position: absolute;
+      right: 0;
+      top: 8px;
+      font-size: 13px;
+      color: #aaa192;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .empty-hint {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      color: #b9b0a0;
+      font-size: clamp(18px, 3vw, 24px);
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+
+    .pad:not(.is-empty) .empty-hint {
+      opacity: 0;
+    }
+
+    footer {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    kbd {
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: white;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    @media (width < 640px) {
+      .actions {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      .actions button {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const MIN_WIDTH_FACTOR = 0.35
+    const MAX_WIDTH_FACTOR = 1.6
+    const WIDTH_SMOOTHING = 0.3 // cuánto se acerca el grosor al nuevo valor en cada punto
+    const EXPORT_PADDING = 16
+    const EXAMPLE_STEP = 0.07
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const pad = $('.pad')
+    const canvas = $('canvas')
+    const context = canvas.getContext('2d')
+    const sizeInput = $('#size')
+    const sizeValue = $('#size-value')
+    const undoButton = $('#undo')
+    const clearButton = $('#clear')
+    const downloadButton = $('#download')
+    const deviceInfo = $('#device')
+    const pressureInfo = $('#pressure')
+    const strokesInfo = $('#strokes')
+
+    const POINTER_NAMES = { mouse: '🖱️ Ratón', touch: '👆 Táctil', pen: '🖊️ Lápiz' }
+
+    // Guardamos cada trazo como un array de puntos (y no solo los píxeles del canvas):
+    // así podemos deshacer, redibujar al cambiar de tamaño y exportar a cualquier escala
+    let strokes = []
+    let currentStroke = null
+    let activePointerId = null
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+    const midPoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+
+    // ---------- Canvas nítido en pantallas retina ----------
+
+    function resizeCanvas() {
+      // En una pantalla retina (devicePixelRatio = 2) cada píxel CSS son 2x2 píxeles
+      // físicos. Si el canvas mide lo mismo que en CSS, el navegador lo estira y se ve
+      // borroso. Solución: hacerlo dpr veces más grande y escalar el contexto.
+      const dpr = window.devicePixelRatio || 1
+      const { width, height } = canvas.getBoundingClientRect()
+      canvas.width = Math.round(width * dpr)
+      canvas.height = Math.round(height * dpr)
+      // Tras esto seguimos dibujando en coordenadas CSS, el escalado es automático
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
+      redraw()
+    }
+
+    // ---------- Grosor variable ----------
+
+    function getPointWidth(point, previous, size) {
+      // Con lápiz tenemos presión real (0 a 1): más presión, trazo más grueso
+      if (point.pointerType === 'pen' && point.pressure > 0) {
+        return size * (MIN_WIDTH_FACTOR + point.pressure * (MAX_WIDTH_FACTOR - MIN_WIDTH_FACTOR))
+      }
+
+      if (!previous) return size
+
+      // Ratón y dedo no tienen presión (o siempre vale 0.5), así que simulamos la
+      // tinta con la velocidad: cuanto más rápido mueves, más fino sale el trazo
+      const distance = Math.hypot(point.x - previous.x, point.y - previous.y)
+      const elapsed = Math.max(point.time - previous.time, 1)
+      const velocity = distance / elapsed // píxeles por milisegundo
+      const target = size * clamp(MAX_WIDTH_FACTOR - velocity * 0.55, MIN_WIDTH_FACTOR, MAX_WIDTH_FACTOR)
+
+      // Suavizamos para evitar saltos bruscos de grosor entre puntos
+      return previous.width + (target - previous.width) * WIDTH_SMOOTHING
+    }
+
+    // ---------- Dibujo suavizado con curvas de Bézier ----------
+
+    // Si uniéramos los puntos con lineTo veríamos una línea "poligonal" con picos.
+    // Truco: la curva va de punto MEDIO a punto medio, usando el punto real como
+    // punto de control de una curva cuadrática. Así las curvas encajan sin esquinas.
+    //
+    //   p0 ---- m1 ---- p1 ---- m2 ---- p2    (m = punto medio)
+    //           \_______/\_______/
+    //         curva con control en p1, luego en p2...
+    function getSegmentStart(points, index) {
+      return index === 1 ? points[0] : midPoint(points[index - 1], points[index])
+    }
+
+    function drawCurve(ctx, stroke, index) {
+      const { points } = stroke
+      const start = getSegmentStart(points, index)
+      const control = points[index]
+      const end = midPoint(points[index], points[index + 1])
+
+      ctx.beginPath()
+      ctx.moveTo(start.x, start.y)
+      ctx.quadraticCurveTo(control.x, control.y, end.x, end.y)
+      ctx.lineWidth = control.width
+      ctx.stroke()
+    }
+
+    function drawTail(ctx, stroke) {
+      const { points } = stroke
+      const last = points.at(-1)
+
+      // Un toque sin mover el puntero es un punto
+      if (points.length === 1) {
+        ctx.beginPath()
+        ctx.arc(last.x, last.y, last.width / 2, 0, Math.PI * 2)
+        ctx.fill()
+        return
+      }
+
+      const start = getSegmentStart(points, points.length - 1)
+      ctx.beginPath()
+      ctx.moveTo(start.x, start.y)
+      ctx.lineTo(last.x, last.y)
+      ctx.lineWidth = last.width
+      ctx.stroke()
+    }
+
+    function applyStyle(ctx, stroke) {
+      ctx.strokeStyle = stroke.color
+      ctx.fillStyle = stroke.color
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+    }
+
+    function drawStroke(ctx, stroke) {
+      applyStyle(ctx, stroke)
+      for (let i = 1; i < stroke.points.length - 1; i++) drawCurve(ctx, stroke, i)
+      drawTail(ctx, stroke)
+    }
+
+    function redraw() {
+      const { width, height } = canvas.getBoundingClientRect()
+      context.clearRect(0, 0, width, height)
+      strokes.forEach((stroke) => drawStroke(context, stroke))
+    }
+
+    // ---------- Pointer Events: ratón, dedo y lápiz con el mismo código ----------
+
+    function createPoint(event, previous) {
+      const rect = canvas.getBoundingClientRect()
+      const point = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+        pressure: event.pressure,
+        pointerType: event.pointerType,
+        time: event.timeStamp
+      }
+      point.width = getPointWidth(point, previous, currentStroke.size)
+      return point
+    }
+
+    function updateInfo(event) {
+      deviceInfo.textContent = POINTER_NAMES[event.pointerType] ?? event.pointerType
+      pressureInfo.textContent = event.pointerType === 'pen' ? event.pressure.toFixed(2) : 'velocidad'
+    }
+
+    function handlePointerDown(event) {
+      // Solo un trazo a la vez (ignoramos un segundo dedo) y solo el botón principal
+      if (activePointerId !== null || !event.isPrimary || event.button !== 0) return
+
+      activePointerId = event.pointerId
+      // Con la captura seguimos recibiendo eventos aunque el puntero salga del canvas
+      canvas.setPointerCapture(event.pointerId)
+
+      currentStroke = {
+        color: document.querySelector('input[name="color"]:checked').value,
+        size: Number(sizeInput.value),
+        points: []
+      }
+      currentStroke.points.push(createPoint(event, null))
+      strokes.push(currentStroke)
+
+      updateInfo(event)
+      updateUI()
+    }
+
+    function handlePointerMove(event) {
+      if (event.pointerId !== activePointerId) return
+
+      // Entre dos frames el navegador puede agrupar varios movimientos en uno.
+      // getCoalescedEvents() nos devuelve todos, para trazos más precisos
+      const events = event.getCoalescedEvents?.() ?? [event]
+
+      for (const coalesced of events) {
+        const { points } = currentStroke
+        const previous = points.at(-1)
+        const point = createPoint(coalesced, previous)
+
+        // Descartamos puntos casi idénticos (evita divisiones raras y trabajo extra)
+        if (Math.hypot(point.x - previous.x, point.y - previous.y) < 1) continue
+
+        points.push(point)
+        // Dibujamos solo el nuevo tramo, no todo el trazo: mucho más eficiente
+        if (points.length >= 3) {
+          applyStyle(context, currentStroke)
+          drawCurve(context, currentStroke, points.length - 2)
+        }
+      }
+
+      updateInfo(event)
+    }
+
+    function handlePointerUp(event) {
+      if (event.pointerId !== activePointerId) return
+
+      applyStyle(context, currentStroke)
+      drawTail(context, currentStroke)
+
+      activePointerId = null
+      currentStroke = null
+      updateUI()
+    }
+
+    // ---------- Acciones ----------
+
+    function undo() {
+      if (activePointerId !== null) return
+      strokes.pop()
+      redraw()
+      updateUI()
+    }
+
+    function clear() {
+      strokes = []
+      redraw()
+      updateUI()
+    }
+
+    function getBounds() {
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+
+      for (const { points } of strokes) {
+        for (const { x, y, width } of points) {
+          minX = Math.min(minX, x - width)
+          minY = Math.min(minY, y - width)
+          maxX = Math.max(maxX, x + width)
+          maxY = Math.max(maxY, y + width)
+        }
+      }
+
+      return { minX, minY, width: maxX - minX, height: maxY - minY }
+    }
+
+    function download() {
+      if (strokes.length === 0) return
+
+      // Exportamos solo la zona con tinta (recortada) en un canvas nuevo.
+      // No pintamos ningún fondo: el PNG conserva la transparencia
+      const scale = Math.max(window.devicePixelRatio || 1, 2)
+      const bounds = getBounds()
+      const exportCanvas = document.createElement('canvas')
+      exportCanvas.width = Math.ceil((bounds.width + EXPORT_PADDING * 2) * scale)
+      exportCanvas.height = Math.ceil((bounds.height + EXPORT_PADDING * 2) * scale)
+
+      const exportContext = exportCanvas.getContext('2d')
+      exportContext.scale(scale, scale)
+      exportContext.translate(EXPORT_PADDING - bounds.minX, EXPORT_PADDING - bounds.minY)
+      strokes.forEach((stroke) => drawStroke(exportContext, stroke))
+
+      exportCanvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'firma.png'
+        link.click()
+        // Liberamos la memoria del Blob cuando ya no la necesitamos
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }, 'image/png')
+    }
+
+    function updateUI() {
+      const isEmpty = strokes.length === 0
+      pad.classList.toggle('is-empty', isEmpty)
+      undoButton.disabled = isEmpty
+      clearButton.disabled = isEmpty
+      downloadButton.disabled = isEmpty
+      strokesInfo.textContent = strokes.length
+      sizeValue.textContent = sizeInput.value
+    }
+
+    // ---------- Firma de ejemplo para que no se vea el lienzo vacío ----------
+
+    function createExampleSignature() {
+      const { width, height } = canvas.getBoundingClientRect()
+      const baseY = height * 0.72 - 22
+      const letterHeight = Math.min(height * 0.3, 110)
+      const turns = 5
+      const stepX = Math.min(width * 0.5, 520) / (turns * Math.PI * 2)
+      const startX = width / 2 - stepX * turns * Math.PI
+      const color = '#1d3a8a'
+      const size = 3
+
+      // Bucles con una cicloide "alargada" (x = t - k·sin t): cuando k > 1 la curva
+      // retrocede y forma lazos, parecidos a las letras "l" y "e" manuscritas
+      const loops = []
+      for (let t = Math.PI; t <= Math.PI * (1 + turns * 2); t += EXAMPLE_STEP) {
+        const amplitude = 0.55 + 0.45 * Math.abs(Math.sin(t * 0.23 + 0.4))
+        const y = baseY - letterHeight * amplitude * (1 + Math.cos(t)) / 2
+        loops.push({
+          // Inclinamos la letra como en la escritura cursiva
+          x: startX + stepX * (t - 1.8 * Math.sin(t)) + (baseY - y) * 0.35,
+          y,
+          pressure: 0.45 + 0.3 * Math.sin(t * 1.3)
+        })
+      }
+
+      // Rúbrica final: sale del último lazo y subraya la firma de derecha a izquierda
+      const last = loops.at(-1)
+      const flourish = []
+      for (let u = 0; u <= 1; u += 0.02) {
+        flourish.push({
+          x: last.x + 30 - u * (last.x - startX + 90),
+          y: baseY + 20 - Math.sin(u * Math.PI) * 12 + u * 6,
+          pressure: 0.2 + 0.55 * Math.sin(u * Math.PI)
+        })
+      }
+
+      return [loops, flourish].map((rawPoints) => {
+        const stroke = { color, size, points: [] }
+        rawPoints.forEach((raw, index) => {
+          // Afinamos el principio y el final del trazo como haría un bolígrafo real
+          const taper = Math.min(1, index / 5, (rawPoints.length - index) / 5)
+          const point = { ...raw, pressure: raw.pressure * (0.3 + 0.7 * taper), pointerType: 'pen' }
+          point.width = getPointWidth(point, null, size)
+          stroke.points.push(point)
+        })
+        return stroke
+      })
+    }
+
+    // ---------- Eventos ----------
+
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointermove', handlePointerMove)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerUp)
+
+    undoButton.addEventListener('click', undo)
+    clearButton.addEventListener('click', clear)
+    downloadButton.addEventListener('click', download)
+    sizeInput.addEventListener('input', updateUI)
+
+    document.addEventListener('keydown', (event) => {
+      const isUndo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z'
+      if (isUndo) {
+        event.preventDefault()
+        undo()
+      }
+    })
+
+    // El canvas cambia de tamaño con la ventana: recalculamos y redibujamos los trazos
+    new ResizeObserver(resizeCanvas).observe(canvas)
+
+    strokes = createExampleSignature()
+    resizeCanvas()
+    updateUI()
+  </script>
+</head>
+
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>✍️ Firma digital</h1>
+        <p>Firma con el ratón, el dedo o un lápiz y descárgala en PNG transparente</p>
+      </div>
+      <div class="info" aria-live="polite">
+        <span class="chip">Dispositivo: <strong id="device">—</strong></span>
+        <span class="chip">Presión: <strong id="pressure">—</strong></span>
+        <span class="chip">Trazos: <strong id="strokes">0</strong></span>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="group">
+        Color
+        <fieldset class="colors">
+          <legend hidden>Color de la tinta</legend>
+          <input type="radio" name="color" value="#1d3a8a" style="--color: #1d3a8a" aria-label="Azul tinta" checked>
+          <input type="radio" name="color" value="#1f2328" style="--color: #1f2328" aria-label="Negro">
+          <input type="radio" name="color" value="#9f1239" style="--color: #9f1239" aria-label="Granate">
+          <input type="radio" name="color" value="#166534" style="--color: #166534" aria-label="Verde">
+        </fieldset>
+      </div>
+
+      <label class="group">
+        Grosor
+        <input id="size" type="range" min="1" max="8" step="0.5" value="3">
+        <strong id="size-value">3</strong>
+      </label>
+
+      <div class="actions">
+        <button id="undo" title="Deshacer (Ctrl/Cmd + Z)">↶ Deshacer</button>
+        <button id="clear">🗑️ Limpiar</button>
+        <button id="download" class="primary">⬇️ Descargar PNG</button>
+      </div>
+    </div>
+
+    <div class="pad">
+      <div class="empty-hint">Firma aquí</div>
+      <div class="baseline"><span>Firma</span></div>
+      <canvas aria-label="Zona para firmar"></canvas>
+    </div>
+
+    <footer>Deshacer: <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Z</kbd></footer>
+  </main>
+</body>
+
+</html>

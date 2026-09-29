@@ -216,3 +216,15 @@ select {
 .output-controls {
   background-color: var(--bg-secondary);
 }
+
+/* API Warning */
+.api-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  padding: 12px;
+  margin: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--warning-border);
+  font-size: 14px;
+  text-align: center;
+}

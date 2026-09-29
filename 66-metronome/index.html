@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>66 - Metrónomo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d12;
+      --panel: #141821;
+      --line: #252b38;
+      --text: #eef1f7;
+      --muted: #8a93a6;
+      --accent: #fbbf24;
+      --beat: #38bdf8;
+      --secondary: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(700px 400px at 30% 30%, #1d2440 0%, transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(260px, 380px) minmax(300px, 420px);
+      gap: 48px;
+      align-items: center;
+    }
+
+    /* --- Metrónomo visual --- */
+    .visual {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .metronome {
+      position: relative;
+      width: 260px;
+      height: 300px;
+    }
+
+    .body {
+      position: absolute;
+      inset: 0;
+      clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
+      background: linear-gradient(135deg, #3a2a1c, #1f150d);
+      border-radius: 12px;
+    }
+
+    .body::after {
+      content: '';
+      position: absolute;
+      inset: 12px 24% 60px;
+      clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%);
+      background: #0f0a06;
+    }
+
+    .flash {
+      position: absolute;
+      inset: -30px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--flash-color, var(--beat)) 0%, transparent 60%);
+      opacity: 0;
+      filter: blur(20px);
+    }
+
+    .flash.is-active {
+      animation: flash .35s ease-out;
+    }
+
+    @keyframes flash {
+      from {
+        opacity: .45;
+      }
+    }
+
+    /*
+      El brazo gira alrededor de su base (transform-origin: bottom).
+      El ángulo lo calcula JS en cada frame a partir del reloj de audio.
+    */
+    .arm {
+      position: absolute;
+      left: 50%;
+      bottom: 70px;
+      width: 6px;
+      height: 210px;
+      margin-left: -3px;
+      border-radius: 3px;
+      background: linear-gradient(#e5e7eb, #9ca3af);
+      transform-origin: 50% 100%;
+      transform: rotate(var(--angle, 0deg));
+    }
+
+    .weight {
+      position: absolute;
+      left: 50%;
+      top: var(--weight-top, 30%);
+      width: 30px;
+      height: 22px;
+      margin-left: -15px;
+      border-radius: 6px;
+      background: linear-gradient(#fcd34d, #b45309);
+      box-shadow: 0 2px 6px #0008;
+      transition: top .25s;
+    }
+
+    .pivot {
+      position: absolute;
+      left: 50%;
+      bottom: 62px;
+      width: 16px;
+      height: 16px;
+      margin-left: -8px;
+      border-radius: 50%;
+      background: #d1d5db;
+    }
+
+    .dots {
+      display: flex;
+      gap: 12px;
+    }
+
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--line);
+      transition: background .08s, transform .08s, box-shadow .08s;
+    }
+
+    .dot.is-accent {
+      outline: 2px solid #fbbf2466;
+      outline-offset: 3px;
+    }
+
+    .dot.is-secondary {
+      outline: 2px solid #a78bfa55;
+      outline-offset: 3px;
+    }
+
+    .dot.is-group-start {
+      margin-left: 14px;
+    }
+
+    .dot.is-current {
+      background: var(--beat);
+      transform: scale(1.25);
+      box-shadow: 0 0 18px var(--beat);
+    }
+
+    .dot.is-current.is-accent {
+      background: var(--accent);
+      box-shadow: 0 0 18px var(--accent);
+    }
+
+    .dot.is-current.is-secondary {
+      background: var(--secondary);
+      box-shadow: 0 0 18px var(--secondary);
+    }
+
+    /* --- Controles --- */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      padding: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: .2em;
+      color: var(--muted);
+    }
+
+    .tempo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .bpm {
+      text-align: center;
+      flex: 1;
+    }
+
+    .bpm output {
+      display: block;
+      font-size: 88px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bpm small {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .bpm strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: #1b2030;
+      border-radius: 14px;
+      transition: background .15s, transform .1s, border-color .15s;
+    }
+
+    button:hover {
+      background: #232a3d;
+    }
+
+    button:active {
+      transform: scale(.96);
+    }
+
+    .step {
+      width: 52px;
+      height: 52px;
+      font-size: 24px;
+      border-radius: 50%;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .signatures button {
+      flex: 1;
+      padding: 10px 0;
+      font-weight: 600;
+    }
+
+    .signatures button[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1a1204;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 10px;
+    }
+
+    .tap {
+      padding: 16px;
+      font-weight: 600;
+    }
+
+    .tap.is-tapped {
+      border-color: var(--beat);
+    }
+
+    .play {
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1a1204;
+    }
+
+    .play:hover {
+      background: #fcd34d;
+    }
+
+    .play[aria-pressed="true"] {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #fff;
+    }
+
+    .options {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .options label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .options input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+
+    .options input[type="range"] {
+      width: 100px;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    kbd {
+      padding: 1px 6px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 800px) {
+      .app {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .metronome {
+        width: 200px;
+        height: 230px;
+      }
+
+      .arm {
+        height: 160px;
+        bottom: 55px;
+      }
+
+      .pivot {
+        bottom: 47px;
+      }
+
+      .bpm output {
+        font-size: 64px;
+      }
+
+      .controls {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="visual" aria-hidden="true">
+      <div class="metronome">
+        <div class="flash" id="flash"></div>
+        <div class="body"></div>
+        <div class="arm" id="arm">
+          <div class="weight" id="weight"></div>
+        </div>
+        <div class="pivot"></div>
+      </div>
+      <div class="dots" id="dots"></div>
+    </section>
+
+    <section class="controls">
+      <h1>Metrónomo</h1>
+
+      <div class="tempo">
+        <button class="step" id="minus" type="button" aria-label="Bajar tempo">−</button>
+        <div class="bpm">
+          <output id="bpm" for="slider">120</output>
+          <small>BPM · <strong id="tempo-name">Allegro</strong></small>
+        </div>
+        <button class="step" id="plus" type="button" aria-label="Subir tempo">+</button>
+      </div>
+
+      <input type="range" id="slider" min="30" max="300" value="120" aria-label="Tempo en BPM">
+
+      <div class="row signatures" id="signatures" role="group" aria-label="Compás">
+        <button type="button" data-signature="2/4">2/4</button>
+        <button type="button" data-signature="3/4">3/4</button>
+        <button type="button" data-signature="4/4">4/4</button>
+        <button type="button" data-signature="6/8">6/8</button>
+      </div>
+
+      <div class="options">
+        <label><input type="checkbox" id="accent" checked> Acentuar el primer tiempo</label>
+        <label>🔊 <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7" aria-label="Volumen"></label>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="tap" id="tap">👆 Tap tempo</button>
+        <button type="button" class="play" id="play" aria-pressed="false">▶ Empezar</button>
+      </div>
+
+      <p class="hint"><kbd>Espacio</kbd> empezar/parar · <kbd>T</kbd> tap · <kbd>←</kbd> <kbd>→</kbd> tempo</p>
+    </section>
+  </main>
+
+  <script type="module">
+    const MIN_BPM = 30
+    const MAX_BPM = 300
+    // Cada cuánto se despierta el planificador (ms)
+    const LOOKAHEAD_MS = 25
+    // Cuánto tiempo hacia el futuro programamos notas (segundos)
+    const SCHEDULE_AHEAD_S = 0.1
+    const NOTE_LENGTH_S = 0.05
+    const MAX_SWING_DEG = 28
+    const TAP_RESET_MS = 2000
+    const MAX_TAPS = 6
+    const SIGNATURES = {
+      '2/4': { beats: 2, secondary: [] },
+      '3/4': { beats: 3, secondary: [] },
+      '4/4': { beats: 4, secondary: [] },
+      // En 6/8 se marcan 6 corcheas agrupadas de 3 en 3: acento secundario en la 4ª
+      '6/8': { beats: 6, secondary: [3] }
+    }
+    const TEMPO_NAMES = [
+      [40, 'Grave'], [60, 'Largo'], [66, 'Larghetto'], [76, 'Adagio'],
+      [108, 'Andante'], [120, 'Moderato'], [168, 'Allegro'], [200, 'Presto'], [Infinity, 'Prestissimo']
+    ]
+
+    const $bpm = document.querySelector('#bpm')
+    const $slider = document.querySelector('#slider')
+    const $tempoName = document.querySelector('#tempo-name')
+    const $dots = document.querySelector('#dots')
+    const $arm = document.querySelector('#arm')
+    const $weight = document.querySelector('#weight')
+    const $flash = document.querySelector('#flash')
+    const $play = document.querySelector('#play')
+    const $tap = document.querySelector('#tap')
+    const $accent = document.querySelector('#accent')
+    const $volume = document.querySelector('#volume')
+
+    let bpm = 120
+    let signature = SIGNATURES['4/4']
+    let isPlaying = false
+
+    let audioContext = null
+    let masterGain = null
+    let timerId = null
+    let rafId = null
+    let nextNoteTime = 0
+    let currentBeat = 0
+    let noteCount = 0
+    // Cola de notas ya programadas en el audio pero que aún no se han "visto"
+    let noteQueue = []
+    let lastNote = null
+    let taps = []
+
+    /*
+      ¿Por qué no un simple setInterval(click, 60000 / bpm)?
+      Los temporizadores de JavaScript NO son precisos: se ejecutan en el
+      hilo principal, así que cualquier trabajo (layout, GC, otro script)
+      los retrasa unos milisegundos, y en pestañas en segundo plano el
+      navegador los agrupa o los frena hasta 1 vez por segundo. Esos
+      retrasos se acumulan y el oído detecta desfases de ~5 ms.
+
+      El AudioContext, en cambio, tiene su propio reloj (currentTime) en
+      el hilo de audio, con precisión de muestra. Así que hacemos esto:
+      un setTimeout frecuente (cada 25 ms) solo sirve para "despertar" y
+      programar, con tiempos exactos del reloj de audio, todas las notas
+      que caigan en los próximos 100 ms. Aunque el setTimeout llegue
+      tarde, las notas ya estaban programadas y suenan en su momento.
+      Este patrón se conoce como "lookahead scheduler" (A Tale of Two Clocks).
+    */
+    function scheduler() {
+      const now = audioContext.currentTime
+
+      // Si nos hemos quedado muy atrás (pestaña congelada), saltamos las
+      // notas perdidas en lugar de hacerlas sonar todas de golpe
+      if (nextNoteTime < now - SCHEDULE_AHEAD_S) {
+        while (nextNoteTime < now) advanceNote()
+      }
+
+      while (nextNoteTime < now + SCHEDULE_AHEAD_S) {
+        scheduleNote(currentBeat, nextNoteTime)
+        advanceNote()
+      }
+
+      timerId = setTimeout(scheduler, LOOKAHEAD_MS)
+    }
+
+    function advanceNote() {
+      // El tempo se lee en cada nota: si cambias los BPM, afecta a la siguiente
+      nextNoteTime += 60 / bpm
+      currentBeat = (currentBeat + 1) % signature.beats
+      noteCount++
+    }
+
+    function getBeatType(beat) {
+      if (beat === 0 && $accent.checked) return 'accent'
+      if (signature.secondary.includes(beat)) return 'secondary'
+      return 'beat'
+    }
+
+    function scheduleNote(beat, time) {
+      const type = getBeatType(beat)
+      noteQueue.push({ beat, time, type, count: noteCount })
+
+      // Un "click" es un oscilador muy corto con una envolvente de volumen
+      const oscillator = audioContext.createOscillator()
+      const envelope = audioContext.createGain()
+      oscillator.frequency.value = type === 'accent' ? 1600 : type === 'secondary' ? 1250 : 1000
+
+      // Rampas exponenciales para evitar el "clic" del corte brusco (no pueden llegar a 0)
+      envelope.gain.setValueAtTime(0.0001, time)
+      envelope.gain.exponentialRampToValueAtTime(type === 'beat' ? 0.6 : 1, time + 0.002)
+      envelope.gain.exponentialRampToValueAtTime(0.0001, time + NOTE_LENGTH_S)
+
+      oscillator.connect(envelope).connect(masterGain)
+      oscillator.start(time)
+      oscillator.stop(time + NOTE_LENGTH_S + 0.01)
+    }
+
+    // --- Dibujo sincronizado ---
+
+    /*
+      El indicador visual no puede basarse en el setTimeout (iría
+      desfasado). En cada frame (requestAnimationFrame) miramos el reloj
+      de audio y sacamos de la cola las notas cuyo momento ya ha llegado.
+      Restamos la latencia de salida: el sonido tarda unos ms (más con
+      Bluetooth) desde que se procesa hasta que sale por el altavoz.
+    */
+    function draw() {
+      if (!isPlaying) return
+
+      const latency = audioContext.outputLatency || audioContext.baseLatency || 0
+      const audibleTime = audioContext.currentTime - latency
+
+      while (noteQueue.length && noteQueue[0].time <= audibleTime) {
+        lastNote = noteQueue.shift()
+        showBeat(lastNote)
+      }
+
+      if (lastNote) {
+        const duration = noteQueue.length ? noteQueue[0].time - lastNote.time : 60 / bpm
+        const phase = Math.min(Math.max((audibleTime - lastNote.time) / duration, 0), 1)
+        // En cada nota el brazo está en un extremo y va hacia el contrario
+        const direction = lastNote.count % 2 === 0 ? 1 : -1
+        setArmAngle(direction * MAX_SWING_DEG * Math.cos(Math.PI * phase))
+      }
+
+      rafId = requestAnimationFrame(draw)
+    }
+
+    function setArmAngle(degrees) {
+      $arm.style.setProperty('--angle', `${degrees}deg`)
+    }
+
+    function showBeat({ beat, type }) {
+      $dots.querySelectorAll('.dot').forEach((dot, index) => {
+        dot.classList.toggle('is-current', index === beat)
+      })
+      const colors = { accent: 'var(--accent)', secondary: 'var(--secondary)', beat: 'var(--beat)' }
+      $flash.style.setProperty('--flash-color', colors[type])
+      $flash.classList.remove('is-active')
+      // Forzamos un reflow para poder reiniciar la animación CSS
+      void $flash.offsetWidth
+      $flash.classList.add('is-active')
+    }
+
+    // --- Arranque y parada ---
+
+    async function start() {
+      isPlaying = true
+      // El AudioContext debe crearse (o reanudarse) tras un gesto del usuario
+      if (!audioContext) {
+        audioContext = new AudioContext()
+        masterGain = audioContext.createGain()
+        masterGain.gain.value = Number($volume.value)
+        masterGain.connect(audioContext.destination)
+      }
+      if (audioContext.state === 'suspended') await audioContext.resume()
+
+      if (!isPlaying) return
+      clearTimeout(timerId)
+      cancelAnimationFrame(rafId)
+      currentBeat = 0
+      noteCount = 0
+      noteQueue = []
+      lastNote = null
+      nextNoteTime = audioContext.currentTime + 0.05
+
+      $play.setAttribute('aria-pressed', 'true')
+      $play.textContent = '■ Parar'
+      scheduler()
+      rafId = requestAnimationFrame(draw)
+    }
+
+    function stop() {
+      isPlaying = false
+      clearTimeout(timerId)
+      cancelAnimationFrame(rafId)
+      noteQueue = []
+      $play.setAttribute('aria-pressed', 'false')
+      $play.textContent = '▶ Empezar'
+      $dots.querySelectorAll('.dot').forEach(dot => dot.classList.remove('is-current'))
+      $arm.animate([{ transform: getComputedStyle($arm).transform }, { transform: 'rotate(0deg)' }], { duration: 300, easing: 'ease-out' })
+      setArmAngle(0)
+    }
+
+    function togglePlay() {
+      if (isPlaying) stop()
+      else start().catch(() => {
+        isPlaying = false
+        $play.textContent = 'Audio no disponible'
+      })
+    }
+
+    // --- Tempo ---
+
+    function getTempoName(value) {
+      return TEMPO_NAMES.find(([limit]) => value < limit)[1]
+    }
+
+    function setBpm(value) {
+      bpm = Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(value)))
+      $bpm.textContent = bpm
+      $slider.value = bpm
+      $tempoName.textContent = getTempoName(bpm)
+      // Como en un metrónomo de verdad: cuanto más arriba la pesa, más lento
+      const progress = (bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)
+      $weight.style.setProperty('--weight-top', `${8 + progress * 62}%`)
+    }
+
+    /*
+      Tap tempo: guardamos el instante de cada toque y calculamos la
+      media de los intervalos entre los últimos. Si pasan más de 2 s
+      sin tocar, empezamos una medición nueva.
+    */
+    function tap() {
+      const now = performance.now()
+      if (taps.length && now - taps.at(-1) > TAP_RESET_MS) taps = []
+      taps.push(now)
+      if (taps.length > MAX_TAPS) taps.shift()
+
+      $tap.classList.add('is-tapped')
+      setTimeout(() => $tap.classList.remove('is-tapped'), 100)
+
+      if (taps.length < 2) {
+        $tap.textContent = '👆 Sigue tocando…'
+        return
+      }
+
+      const intervals = taps.slice(1).map((time, index) => time - taps[index])
+      const average = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length
+      setBpm(60000 / average)
+      $tap.textContent = `👆 Tap (${taps.length})`
+    }
+
+    // --- Compás ---
+
+    function setSignature(name) {
+      signature = SIGNATURES[name]
+      currentBeat = 0
+      document.querySelectorAll('#signatures button').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.signature === name)
+      })
+      $dots.replaceChildren(...Array.from({ length: signature.beats }, (_, index) => {
+        const dot = document.createElement('span')
+        dot.className = 'dot'
+        dot.classList.toggle('is-accent', index === 0)
+        dot.classList.toggle('is-secondary', signature.secondary.includes(index))
+        dot.classList.toggle('is-group-start', signature.secondary.includes(index))
+        return dot
+      }))
+    }
+
+    // --- Eventos ---
+
+    $play.addEventListener('click', togglePlay)
+    $tap.addEventListener('pointerdown', tap)
+    $tap.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') tap()
+    })
+    $slider.addEventListener('input', () => setBpm(Number($slider.value)))
+    document.querySelector('#minus').addEventListener('click', () => setBpm(bpm - 1))
+    document.querySelector('#plus').addEventListener('click', () => setBpm(bpm + 1))
+    $volume.addEventListener('input', () => {
+      if (masterGain) masterGain.gain.setTargetAtTime(Number($volume.value), audioContext.currentTime, 0.01)
+    })
+    document.querySelector('#signatures').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (button) setSignature(button.dataset.signature)
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.target.matches('input[type="range"]') && event.key.startsWith('Arrow')) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        togglePlay()
+      } else if (event.key.toLowerCase() === 't' && !event.repeat) {
+        tap()
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        setBpm(bpm + (event.shiftKey ? 10 : 1))
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+        event.preventDefault()
+        setBpm(bpm - (event.shiftKey ? 10 : 1))
+      }
+    })
+
+    // Evitamos que "Espacio" pulse también el botón que tenga el foco
+    document.querySelectorAll('button').forEach(button => {
+      button.addEventListener('keyup', (event) => {
+        if (event.code === 'Space') event.preventDefault()
+      })
+    })
+
+    setSignature('4/4')
+    setBpm(120)
+    setArmAngle(-MAX_SWING_DEG * 0.6)
+  </script>
+</body>
+
+</html>

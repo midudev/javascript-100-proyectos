@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>17 - Generador de contraseñas</title>
+  <style>
+    :root {
+      --bg: #09090f;
+      --surface: #13131d;
+      --surface-2: #1b1b29;
+      --border: #272738;
+      --text: #ececf4;
+      --muted: #8d8da5;
+      --accent: #a78bfa;
+      --digit: #60a5fa;
+      --symbol: #f472b6;
+      --strength: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(ellipse at top, rgba(167, 139, 250, 0.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    main {
+      width: min(100%, 580px);
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+
+    .card {
+      display: grid;
+      gap: 18px;
+      padding: 22px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: 0 30px 80px -30px rgba(167, 139, 250, 0.35);
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    .tabs button {
+      padding: 9px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tabs button[aria-selected='true'] {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    /* --- Resultado --- */
+    .output {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 14px 14px 18px;
+      border-radius: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+
+    .password {
+      flex: 1;
+      min-height: 1.5em;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: clamp(1rem, 3.6vw, 1.3rem);
+      line-height: 1.5;
+      word-break: break-all;
+      user-select: all;
+    }
+
+    .password .digit {
+      color: var(--digit);
+    }
+
+    .password .symbol {
+      color: var(--symbol);
+    }
+
+    .icon-button {
+      flex-shrink: 0;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .icon-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .icon-button.is-copied {
+      background: #16a34a;
+      border-color: #16a34a;
+    }
+
+    /* --- Fortaleza --- */
+    .strength {
+      display: grid;
+      gap: 8px;
+    }
+
+    .strength-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+
+    .strength-header strong {
+      color: var(--strength);
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+
+    .bar div {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: var(--strength);
+      box-shadow: 0 0 12px var(--strength);
+      transition: width 0.4s ease, background 0.4s;
+    }
+
+    .formula {
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .formula code {
+      color: var(--text);
+    }
+
+    /* --- Opciones --- */
+    .options {
+      display: grid;
+      gap: 14px;
+    }
+
+    .options[hidden] {
+      display: none;
+    }
+
+    .range {
+      display: grid;
+      gap: 8px;
+    }
+
+    .range label {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+
+    .range output {
+      min-width: 2.5ch;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--accent);
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type='range'] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .checks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--surface-2);
+      cursor: pointer;
+      font-size: 0.92rem;
+    }
+
+    .check small {
+      margin-left: auto;
+      font-family: ui-monospace, Menlo, monospace;
+      color: var(--muted);
+    }
+
+    .check input {
+      width: 17px;
+      height: 17px;
+      accent-color: var(--accent);
+    }
+
+    select {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+    }
+
+    .select-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: var(--surface-2);
+      font-size: 0.92rem;
+    }
+  </style>
+
+  <script type="module">
+    const $password = document.querySelector('.password')
+    const $regenerate = document.querySelector('#regenerate')
+    const $copy = document.querySelector('#copy')
+    const $tabs = document.querySelectorAll('.tabs button')
+    const $passwordOptions = document.querySelector('#password-options')
+    const $passphraseOptions = document.querySelector('#passphrase-options')
+    const $length = document.querySelector('#length')
+    const $lengthOutput = document.querySelector('#length-output')
+    const $words = document.querySelector('#words')
+    const $wordsOutput = document.querySelector('#words-output')
+    const $separator = document.querySelector('#separator')
+    const $strengthLabel = document.querySelector('#strength-label')
+    const $bits = document.querySelector('#bits')
+    const $bar = document.querySelector('.bar div')
+    const $formula = document.querySelector('.formula')
+
+    // CONSTANTES
+    const CHARSETS = {
+      upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      lower: 'abcdefghijklmnopqrstuvwxyz',
+      numbers: '0123456789',
+      symbols: '!@#$%^&*()-_=+[]{};:,.<>?/~'
+    }
+
+    // Caracteres que se confunden fácilmente al leerlos o dictarlos
+    const AMBIGUOUS = new Set('Il1O0o')
+
+    // Lista corta de palabras (sin tildes para que sean fáciles de teclear).
+    // Las listas "de verdad" como la de la EFF tienen 7776 palabras
+    const WORDS = [...new Set(`
+      agua abeja abrazo aceite acero actor ajedrez alba alegre almendra alto amigo
+      ancla anillo antena arena armario arroz astro atlas avena azul bailar ballena
+      banco barco barro bosque botella brisa bruma burbuja caballo cabra cacao cadena
+      calor cama camino campana canela canoa cantar caracol carta castillo cebra cena
+      cereza cielo cine circo ciudad clavo cobre cohete collar cometa conejo copa
+      coral corona cuerda cueva dardo desierto diente ducha duende eco elefante enano
+      escoba espada espejo estrella faro fiesta flecha flor foca fresa fruta fuego
+      fuente galleta gato gigante globo gorila gota grano grillo guitarra hada harina
+      helado hierba hielo hoja hormiga hueso huevo humo isla jirafa joya juego junco
+      koala lago lana leche lechuza libro llave lluvia lobo loro luna madera maleta
+      mango manzana mapa mar marco martillo medusa mesa miel molino moneda mosca mundo
+      museo naranja nave niebla nieve nube nuez oasis ola olivo oro oso oveja paloma
+      pan panda papel parque pasta pato peine pelota perla perro pez piano piedra
+      pimienta pino pirata planeta plata playa pluma pollo puente puerta pulpo queso
+      radio rana rayo reloj roble roca rosa rueda sal salsa selva semilla serpiente
+      silla sol sombra sopa tambor taza tejado tigre tijera tierra tomate tormenta
+      toro torre tortuga trigo trueno tren tubo uva vaca valle vela ventana verde
+      viento yate yogur zapato zorro cactus chispa chocolate cangrejo calabaza bufanda
+      bombilla bicicleta barca abanico aguja ardilla bandera bigote bolsa burro camello
+      canguro cerdo cisne cuchara dinosaurio erizo gallina granja hamaca jarra lagarto
+      linterna mochila nido nutria paraguas patata pepino raqueta sirena trompeta
+      unicornio vaso velero zanahoria
+    `.trim().split(/\s+/))]
+
+    const STRENGTH_LEVELS = [
+      { min: 0, label: 'Muy débil', color: '#ef4444' },
+      { min: 36, label: 'Débil', color: '#f97316' },
+      { min: 60, label: 'Aceptable', color: '#eab308' },
+      { min: 80, label: 'Fuerte', color: '#22c55e' },
+      { min: 110, label: 'Muy fuerte', color: '#10b981' }
+    ]
+
+    // Suponemos un ataque offline con GPUs: 10.000 millones de intentos por segundo
+    const GUESSES_PER_SECOND = 1e10
+    const SECONDS_PER_YEAR = 31_557_600
+    const UNIVERSE_AGE_YEARS = 1.38e10
+
+    let mode = 'password'
+
+    // ¿Por qué no Math.random()?
+    // Math.random es un generador PSEUDOaleatorio pensado para juegos y
+    // simulaciones: es rápido pero predecible. Con suficientes salidas se
+    // puede deducir su estado interno y adivinar los siguientes valores.
+    // crypto.getRandomValues usa la fuente de entropía del sistema operativo
+    // y es criptográficamente seguro.
+    //
+    // Además evitamos el SESGO DEL MÓDULO: si hacemos `valor % max` con un
+    // valor entre 0 y 2³² - 1, los primeros restos salen un poquito más
+    // a menudo (2³² no es múltiplo de max). Con "rejection sampling"
+    // descartamos los valores de la última vuelta incompleta y repetimos.
+    function secureRandomInt(max) {
+      const limit = Math.floor(2 ** 32 / max) * max
+      const buffer = new Uint32Array(1)
+
+      do {
+        crypto.getRandomValues(buffer)
+      } while (buffer[0] >= limit)
+
+      return buffer[0] % max
+    }
+
+    function pick(list) {
+      return list[secureRandomInt(list.length)]
+    }
+
+    // Fisher-Yates con números aleatorios seguros
+    function secureShuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = secureRandomInt(i + 1)
+        const temp = array[i]
+        array[i] = array[j]
+        array[j] = temp
+      }
+      return array
+    }
+
+    function getPools() {
+      const avoidAmbiguous = document.querySelector('#ambiguous').checked
+
+      return Object.keys(CHARSETS)
+        .filter((name) => document.querySelector(`#${name}`).checked)
+        .map((name) => [...CHARSETS[name]].filter((char) => !avoidAmbiguous || !AMBIGUOUS.has(char)))
+    }
+
+    function generatePassword() {
+      const length = Number($length.value)
+      const pools = getPools()
+      const alphabet = pools.flat()
+
+      // Garantizamos al menos un carácter de cada conjunto elegido...
+      const chars = pools.map((pool) => pick(pool))
+
+      // ...rellenamos el resto con el alfabeto completo...
+      while (chars.length < length) chars.push(pick(alphabet))
+
+      // ...y barajamos para que los caracteres garantizados no estén siempre al principio
+      const password = secureShuffle(chars).slice(0, length).join('')
+
+      // Entropía = longitud × log2(tamaño del alfabeto).
+      // (Garantizar un carácter de cada tipo la reduce un pelín, es despreciable)
+      const bits = length * Math.log2(alphabet.length)
+      const formula = `${length} caracteres × log₂(${alphabet.length} símbolos posibles)`
+
+      return { password, bits, formula }
+    }
+
+    function generatePassphrase() {
+      const count = Number($words.value)
+      const separator = $separator.value
+      const capitalize = document.querySelector('#capitalize').checked
+      const addNumber = document.querySelector('#add-number').checked
+
+      const words = Array.from({ length: count }, () => {
+        const word = pick(WORDS)
+        return capitalize ? word[0].toUpperCase() + word.slice(1) : word
+      })
+
+      // Cada palabra aporta log2(tamaño de la lista) bits.
+      // Poner mayúsculas o elegir separador NO añade entropía: es predecible
+      let bits = count * Math.log2(WORDS.length)
+      let formula = `${count} palabras × log₂(${WORDS.length} palabras en la lista)`
+
+      if (addNumber) {
+        words.push(String(10 + secureRandomInt(90)))
+        bits += Math.log2(90)
+        formula += ' + log₂(90) del número'
+      }
+
+      return { password: words.join(separator), bits, formula }
+    }
+
+    function formatCrackTime(bits) {
+      // De media, un atacante encuentra la clave tras probar la mitad de combinaciones
+      const seconds = 2 ** (bits - 1) / GUESSES_PER_SECOND
+
+      if (seconds < 1) return 'al instante'
+      if (seconds < 60) return `${Math.round(seconds)} segundos`
+      if (seconds < 3600) return `${Math.round(seconds / 60)} minutos`
+      if (seconds < 86_400) return `${Math.round(seconds / 3600)} horas`
+
+      const years = seconds / SECONDS_PER_YEAR
+      if (years < 1) return `${Math.round(seconds / 86_400)} días`
+      if (years > UNIVERSE_AGE_YEARS) return 'más que la edad del universo 🌌'
+
+      const formatter = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
+      return `${formatter.format(years)} años`
+    }
+
+    function renderPassword(password) {
+      // Construimos nodos en lugar de usar innerHTML: la contraseña puede
+      // contener < > & y no queremos que se interprete como HTML
+      const fragment = document.createDocumentFragment()
+
+      for (const char of password) {
+        const $span = document.createElement('span')
+        $span.textContent = char
+        if (/\d/.test(char)) $span.className = 'digit'
+        else if (!/[a-z]/i.test(char)) $span.className = 'symbol'
+        fragment.append($span)
+      }
+
+      $password.replaceChildren(fragment)
+    }
+
+    function renderStrength(bits, formula) {
+      const level = STRENGTH_LEVELS.findLast(({ min }) => bits >= min) ?? STRENGTH_LEVELS[0]
+
+      document.body.style.setProperty('--strength', level.color)
+      $strengthLabel.textContent = level.label
+      $bits.textContent = `${Math.round(bits)} bits de entropía`
+      $bar.style.width = `${Math.min(100, (bits / 128) * 100)}%`
+      $formula.innerHTML = `
+        <code>${formula} ≈ ${bits.toFixed(1)} bits</code><br>
+        Tiempo medio para adivinarla a 10.000 millones de intentos/s:
+        <strong>${formatCrackTime(bits)}</strong>
+      `
+    }
+
+    function generate() {
+      const { password, bits, formula } = mode === 'password'
+        ? generatePassword()
+        : generatePassphrase()
+
+      renderPassword(password)
+      renderStrength(bits, formula)
+      $copy.dataset.value = password
+    }
+
+    // COPIAR
+    async function copyPassword() {
+      const value = $copy.dataset.value
+
+      try {
+        // La Clipboard API es asíncrona y solo funciona en contextos seguros (HTTPS o localhost)
+        await navigator.clipboard.writeText(value)
+      } catch {
+        // Plan B: seleccionar el texto y usar el antiguo execCommand
+        const selection = window.getSelection()
+        selection.selectAllChildren($password)
+        const copied = document.execCommand('copy')
+        if (!copied) {
+          showCopyFeedback('Selecciónala y copia', false)
+          return
+        }
+      }
+
+      showCopyFeedback('¡Copiada! ✓', true)
+    }
+
+    let copyTimeoutId = null
+
+    function showCopyFeedback(text, success) {
+      $copy.textContent = text
+      $copy.classList.toggle('is-copied', success)
+      clearTimeout(copyTimeoutId)
+      copyTimeoutId = setTimeout(() => {
+        $copy.textContent = 'Copiar'
+        $copy.classList.remove('is-copied')
+      }, 1600)
+    }
+
+    // EVENTOS
+    function syncOutputs() {
+      $lengthOutput.textContent = $length.value
+      $wordsOutput.textContent = $words.value
+    }
+
+    document.querySelector('main').addEventListener('input', (event) => {
+      const $input = event.target
+      if (!$input.matches('input, select')) return
+
+      // No dejamos desmarcar el último conjunto de caracteres:
+      // sin alfabeto no se puede generar nada
+      const isLastCharset = $input.matches('.charset') &&
+        document.querySelectorAll('.charset:checked').length === 0
+      if (isLastCharset) $input.checked = true
+
+      syncOutputs()
+      generate()
+    })
+
+    $tabs.forEach(($tab) => {
+      $tab.addEventListener('click', () => {
+        mode = $tab.dataset.mode
+        $tabs.forEach(($t) => $t.setAttribute('aria-selected', String($t === $tab)))
+        $passwordOptions.hidden = mode !== 'password'
+        $passphraseOptions.hidden = mode !== 'passphrase'
+        generate()
+      })
+    })
+
+    $regenerate.addEventListener('click', generate)
+    $copy.addEventListener('click', copyPassword)
+
+    syncOutputs()
+    generate()
+  </script>
+</head>
+
+<body>
+  <main>
+    <h1>🔐 Generador de contraseñas</h1>
+
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-mode="password" aria-selected="true">Contraseña</button>
+        <button role="tab" data-mode="passphrase" aria-selected="false">Frase de contraseña</button>
+      </div>
+
+      <div class="output">
+        <div class="password" aria-live="polite"></div>
+        <button id="regenerate" class="icon-button" title="Generar otra" aria-label="Generar otra">↻</button>
+        <button id="copy" class="icon-button">Copiar</button>
+      </div>
+
+      <section class="strength">
+        <div class="strength-header">
+          <strong id="strength-label">—</strong>
+          <span id="bits"></span>
+        </div>
+        <div class="bar">
+          <div></div>
+        </div>
+        <p class="formula"></p>
+      </section>
+
+      <section id="password-options" class="options">
+        <div class="range">
+          <label for="length">Longitud <output id="length-output">16</output></label>
+          <input id="length" type="range" min="4" max="64" value="16">
+        </div>
+        <div class="checks">
+          <label class="check"><input class="charset" id="upper" type="checkbox" checked> Mayúsculas <small>A-Z</small></label>
+          <label class="check"><input class="charset" id="lower" type="checkbox" checked> Minúsculas <small>a-z</small></label>
+          <label class="check"><input class="charset" id="numbers" type="checkbox" checked> Números <small>0-9</small></label>
+          <label class="check"><input class="charset" id="symbols" type="checkbox" checked> Símbolos <small>!@#</small></label>
+          <label class="check"><input id="ambiguous" type="checkbox"> Evitar ambiguos <small>Il1O0o</small></label>
+        </div>
+      </section>
+
+      <section id="passphrase-options" class="options" hidden>
+        <div class="range">
+          <label for="words">Palabras <output id="words-output">5</output></label>
+          <input id="words" type="range" min="3" max="10" value="5">
+        </div>
+        <div class="checks">
+          <label class="check"><input id="capitalize" type="checkbox" checked> Primera letra en mayúscula</label>
+          <label class="check"><input id="add-number" type="checkbox" checked> Añadir un número</label>
+        </div>
+        <label class="select-row">Separador
+          <select id="separator">
+            <option value="-">Guion ( - )</option>
+            <option value=".">Punto ( . )</option>
+            <option value="_">Guion bajo ( _ )</option>
+            <option value=" ">Espacio</option>
+          </select>
+        </label>
+      </section>
+    </div>
+  </main>
+</body>
+
+</html>

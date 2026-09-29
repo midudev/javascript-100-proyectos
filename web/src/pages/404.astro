@@ -1,0 +1,21 @@
+---
+import Layout from "../layouts/Layout.astro"
+import Header from "../components/Header.astro"
+---
+
+<Layout title="Página no encontrada | 100 proyectos de JavaScript" noindex>
+  <main
+    class="min-h-screen flex flex-col items-center justify-center gap-8 px-8 text-center"
+  >
+    <Header />
+    <p class="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+      Esta página no existe (todavía).
+    </p>
+    <a
+      href="/"
+      class="rounded-lg bg-yellow-300 px-4 py-2 text-sm font-semibold text-black transition hover:bg-yellow-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+    >
+      ← Volver a los proyectos
+    </a>
+  </main>
+</Layout>

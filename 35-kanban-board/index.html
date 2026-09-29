@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>35 - Tablero Kanban</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #eef2f7;
+      --column: #e2e8f0;
+      --card: #fff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --accent: #4f46e5;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 0 0, #dbeafe 0, transparent 40%),
+        radial-gradient(circle at 100% 100%, #ede9fe 0, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body.is-dragging {
+      cursor: grabbing;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -.5px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .reset {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .reset:hover {
+      color: var(--text);
+    }
+
+    .board {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      padding: 12px 24px 24px;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: rgb(226 232 240 / .7);
+      border: 1px solid rgb(203 213 225 / .6);
+      border-radius: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 14px 10px;
+    }
+
+    .column-header h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--color);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color) 20%, transparent);
+    }
+
+    .count {
+      min-width: 24px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .add {
+      margin-left: auto;
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .add:hover {
+      background: #fff;
+      color: var(--accent);
+    }
+
+    .list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 80px;
+      padding: 4px 12px 14px;
+      overflow-y: auto;
+    }
+
+    .list:empty::before {
+      content: 'Suelta aquí una tarjeta';
+      display: grid;
+      place-content: center;
+      height: 80px;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .card {
+      position: relative;
+      padding: 12px 36px 12px 14px;
+      background: var(--card);
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgb(15 23 42 / .06), 0 2px 8px rgb(15 23 42 / .04);
+      cursor: grab;
+      /* Sin esto, en móvil el navegador usaría el gesto para hacer scroll
+         y cancelaría nuestros pointer events (pointercancel) */
+      touch-action: none;
+      transition: box-shadow .15s;
+    }
+
+    .card:hover {
+      box-shadow: 0 2px 4px rgb(15 23 42 / .08), 0 8px 20px rgb(15 23 42 / .08);
+    }
+
+    .card.is-hidden {
+      display: none;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .done .card p {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: hsl(var(--hue) 85% 93%);
+      color: hsl(var(--hue) 60% 32%);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .delete {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      opacity: 0;
+    }
+
+    .card:hover .delete,
+    .delete:focus-visible {
+      opacity: 1;
+    }
+
+    .delete:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+
+    @media (hover: none) {
+      .delete {
+        opacity: 1;
+      }
+    }
+
+    .card.is-editing {
+      padding: 8px;
+      cursor: default;
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    .card textarea {
+      width: 100%;
+      min-height: 64px;
+      padding: 6px;
+      border: 0;
+      outline: 0;
+      resize: vertical;
+      font: inherit;
+      font-size: 14px;
+      color: inherit;
+    }
+
+    .card small {
+      display: block;
+      padding: 0 6px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .placeholder {
+      flex-shrink: 0;
+      border: 2px dashed var(--accent);
+      border-radius: 12px;
+      background: rgb(79 70 229 / .06);
+    }
+
+    .ghost {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10;
+      margin: 0;
+      pointer-events: none;
+      cursor: grabbing;
+      box-shadow: 0 18px 40px rgb(15 23 42 / .22);
+      will-change: transform;
+    }
+
+    .ghost .delete {
+      display: none;
+    }
+
+    @media (width < 760px) {
+      header {
+        padding: 16px 16px 4px;
+      }
+
+      .board {
+        display: flex;
+        flex-direction: column;
+        padding: 12px 16px 24px;
+        overflow-y: auto;
+      }
+
+      .column {
+        flex-shrink: 0;
+      }
+
+      .list {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>📋 Tablero Kanban</h1>
+      <p>Arrastra las tarjetas · Doble clic para editar · Usa #etiquetas</p>
+    </div>
+    <button class="reset" id="reset">Restablecer</button>
+  </header>
+
+  <main class="board" id="board">
+    <section class="column" data-column="todo" style="--color: #6366f1">
+      <div class="column-header">
+        <span class="dot"></span>
+        <h2>Por hacer</h2>
+        <span class="count">0</span>
+        <button class="add" aria-label="Añadir tarjeta">+</button>
+      </div>
+      <div class="list"></div>
+    </section>
+
+    <section class="column" data-column="doing" style="--color: #f59e0b">
+      <div class="column-header">
+        <span class="dot"></span>
+        <h2>En progreso</h2>
+        <span class="count">0</span>
+        <button class="add" aria-label="Añadir tarjeta">+</button>
+      </div>
+      <div class="list"></div>
+    </section>
+
+    <section class="column done" data-column="done" style="--color: #10b981">
+      <div class="column-header">
+        <span class="dot"></span>
+        <h2>Hecho</h2>
+        <span class="count">0</span>
+        <button class="add" aria-label="Añadir tarjeta">+</button>
+      </div>
+      <div class="list"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    const STORAGE_KEY = 'kanban-board-state'
+    const DRAG_THRESHOLD = 5 // píxeles antes de considerar que empieza el arrastre
+    const COLUMN_IDS = ['todo', 'doing', 'done']
+    const TAG_REGEX = /#[\p{L}\d_-]+/gu
+
+    const DEMO_STATE = {
+      todo: [
+        'Diseñar la pantalla de inicio #diseño',
+        'Añadir modo oscuro #feature',
+        'Escribir tests del carrito de la compra #testing',
+        'Revisar la accesibilidad de los formularios #a11y #ux'
+      ],
+      doing: [
+        'Migrar las peticiones a la Fetch API #refactor',
+        'Arreglar el scroll en Safari iOS #bug'
+      ],
+      done: [
+        'Configurar el repositorio y el linter #devops',
+        'Crear el logo del proyecto #diseño',
+        'Publicar la primera versión 🚀'
+      ]
+    }
+
+    const $board = document.querySelector('#board')
+    const $reset = document.querySelector('#reset')
+
+    // ---------- ESTADO ----------
+    // Patrón "estado único": toda la información vive en este objeto.
+    // El DOM nunca es la fuente de verdad: cada cambio modifica el estado,
+    // lo guarda en localStorage y vuelve a pintar (render) la interfaz.
+    let state = loadState()
+
+    function createId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+    }
+
+    function createDemoState() {
+      return Object.fromEntries(
+        COLUMN_IDS.map(id => [id, DEMO_STATE[id].map(text => ({ id: createId(), text }))])
+      )
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        // Validamos la forma de los datos: localStorage puede tener basura
+        if (saved && COLUMN_IDS.every(id => Array.isArray(saved[id]))) return saved
+      } catch {}
+      return createDemoState()
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      } catch {}
+    }
+
+    function commit() {
+      saveState()
+      render()
+    }
+
+    function findCard(cardId) {
+      for (const columnId of COLUMN_IDS) {
+        const index = state[columnId].findIndex(card => card.id === cardId)
+        if (index !== -1) return { columnId, index, card: state[columnId][index] }
+      }
+      return null
+    }
+
+    function moveCard(cardId, toColumn, toIndex) {
+      const found = findCard(cardId)
+      if (!found) return
+      state[found.columnId].splice(found.index, 1)
+      state[toColumn].splice(toIndex, 0, found.card)
+      commit()
+    }
+
+    function updateCard(cardId, text) {
+      const found = findCard(cardId)
+      if (found) found.card.text = text
+      commit()
+    }
+
+    function deleteCard(cardId) {
+      const found = findCard(cardId)
+      if (found) state[found.columnId].splice(found.index, 1)
+      commit()
+    }
+
+    function addCard(columnId, text) {
+      state[columnId].unshift({ id: createId(), text })
+      commit()
+    }
+
+    // ---------- RENDER ----------
+    function getList(columnId) {
+      return $board.querySelector(`[data-column="${columnId}"] .list`)
+    }
+
+    function hueFromText(text) {
+      // Pequeño hash para que cada etiqueta tenga siempre el mismo color
+      let hash = 0
+      for (const char of text) hash = (hash * 31 + char.codePointAt(0)) % 360
+      return hash
+    }
+
+    function createCardElement(card) {
+      const $card = document.createElement('article')
+      $card.className = 'card'
+      $card.dataset.id = card.id
+
+      const tags = card.text.match(TAG_REGEX) ?? []
+      const $text = document.createElement('p')
+      // textContent (y no innerHTML) para no inyectar HTML del usuario
+      $text.textContent = card.text.replace(TAG_REGEX, '').replace(/\s+/g, ' ').trim() || card.text
+      $card.append($text)
+
+      if (tags.length > 0) {
+        const $tags = document.createElement('div')
+        $tags.className = 'tags'
+        for (const tag of tags) {
+          const $tag = document.createElement('span')
+          $tag.className = 'tag'
+          $tag.textContent = tag.slice(1)
+          $tag.style.setProperty('--hue', hueFromText(tag))
+          $tags.append($tag)
+        }
+        $card.append($tags)
+      }
+
+      const $delete = document.createElement('button')
+      $delete.className = 'delete'
+      $delete.textContent = '×'
+      $delete.setAttribute('aria-label', 'Borrar tarjeta')
+      $card.append($delete)
+
+      return $card
+    }
+
+    function render() {
+      for (const columnId of COLUMN_IDS) {
+        const cards = state[columnId]
+        getList(columnId).replaceChildren(...cards.map(createCardElement))
+        $board.querySelector(`[data-column="${columnId}"] .count`).textContent = cards.length
+      }
+    }
+
+    // ---------- EDICIÓN ----------
+    function openEditor($container, initialText, onSave) {
+      let closed = false
+      $container.className = 'card is-editing'
+      const $textarea = document.createElement('textarea')
+      $textarea.value = initialText
+      $textarea.placeholder = 'Escribe la tarea… #etiqueta'
+      const $help = document.createElement('small')
+      $help.textContent = 'Enter para guardar · Esc para cancelar'
+      $container.replaceChildren($textarea, $help)
+      $textarea.focus()
+      $textarea.setSelectionRange(initialText.length, initialText.length)
+
+      // "closed" evita guardar dos veces (Enter + blur al desaparecer)
+      function close(save) {
+        if (closed) return
+        closed = true
+        const text = $textarea.value.trim()
+        if (save && text) onSave(text)
+        else render()
+      }
+
+      $textarea.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+          event.preventDefault()
+          close(true)
+        } else if (event.key === 'Escape') {
+          close(false)
+        }
+      })
+      $textarea.addEventListener('blur', () => close(true))
+    }
+
+    $board.addEventListener('dblclick', (event) => {
+      const $card = event.target.closest('.card')
+      if (!$card || $card.classList.contains('is-editing') || event.target.closest('button')) return
+      const found = findCard($card.dataset.id)
+      // Buscamos el elemento "vivo" por si un render previo lo ha sustituido
+      const $live = $board.querySelector(`.card[data-id="${$card.dataset.id}"]`)
+      if (!found || !$live) return
+      openEditor($live, found.card.text, text => updateCard(found.card.id, text))
+    })
+
+    $board.addEventListener('click', (event) => {
+      const $delete = event.target.closest('.delete')
+      if ($delete) {
+        deleteCard($delete.closest('.card').dataset.id)
+        return
+      }
+
+      const $add = event.target.closest('.add')
+      if ($add) {
+        const columnId = $add.closest('.column').dataset.column
+        const $list = getList(columnId)
+        const $new = document.createElement('article')
+        $list.prepend($new)
+        $list.scrollTop = 0
+        openEditor($new, '', text => addCard(columnId, text))
+      }
+    })
+
+    $reset.addEventListener('click', () => {
+      state = createDemoState()
+      commit()
+    })
+
+    // ---------- DRAG & DROP CON POINTER EVENTS ----------
+    // La API nativa de Drag & Drop de HTML no funciona con pantallas táctiles.
+    // Los Pointer Events unifican ratón, dedo y lápiz en un único modelo.
+    let drag = null
+
+    function handlePointerDown(event) {
+      if (drag || event.button !== 0 || !event.isPrimary) return
+      const $card = event.target.closest('.card')
+      if (!$card || $card.classList.contains('is-editing') || event.target.closest('button, textarea')) return
+
+      const rect = $card.getBoundingClientRect()
+      drag = {
+        $card,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+        x: event.clientX,
+        y: event.clientY,
+        started: false
+      }
+
+      // setPointerCapture: todos los eventos de este puntero llegarán a la
+      // tarjeta aunque el cursor salga de ella (o de la ventana) al moverlo rápido
+      $card.setPointerCapture(event.pointerId)
+    }
+
+    function startDrag() {
+      const { $card } = drag
+      const rect = $card.getBoundingClientRect()
+
+      // El "fantasma" es una copia visual que sigue al puntero
+      const $ghost = $card.cloneNode(true)
+      $ghost.classList.add('ghost')
+      $ghost.style.width = `${rect.width}px`
+      document.body.append($ghost)
+
+      // El placeholder marca dónde caerá la tarjeta al soltarla
+      const $placeholder = document.createElement('div')
+      $placeholder.className = 'placeholder'
+      $placeholder.style.height = `${rect.height}px`
+      $card.before($placeholder)
+      $card.classList.add('is-hidden')
+
+      document.body.classList.add('is-dragging')
+      drag.started = true
+      drag.$ghost = $ghost
+      drag.$placeholder = $placeholder
+      drag.frame = requestAnimationFrame(autoScroll)
+    }
+
+    function moveGhost() {
+      const { $ghost, x, y, offsetX, offsetY } = drag
+      $ghost.style.transform = `translate(${x - offsetX}px, ${y - offsetY}px) rotate(3deg)`
+    }
+
+    function updatePlaceholder() {
+      const { x, y, $placeholder } = drag
+      // El fantasma tiene pointer-events: none, así que elementFromPoint
+      // devuelve lo que hay DEBAJO de él
+      const $column = document.elementFromPoint(x, y)?.closest('.column')
+      if (!$column) return
+
+      const $list = $column.querySelector('.list')
+      const cards = [...$list.querySelectorAll('.card:not(.is-hidden)')]
+
+      // Buscamos la primera tarjeta cuyo centro vertical está por debajo del
+      // puntero: el placeholder va justo antes de ella. Si no hay, va al final
+      const $next = cards.find(($card) => {
+        const rect = $card.getBoundingClientRect()
+        return y < rect.top + rect.height / 2
+      })
+
+      if ($next) {
+        if ($next.previousElementSibling !== $placeholder) $list.insertBefore($placeholder, $next)
+      } else if ($list.lastElementChild !== $placeholder) {
+        $list.append($placeholder)
+      }
+    }
+
+    function autoScroll() {
+      if (!drag?.started) return
+      const EDGE = 48
+      const SPEED = 10
+      // Si arrastramos cerca del borde de una zona con scroll, la desplazamos
+      const $list = document.elementFromPoint(drag.x, drag.y)?.closest('.list')
+      for (const $el of [$list, $board]) {
+        if (!$el || $el.scrollHeight <= $el.clientHeight) continue
+        const rect = $el.getBoundingClientRect()
+        if (drag.y < rect.top + EDGE) $el.scrollTop -= SPEED
+        else if (drag.y > rect.bottom - EDGE) $el.scrollTop += SPEED
+      }
+      updatePlaceholder()
+      drag.frame = requestAnimationFrame(autoScroll)
+    }
+
+    function handlePointerMove(event) {
+      if (!drag || event.pointerId !== drag.pointerId) return
+      drag.x = event.clientX
+      drag.y = event.clientY
+
+      if (!drag.started) {
+        const distance = Math.hypot(drag.x - drag.startX, drag.y - drag.startY)
+        // Umbral: un clic o un doble clic no deben iniciar un arrastre
+        if (distance < DRAG_THRESHOLD) return
+        startDrag()
+      }
+
+      moveGhost()
+      updatePlaceholder()
+    }
+
+    function finishDrag(shouldDrop) {
+      if (!drag) return
+      const current = drag
+      drag = null
+      if (!current.started) return
+
+      cancelAnimationFrame(current.frame)
+      current.$ghost.remove()
+      document.body.classList.remove('is-dragging')
+
+      if (!shouldDrop) {
+        render()
+        return
+      }
+
+      // Calculamos el destino a partir de la posición del placeholder
+      const $list = current.$placeholder.parentElement
+      const columnId = $list.closest('.column').dataset.column
+      const siblings = [...$list.children].filter($el => !$el.classList.contains('is-hidden'))
+      const index = siblings.indexOf(current.$placeholder)
+
+      // Actualizamos el ESTADO y dejamos que render() pinte el resultado
+      moveCard(current.$card.dataset.id, columnId, index)
+    }
+
+    $board.addEventListener('pointerdown', handlePointerDown)
+    $board.addEventListener('pointermove', handlePointerMove)
+    $board.addEventListener('pointerup', () => finishDrag(true))
+    $board.addEventListener('pointercancel', () => finishDrag(false))
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && drag?.started) finishDrag(false)
+    })
+
+    render()
+  </script>
+</body>
+
+</html>

@@ -1,3 +1,23 @@
+export const SITE_NAME = "100 proyectos de JavaScript"
+
+export const SITE_DESCRIPTION =
+  "Aprende JavaScript con 100 proyectos prácticos: juegos, clones de apps y herramientas con HTML, CSS y JavaScript. Código fuente y vídeo paso a paso, gratis."
+
+export const REPO_URL = "https://github.com/midudev/javascript-100-proyectos"
+
+export const AUTHOR = {
+  "@type": "Person",
+  name: "Miguel Ángel Durán",
+  alternateName: "midudev",
+  url: "https://midu.dev",
+  sameAs: [
+    "https://github.com/midudev",
+    "https://x.com/midudev",
+    "https://twitch.tv/midudev",
+    "https://youtube.com/midulive",
+  ],
+}
+
 export const PROJECTS = [
   {
     slug: "01-tinder-swipe",

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>64 - Relojes del mundo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070b16;
+      --card: #0f1627;
+      --card-border: #1e2a44;
+      --text: #e6ebf5;
+      --muted: #8b97b1;
+      --accent: #f59e0b;
+      --day-face: #f7f4ec;
+      --day-ink: #1c2233;
+      --night-face: #111a31;
+      --night-ink: #dbe4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, #1b2a55 0%, transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, #2a1640 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 32px 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 30px);
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    #local-info {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .search {
+      position: relative;
+      width: min(380px, 100%);
+    }
+
+    .search input {
+      width: 100%;
+      padding: 12px 16px 12px 40px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: #0b1222 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%238b97b1' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 14px center;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .search input:focus {
+      border-color: var(--accent);
+    }
+
+    .suggestions {
+      position: absolute;
+      z-index: 10;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      margin: 0;
+      padding: 6px;
+      list-style: none;
+      background: #0d1426;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px #0008;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .suggestions:empty {
+      display: none;
+    }
+
+    .suggestions li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .suggestions li[aria-selected="true"],
+    .suggestions li:hover {
+      background: #1a2440;
+    }
+
+    .suggestions small {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .clocks {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+      padding: 16px 32px 32px;
+      align-content: start;
+    }
+
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 16px 16px;
+      background: linear-gradient(180deg, #121b30, var(--card));
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      animation: appear .4s ease both;
+    }
+
+    .card.is-local {
+      border-color: #f59e0b66;
+      box-shadow: 0 0 0 1px #f59e0b33, 0 10px 30px #f59e0b14;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(.98);
+      }
+    }
+
+    .remove {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      opacity: .5;
+      transition: opacity .2s, background .2s;
+    }
+
+    .card:hover .remove,
+    .remove:focus-visible {
+      opacity: 1;
+    }
+
+    .remove:hover {
+      background: #ffffff14;
+    }
+
+    .badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f59e0b22;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .period {
+      position: absolute;
+      top: 10px;
+      right: 44px;
+      font-size: 18px;
+    }
+
+    /* --- Reloj analógico --- */
+    .clock {
+      --face: var(--day-face);
+      --ink: var(--day-ink);
+      position: relative;
+      width: clamp(120px, 12vw, 150px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--face);
+      color: var(--ink);
+      box-shadow: inset 0 0 0 4px #0000000f, 0 8px 24px #0006;
+      transition: background .6s, color .6s;
+    }
+
+    .is-night .clock {
+      --face: var(--night-face);
+      --ink: var(--night-ink);
+      box-shadow: inset 0 0 0 4px #ffffff10, 0 8px 24px #0006;
+    }
+
+    .face {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .face text {
+      font: 600 8px system-ui, sans-serif;
+      fill: currentColor;
+    }
+
+    /*
+      Las manecillas se colocan con su base en el centro del reloj y
+      giran alrededor de ese punto (transform-origin: bottom).
+      El ángulo llega desde JS mediante variables CSS: así JS solo
+      calcula números y CSS se encarga de la transformación.
+    */
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      border-radius: 4px;
+      background: currentColor;
+      transform-origin: 50% 100%;
+      transform: translateX(-50%) rotate(calc(var(--angle, 0) * 1deg));
+    }
+
+    .hour {
+      --angle: var(--hour-angle);
+      width: 5px;
+      height: 26%;
+    }
+
+    .minute {
+      --angle: var(--minute-angle);
+      width: 3.5px;
+      height: 36%;
+    }
+
+    .second {
+      --angle: var(--second-angle);
+      width: 1.5px;
+      height: 42%;
+      background: #ef4444;
+      /* La "cola" del segundero sobresale un poco por detrás del centro */
+      box-shadow: 0 10px 0 0 #ef4444;
+    }
+
+    .pin {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: 2px solid var(--face);
+    }
+
+    .info {
+      text-align: center;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .city {
+      margin: 0;
+      font-size: 17px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .digital {
+      margin: 2px 0;
+      font-size: 26px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .digital small {
+      font-size: 15px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .diff {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    @media (max-width: 520px) {
+      header,
+      .clocks {
+        padding-inline: 16px;
+      }
+
+      .clocks {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .card {
+        padding: 16px 8px 12px;
+      }
+
+      .clock {
+        width: 110px;
+      }
+
+      .digital {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>Relojes del <span>mundo</span></h1>
+      <p id="local-info"></p>
+    </div>
+
+    <form class="search" role="search" autocomplete="off">
+      <input id="search" type="search" placeholder="Añadir ciudad o zona horaria…" aria-label="Buscar zona horaria"
+        aria-controls="suggestions" aria-autocomplete="list">
+      <ul id="suggestions" class="suggestions" role="listbox"></ul>
+    </form>
+  </header>
+
+  <main id="clocks" class="clocks" aria-live="polite"></main>
+
+  <template id="clock-template">
+    <article class="card">
+      <button class="remove" type="button" aria-label="Quitar reloj">×</button>
+      <span class="period" aria-hidden="true"></span>
+      <div class="clock" role="img">
+        <div class="hand hour"></div>
+        <div class="hand minute"></div>
+        <div class="hand second"></div>
+        <div class="pin"></div>
+      </div>
+      <div class="info">
+        <h2 class="city"></h2>
+        <p class="digital"></p>
+        <p class="meta"><span class="diff"></span> · <span class="date"></span></p>
+      </div>
+    </article>
+  </template>
+
+  <script type="module">
+    const STORAGE_KEY = 'world-clock:zones'
+    const LOCAL_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const DEFAULT_ZONES = [
+      'America/Los_Angeles',
+      'America/Mexico_City',
+      'America/New_York',
+      'America/Argentina/Buenos_Aires',
+      'Europe/London',
+      'Asia/Tokyo',
+      'Australia/Sydney'
+    ]
+    const FALLBACK_ZONES = [
+      'UTC', 'Europe/Madrid', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+      'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'America/Mexico_City',
+      'America/Bogota', 'America/Lima', 'America/Santiago', 'America/Argentina/Buenos_Aires',
+      'America/Sao_Paulo', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Kolkata', 'Asia/Dubai',
+      'Australia/Sydney', 'Pacific/Auckland', 'Africa/Cairo', 'Atlantic/Canary'
+    ]
+    // Nombres en español para las ciudades más buscadas (también sirven para buscar)
+    const SPANISH_NAMES = {
+      'America/New_York': 'Nueva York',
+      'America/Mexico_City': 'Ciudad de México',
+      'America/Sao_Paulo': 'São Paulo',
+      'America/Argentina/Buenos_Aires': 'Buenos Aires',
+      'Europe/London': 'Londres',
+      'Europe/Paris': 'París',
+      'Europe/Berlin': 'Berlín',
+      'Europe/Rome': 'Roma',
+      'Europe/Lisbon': 'Lisboa',
+      'Europe/Moscow': 'Moscú',
+      'Europe/Athens': 'Atenas',
+      'Asia/Tokyo': 'Tokio',
+      'Asia/Shanghai': 'Shanghái',
+      'Asia/Seoul': 'Seúl',
+      'Asia/Singapore': 'Singapur',
+      'Asia/Kolkata': 'Calcuta',
+      'Asia/Calcutta': 'Calcuta (Kolkata)',
+      'Europe/Kiev': 'Kiev',
+      'Africa/Cairo': 'El Cairo',
+      'Atlantic/Canary': 'Canarias',
+      'Pacific/Honolulu': 'Honolulú'
+    }
+    const DAY_START_HOUR = 7
+    const NIGHT_START_HOUR = 20
+    const MAX_SUGGESTIONS = 8
+
+    const ALL_ZONES = getSupportedZones()
+
+    const $clocks = document.querySelector('#clocks')
+    const $template = document.querySelector('#clock-template')
+    const $search = document.querySelector('#search')
+    const $suggestions = document.querySelector('#suggestions')
+    const $localInfo = document.querySelector('#local-info')
+
+    // Cada reloj guarda su formateador (crearlos es caro, usarlos es barato)
+    let clocks = []
+    let selectedSuggestion = 0
+
+    // --- Zonas horarias ---
+
+    function getSupportedZones() {
+      // Intl.supportedValuesOf devuelve todas las zonas IANA que conoce el navegador
+      const zones = Intl.supportedValuesOf?.('timeZone') ?? FALLBACK_ZONES
+      return zones.includes('UTC') ? zones : ['UTC', ...zones]
+    }
+
+    function isValidZone(zone) {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: zone })
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    function createFormatter(timeZone) {
+      // Usamos 'en-US' con números latinos para poder convertir cada parte a Number.
+      // hourCycle 'h23' evita que la medianoche salga como "24".
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hourCycle: 'h23',
+        numberingSystem: 'latn',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric'
+      })
+    }
+
+    /*
+      Un objeto Date NO tiene zona horaria: internamente es solo un número,
+      los milisegundos desde el 1 de enero de 1970 en UTC. Es la misma
+      marca de tiempo en Tokio que en Madrid. Lo que cambia es cómo se
+      *representa*. Por eso le pedimos a Intl que "pinte" ese instante en
+      otra zona y leemos cada trozo con formatToParts.
+    */
+    function getZoneTime(formatter, date) {
+      const values = {}
+      for (const { type, value } of formatter.formatToParts(date)) {
+        values[type] = Number(value)
+      }
+      return values
+    }
+
+    // Diferencia con UTC en minutos: reconstruimos la hora "de pared"
+    // como si fuera UTC y la comparamos con el instante real.
+    function getOffsetMinutes(time, date) {
+      const wallClockAsUTC = Date.UTC(time.year, time.month - 1, time.day, time.hour, time.minute, time.second)
+      const instant = Math.floor(date.getTime() / 1000) * 1000
+      return Math.round((wallClockAsUTC - instant) / 60000)
+    }
+
+    function getLocalOffsetMinutes(date) {
+      // getTimezoneOffset devuelve el signo al revés (UTC - local)
+      return -date.getTimezoneOffset()
+    }
+
+    function getCityName(zone) {
+      if (SPANISH_NAMES[zone]) return SPANISH_NAMES[zone]
+      return zone.split('/').at(-1).replaceAll('_', ' ')
+    }
+
+    function getZoneLongName(zone, date) {
+      const parts = new Intl.DateTimeFormat('es', { timeZone: zone, timeZoneName: 'long' }).formatToParts(date)
+      return parts.find(part => part.type === 'timeZoneName')?.value ?? zone
+    }
+
+    // --- Formato de textos ---
+
+    function pad(number) {
+      return String(number).padStart(2, '0')
+    }
+
+    function formatOffset(minutes, { prefix = '' } = {}) {
+      const sign = minutes < 0 ? '−' : '+'
+      const abs = Math.abs(minutes)
+      const hours = Math.floor(abs / 60)
+      const rest = abs % 60
+      return `${prefix}${sign}${hours}${rest ? `:${pad(rest)}` : ''}`
+    }
+
+    function formatDifference(minutes) {
+      if (minutes === 0) return 'Misma hora'
+      const sign = minutes > 0 ? '+' : '−'
+      const abs = Math.abs(minutes)
+      const hours = Math.floor(abs / 60)
+      const rest = abs % 60
+      return `${sign}${hours} h${rest ? ` ${rest} min` : ''}`
+    }
+
+    function getDayLabel(time, localDate) {
+      // Comparamos solo la fecha del calendario: ¿es ayer, hoy o mañana allí?
+      const zoneDay = Date.UTC(time.year, time.month - 1, time.day)
+      const localDay = Date.UTC(localDate.getFullYear(), localDate.getMonth(), localDate.getDate())
+      const diffDays = Math.round((zoneDay - localDay) / 86400000)
+      if (diffDays === 1) return 'Mañana'
+      if (diffDays === -1) return 'Ayer'
+      return 'Hoy'
+    }
+
+    function isDaytime(hour) {
+      return hour >= DAY_START_HOUR && hour < NIGHT_START_HOUR
+    }
+
+    // --- Esfera del reloj (trigonometría) ---
+
+    /*
+      Para colocar cada marca en el círculo usamos coordenadas polares:
+        x = centro + radio · sin(ángulo)
+        y = centro − radio · cos(ángulo)
+      Usamos sin para x y −cos para y porque en un reloj el ángulo 0
+      apunta hacia arriba (las 12) y crece en el sentido de las agujas,
+      mientras que en el eje Y de la pantalla los valores crecen hacia abajo.
+    */
+    function polar(radius, angleDeg, center = 50) {
+      const radians = angleDeg * Math.PI / 180
+      return {
+        x: +(center + radius * Math.sin(radians)).toFixed(2),
+        y: +(center - radius * Math.cos(radians)).toFixed(2)
+      }
+    }
+
+    function createFaceSVG() {
+      let marks = ''
+      for (let i = 0; i < 60; i++) {
+        const isHour = i % 5 === 0
+        const angle = i * 6
+        const outer = polar(46, angle)
+        const inner = polar(isHour ? 40 : 43.5, angle)
+        marks += `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"
+          stroke="currentColor" stroke-width="${isHour ? 1.8 : 0.7}" stroke-linecap="round"
+          opacity="${isHour ? 0.9 : 0.4}"/>`
+      }
+      for (let hour = 1; hour <= 12; hour++) {
+        const { x, y } = polar(32, hour * 30)
+        marks += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central">${hour}</text>`
+      }
+      return `<svg class="face" viewBox="0 0 100 100" aria-hidden="true">${marks}</svg>`
+    }
+
+    const FACE_SVG = createFaceSVG()
+
+    // --- Persistencia ---
+
+    function loadZones() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        if (Array.isArray(saved)) return saved.filter(isValidZone)
+      } catch { }
+      return DEFAULT_ZONES
+    }
+
+    function saveZones() {
+      const zones = clocks.filter(clock => !clock.isLocal).map(clock => clock.zone)
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(zones))
+      } catch { }
+    }
+
+    // --- Renderizado ---
+
+    function createClock(zone) {
+      const fragment = $template.content.cloneNode(true)
+      const card = fragment.querySelector('.card')
+      const isLocal = zone === LOCAL_ZONE
+
+      card.querySelector('.clock').insertAdjacentHTML('afterbegin', FACE_SVG)
+      card.querySelector('.city').textContent = getCityName(zone)
+      card.querySelector('.city').title = zone
+      card.dataset.zone = zone
+
+      const removeButton = card.querySelector('.remove')
+      if (isLocal) {
+        removeButton.remove()
+        card.classList.add('is-local')
+        card.insertAdjacentHTML('afterbegin', '<span class="badge">Tu hora</span>')
+      } else {
+        removeButton.addEventListener('click', () => removeZone(zone))
+      }
+
+      return {
+        zone,
+        isLocal,
+        card,
+        formatter: createFormatter(zone),
+        clockEl: card.querySelector('.clock'),
+        digitalEl: card.querySelector('.digital'),
+        dateEl: card.querySelector('.date'),
+        diffEl: card.querySelector('.diff'),
+        periodEl: card.querySelector('.period'),
+        lastSecond: -1,
+        offset: 0
+      }
+    }
+
+    function renderClocks() {
+      const now = new Date()
+      // Ordenamos de oeste a este según su diferencia con UTC
+      for (const clock of clocks) {
+        clock.offset = getOffsetMinutes(getZoneTime(clock.formatter, now), now)
+      }
+      clocks.sort((a, b) => a.offset - b.offset || a.zone.localeCompare(b.zone))
+      $clocks.replaceChildren(...clocks.map(clock => clock.card))
+      for (const clock of clocks) clock.lastSecond = -1
+    }
+
+    function updateClock(clock, now) {
+      const time = getZoneTime(clock.formatter, now)
+
+      /*
+        Los milisegundos son los mismos en cualquier zona, así que los
+        sumamos a los segundos para que el segundero avance de forma
+        continua en lugar de dar saltos. Cada manecilla "arrastra" la
+        fracción de la inferior: 360° / 60 = 6° por minuto o segundo,
+        360° / 12 = 30° por hora.
+      */
+      const seconds = time.second + now.getMilliseconds() / 1000
+      const minutes = time.minute + seconds / 60
+      const hours = (time.hour % 12) + minutes / 60
+
+      const style = clock.clockEl.style
+      style.setProperty('--second-angle', seconds * 6)
+      style.setProperty('--minute-angle', minutes * 6)
+      style.setProperty('--hour-angle', hours * 30)
+
+      // Los textos solo cambian una vez por segundo: evitamos tocar el DOM en cada frame
+      if (time.second === clock.lastSecond) return
+      clock.lastSecond = time.second
+
+      const offset = getOffsetMinutes(time, now)
+      const localOffset = getLocalOffsetMinutes(now)
+      const isDay = isDaytime(time.hour)
+
+      clock.offset = offset
+      clock.card.classList.toggle('is-night', !isDay)
+      clock.periodEl.textContent = isDay ? '☀️' : '🌙'
+      clock.periodEl.title = isDay ? 'Es de día' : 'Es de noche'
+      clock.digitalEl.innerHTML = `${pad(time.hour)}:${pad(time.minute)}<small>:${pad(time.second)}</small>`
+      clock.diffEl.textContent = clock.isLocal ? formatOffset(offset, { prefix: 'UTC' }) : formatDifference(offset - localOffset)
+      clock.dateEl.textContent = `${getDayLabel(time, now)}, ${time.day}/${pad(time.month)}`
+      clock.clockEl.setAttribute('aria-label', `${getCityName(clock.zone)}: ${pad(time.hour)}:${pad(time.minute)}`)
+    }
+
+    // requestAnimationFrame se sincroniza con el refresco de la pantalla:
+    // el segundero se mueve suave y el bucle se pausa si la pestaña está oculta.
+    function tick() {
+      const now = new Date()
+      for (const clock of clocks) updateClock(clock, now)
+      requestAnimationFrame(tick)
+    }
+
+    // --- Añadir y quitar zonas ---
+
+    function addZone(zone) {
+      if (!zone || !isValidZone(zone)) return
+      const existing = clocks.find(clock => clock.zone === zone)
+      if (existing) {
+        existing.card.animate(
+          [{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }],
+          { duration: 350 }
+        )
+        existing.card.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        return
+      }
+      clocks.push(createClock(zone))
+      renderClocks()
+      saveZones()
+    }
+
+    function removeZone(zone) {
+      clocks = clocks.filter(clock => clock.zone !== zone)
+      renderClocks()
+      saveZones()
+    }
+
+    // --- Buscador ---
+
+    function normalize(text) {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replaceAll('_', ' ')
+    }
+
+    function searchZones(query) {
+      const q = normalize(query.trim())
+      if (!q) return []
+      return ALL_ZONES
+        .filter(zone => normalize(`${zone} ${SPANISH_NAMES[zone] ?? ''}`).includes(q))
+        // Primero las que empiezan por la búsqueda en el nombre de la ciudad
+        .sort((a, b) => {
+          const aStarts = normalize(getCityName(a)).startsWith(q) ? 0 : 1
+          const bStarts = normalize(getCityName(b)).startsWith(q) ? 0 : 1
+          return aStarts - bStarts
+        })
+        .slice(0, MAX_SUGGESTIONS)
+    }
+
+    function renderSuggestions() {
+      const results = searchZones($search.value)
+      const now = new Date()
+      selectedSuggestion = Math.min(selectedSuggestion, Math.max(results.length - 1, 0))
+
+      $suggestions.replaceChildren(...results.map((zone, index) => {
+        const time = getZoneTime(createFormatter(zone), now)
+        const li = document.createElement('li')
+        li.setAttribute('role', 'option')
+        li.dataset.zone = zone
+        li.setAttribute('aria-selected', index === selectedSuggestion)
+        li.innerHTML = `<span></span><small>${pad(time.hour)}:${pad(time.minute)} · ${formatOffset(getOffsetMinutes(time, now), { prefix: 'UTC' })}</small>`
+        li.firstElementChild.textContent = SPANISH_NAMES[zone] ? `${SPANISH_NAMES[zone]} (${zone})` : zone.replaceAll('_', ' ')
+        return li
+      }))
+    }
+
+    function chooseSuggestion(zone) {
+      addZone(zone)
+      $search.value = ''
+      selectedSuggestion = 0
+      renderSuggestions()
+    }
+
+    $search.addEventListener('input', () => {
+      selectedSuggestion = 0
+      renderSuggestions()
+    })
+
+    $search.addEventListener('keydown', (event) => {
+      const items = $suggestions.children
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        if (!items.length) return
+        const step = event.key === 'ArrowDown' ? 1 : -1
+        selectedSuggestion = (selectedSuggestion + step + items.length) % items.length
+        renderSuggestions()
+      } else if (event.key === 'Escape') {
+        $search.value = ''
+        renderSuggestions()
+      }
+    })
+
+    $search.form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      const item = $suggestions.children[selectedSuggestion]
+      if (item) chooseSuggestion(item.dataset.zone)
+    })
+
+    $suggestions.addEventListener('pointerdown', (event) => {
+      const item = event.target.closest('li')
+      if (!item) return
+      event.preventDefault()
+      chooseSuggestion(item.dataset.zone)
+    })
+
+    $search.addEventListener('blur', () => {
+      $suggestions.replaceChildren()
+    })
+
+    // --- Inicio ---
+
+    function init() {
+      const now = new Date()
+      const localOffset = getLocalOffsetMinutes(now)
+      $localInfo.textContent = `Tu zona: ${LOCAL_ZONE} · ${formatOffset(localOffset, { prefix: 'UTC' })} · ${getZoneLongName(LOCAL_ZONE, now)}`
+
+      const zones = [LOCAL_ZONE, ...loadZones().filter(zone => zone !== LOCAL_ZONE)]
+      clocks = zones.map(createClock)
+      renderClocks()
+      requestAnimationFrame(tick)
+    }
+
+    init()
+  </script>
+</body>
+
+</html>

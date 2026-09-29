@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>74 - Asteroids</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #04050a;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      color: #e8ecff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .touch {
+      position: fixed;
+      bottom: 20px;
+      display: none;
+      gap: 12px;
+    }
+
+    .touch.left {
+      left: 20px;
+    }
+
+    .touch.right {
+      right: 20px;
+    }
+
+    .touch button {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1px solid #7aa2ff66;
+      background: #0d1430aa;
+      color: #e8ecff;
+      font-size: 24px;
+      touch-action: none;
+    }
+
+    .touch button:active {
+      background: #7aa2ff55;
+    }
+
+    /* Los controles táctiles solo aparecen en pantallas táctiles */
+    @media (pointer: coarse) {
+      .touch {
+        display: flex;
+      }
+    }
+
+    @media (pointer: coarse) and (min-width: 640px) {
+      .touch.left {
+        bottom: 160px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas></canvas>
+
+  <div class="touch left">
+    <button data-key="ArrowLeft" aria-label="Girar a la izquierda">⟲</button>
+    <button data-key="ArrowRight" aria-label="Girar a la derecha">⟳</button>
+  </div>
+  <div class="touch right">
+    <button data-key="ArrowUp" aria-label="Propulsar">▲</button>
+    <button data-key="Space" aria-label="Disparar">●</button>
+  </div>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const ctx = canvas.getContext('2d')
+
+    // CONSTANTES (distancias en px, tiempos en segundos)
+    const SHIP_RADIUS = 14
+    const TURN_SPEED = Math.PI * 1.6 // radianes por segundo
+    const THRUST = 360 // aceleración en px/s²
+    const FRICTION = 0.5 // fracción de velocidad que se conserva tras 1 segundo
+    const MAX_SPEED = 480
+    const BULLET_SPEED = 620
+    const BULLET_LIFE = 0.9
+    const MAX_BULLETS = 6
+    const FIRE_COOLDOWN = 0.2
+    const INVULNERABLE_TIME = 3
+    const RESPAWN_DELAY = 1.5
+    const START_LIVES = 3
+    const SAFE_DISTANCE = 200
+    const EXTRA_LIFE_EVERY = 10000
+    const LEVEL_DELAY = 2
+
+    const ASTEROID_TYPES = {
+      3: { radius: 54, points: 20, minSpeed: 25, maxSpeed: 60 },
+      2: { radius: 30, points: 50, minSpeed: 45, maxSpeed: 95 },
+      1: { radius: 16, points: 100, minSpeed: 65, maxSpeed: 140 }
+    }
+
+    const STATES = {
+      MENU: 'menu',
+      PLAYING: 'playing',
+      PAUSED: 'paused',
+      GAME_OVER: 'gameover'
+    }
+
+    const BEST_KEY = 'asteroids-best'
+
+    // ESTADO
+    let width = 0
+    let height = 0
+    let stars = []
+    let ship, bullets, asteroids, particles
+    let state = STATES.MENU
+    let score = 0
+    let best = readBest()
+    let lives = START_LIVES
+    let level = 1
+    let nextExtraLife = EXTRA_LIFE_EVERY
+    let levelTimer = 0
+    let bannerTimer = 0
+    let lastTime = 0
+    const keys = new Set()
+
+    // --- Utilidades ---
+
+    const random = (min, max) => min + Math.random() * (max - min)
+
+    // Wrap-around: lo que sale por un borde aparece por el contrario.
+    // Ojo: en JS el operador % conserva el signo (-10 % 800 === -10), por eso
+    // hacemos ((n % m) + m) % m para obtener siempre un valor positivo.
+    // El margen (el radio del objeto) hace que desaparezca del todo antes de reaparecer.
+    function wrap(value, size, margin) {
+      const total = size + margin * 2
+      return (((value + margin) % total) + total) % total - margin
+    }
+
+    function wrapPosition(entity) {
+      entity.x = wrap(entity.x, width, entity.radius)
+      entity.y = wrap(entity.y, height, entity.radius)
+    }
+
+    // Colisión círculo-círculo: chocan si la distancia entre centros es menor
+    // que la suma de radios. Comparamos cuadrados para ahorrarnos la raíz.
+    function collides(a, b) {
+      const dx = a.x - b.x
+      const dy = a.y - b.y
+      const radii = a.radius + b.radius
+      return dx * dx + dy * dy < radii * radii
+    }
+
+    function readBest() {
+      try {
+        return Number(localStorage.getItem(BEST_KEY)) || 0
+      } catch {
+        return 0
+      }
+    }
+
+    function saveBest() {
+      best = Math.max(best, score)
+      try {
+        localStorage.setItem(BEST_KEY, best)
+      } catch {}
+    }
+
+    // --- Creación de entidades ---
+
+    function createShip() {
+      return {
+        x: width / 2,
+        y: height / 2,
+        vx: 0,
+        vy: 0,
+        angle: -Math.PI / 2, // apuntando hacia arriba (en canvas la Y crece hacia abajo)
+        radius: SHIP_RADIUS,
+        alive: true,
+        thrusting: false,
+        invulnerable: INVULNERABLE_TIME,
+        respawnTimer: 0,
+        cooldown: 0
+      }
+    }
+
+    function createAsteroid(x, y, size) {
+      const { radius, minSpeed, maxSpeed } = ASTEROID_TYPES[size]
+      const direction = random(0, Math.PI * 2)
+      const speed = random(minSpeed, maxSpeed) * (1 + (level - 1) * 0.08)
+      const vertices = Math.floor(random(9, 14))
+
+      return {
+        x,
+        y,
+        // Un vector velocidad a partir de un ángulo y un módulo: (cos, sin) * velocidad
+        vx: Math.cos(direction) * speed,
+        vy: Math.sin(direction) * speed,
+        size,
+        radius,
+        rotation: random(0, Math.PI * 2),
+        spin: random(-1, 1),
+        // Cada vértice a una distancia aleatoria del centro → polígono irregular
+        shape: Array.from({ length: vertices }, () => random(0.72, 1.18))
+      }
+    }
+
+    // Colocamos los asteroides lejos de la nave para no morir nada más empezar
+    function spawnAsteroids(count) {
+      for (let i = 0; i < count; i++) {
+        let x, y
+        let tries = 0
+        do {
+          x = random(0, width)
+          y = random(0, height)
+          tries++
+        } while (Math.hypot(x - width / 2, y - height / 2) < SAFE_DISTANCE && tries < 50)
+        asteroids.push(createAsteroid(x, y, 3))
+      }
+    }
+
+    function explode(x, y, amount, color = '#e8ecff') {
+      for (let i = 0; i < amount; i++) {
+        const angle = random(0, Math.PI * 2)
+        const speed = random(30, 220)
+        const life = random(0.4, 1.1)
+        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life, maxLife: life, color })
+      }
+    }
+
+    // --- Flujo de la partida ---
+
+    function resetWorld() {
+      ship = createShip()
+      bullets = []
+      asteroids = []
+      particles = []
+    }
+
+    function startGame() {
+      score = 0
+      lives = START_LIVES
+      nextExtraLife = EXTRA_LIFE_EVERY
+      resetWorld()
+      startLevel(1)
+      state = STATES.PLAYING
+    }
+
+    function startLevel(number) {
+      level = number
+      bullets = []
+      spawnAsteroids(Math.min(3 + level, 11))
+      bannerTimer = LEVEL_DELAY
+      ship.invulnerable = Math.max(ship.invulnerable, 1.5)
+    }
+
+    function startMenu() {
+      resetWorld()
+      ship.alive = false
+      level = 1
+      spawnAsteroids(7)
+      state = STATES.MENU
+    }
+
+    function addScore(points) {
+      score += points
+      if (score >= nextExtraLife) {
+        lives++
+        nextExtraLife += EXTRA_LIFE_EVERY
+      }
+    }
+
+    function destroyAsteroid(index) {
+      const asteroid = asteroids[index]
+      asteroids.splice(index, 1)
+      explode(asteroid.x, asteroid.y, asteroid.size * 8)
+
+      if (state === STATES.PLAYING) addScore(ASTEROID_TYPES[asteroid.size].points)
+
+      // Un asteroide grande se parte en dos más pequeños que salen en direcciones aleatorias
+      if (asteroid.size > 1) {
+        asteroids.push(createAsteroid(asteroid.x, asteroid.y, asteroid.size - 1))
+        asteroids.push(createAsteroid(asteroid.x, asteroid.y, asteroid.size - 1))
+      }
+    }
+
+    function killShip() {
+      explode(ship.x, ship.y, 40, '#ffb36b')
+      ship.alive = false
+      ship.thrusting = false
+      ship.respawnTimer = RESPAWN_DELAY
+      lives--
+    }
+
+    // --- Actualización ---
+
+    function updateShip(dt) {
+      if (!ship.alive) {
+        ship.respawnTimer -= dt
+        if (ship.respawnTimer <= 0) {
+          if (lives <= 0) {
+            saveBest()
+            state = STATES.GAME_OVER
+          } else {
+            ship = createShip()
+          }
+        }
+        return
+      }
+
+      if (keys.has('ArrowLeft') || keys.has('KeyA')) ship.angle -= TURN_SPEED * dt
+      if (keys.has('ArrowRight') || keys.has('KeyD')) ship.angle += TURN_SPEED * dt
+
+      // Propulsión: sumamos a la velocidad un vector en la dirección de la nave.
+      // Como no fijamos la velocidad, la nave sigue deslizándose (inercia).
+      ship.thrusting = keys.has('ArrowUp') || keys.has('KeyW')
+      if (ship.thrusting) {
+        ship.vx += Math.cos(ship.angle) * THRUST * dt
+        ship.vy += Math.sin(ship.angle) * THRUST * dt
+      }
+
+      // Fricción independiente de los FPS: FRICTION^dt
+      const damping = FRICTION ** dt
+      ship.vx *= damping
+      ship.vy *= damping
+
+      // Limitamos el módulo del vector velocidad sin cambiar su dirección
+      const speed = Math.hypot(ship.vx, ship.vy)
+      if (speed > MAX_SPEED) {
+        ship.vx = (ship.vx / speed) * MAX_SPEED
+        ship.vy = (ship.vy / speed) * MAX_SPEED
+      }
+
+      ship.x += ship.vx * dt
+      ship.y += ship.vy * dt
+      wrapPosition(ship)
+
+      ship.invulnerable = Math.max(0, ship.invulnerable - dt)
+      ship.cooldown -= dt
+      if (keys.has('Space') && ship.cooldown <= 0 && bullets.length < MAX_BULLETS) shoot()
+    }
+
+    function shoot() {
+      ship.cooldown = FIRE_COOLDOWN
+      const noseX = ship.x + Math.cos(ship.angle) * ship.radius
+      const noseY = ship.y + Math.sin(ship.angle) * ship.radius
+
+      // La bala hereda la velocidad de la nave más la suya propia
+      bullets.push({
+        x: noseX,
+        y: noseY,
+        vx: ship.vx + Math.cos(ship.angle) * BULLET_SPEED,
+        vy: ship.vy + Math.sin(ship.angle) * BULLET_SPEED,
+        radius: 2,
+        life: BULLET_LIFE
+      })
+    }
+
+    function updateEntities(dt) {
+      for (const bullet of bullets) {
+        bullet.x += bullet.vx * dt
+        bullet.y += bullet.vy * dt
+        bullet.life -= dt
+        wrapPosition(bullet)
+      }
+      // Tiempo de vida: las balas desaparecen solas aunque no choquen
+      bullets = bullets.filter((bullet) => bullet.life > 0)
+
+      for (const asteroid of asteroids) {
+        asteroid.x += asteroid.vx * dt
+        asteroid.y += asteroid.vy * dt
+        asteroid.rotation += asteroid.spin * dt
+        wrapPosition(asteroid)
+      }
+
+      for (const particle of particles) {
+        particle.x += particle.vx * dt
+        particle.y += particle.vy * dt
+        particle.vx *= 0.97
+        particle.vy *= 0.97
+        particle.life -= dt
+      }
+      particles = particles.filter((particle) => particle.life > 0)
+    }
+
+    function checkCollisions() {
+      // Recorremos al revés porque eliminamos elementos del array mientras iteramos
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const asteroid = asteroids[i]
+        const hitBox = { x: asteroid.x, y: asteroid.y, radius: asteroid.radius * 0.9 }
+
+        const bulletIndex = bullets.findIndex((bullet) => collides(bullet, hitBox))
+        if (bulletIndex !== -1) {
+          bullets.splice(bulletIndex, 1)
+          destroyAsteroid(i)
+          continue
+        }
+
+        if (ship.alive && ship.invulnerable <= 0 && collides(ship, hitBox)) {
+          killShip()
+          destroyAsteroid(i)
+        }
+      }
+    }
+
+    function update(dt) {
+      bannerTimer = Math.max(0, bannerTimer - dt)
+
+      if (state === STATES.PAUSED) return
+      updateEntities(dt)
+      if (state !== STATES.PLAYING) return
+
+      updateShip(dt)
+      checkCollisions()
+
+      // Nivel superado: esperamos un poco y lanzamos más asteroides
+      if (asteroids.length === 0 && state === STATES.PLAYING) {
+        levelTimer += dt
+        if (levelTimer >= LEVEL_DELAY) {
+          levelTimer = 0
+          startLevel(level + 1)
+        }
+      }
+    }
+
+    // --- Dibujo ---
+
+    function drawStars() {
+      ctx.fillStyle = '#04050a'
+      ctx.fillRect(0, 0, width, height)
+      for (const star of stars) {
+        ctx.fillStyle = `rgba(200, 215, 255, ${star.alpha})`
+        ctx.fillRect(star.x, star.y, star.size, star.size)
+      }
+    }
+
+    function drawShipShape(x, y, angle, radius, withFlame) {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(angle)
+      ctx.beginPath()
+      ctx.moveTo(radius, 0)
+      ctx.lineTo(-radius * 0.8, -radius * 0.7)
+      ctx.lineTo(-radius * 0.45, 0)
+      ctx.lineTo(-radius * 0.8, radius * 0.7)
+      ctx.closePath()
+      ctx.stroke()
+
+      // Llama con parpadeo aleatorio cuando propulsamos
+      if (withFlame) {
+        ctx.strokeStyle = '#ffb36b'
+        ctx.shadowColor = '#ff7b2e'
+        ctx.beginPath()
+        ctx.moveTo(-radius * 0.55, -radius * 0.3)
+        ctx.lineTo(-radius * random(1.1, 1.6), 0)
+        ctx.lineTo(-radius * 0.55, radius * 0.3)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    function drawAsteroid(asteroid) {
+      const { x, y, radius, rotation, shape } = asteroid
+      ctx.beginPath()
+      shape.forEach((offset, index) => {
+        // Repartimos los vértices en el círculo y los proyectamos con cos/sin
+        const angle = rotation + (index / shape.length) * Math.PI * 2
+        const px = x + Math.cos(angle) * radius * offset
+        const py = y + Math.sin(angle) * radius * offset
+        index === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+      })
+      ctx.closePath()
+      ctx.stroke()
+    }
+
+    function drawWorld() {
+      ctx.lineWidth = 1.6
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#e8ecff'
+      ctx.shadowColor = '#7aa2ff'
+      ctx.shadowBlur = 10
+
+      asteroids.forEach(drawAsteroid)
+
+      ctx.fillStyle = '#ffffff'
+      for (const bullet of bullets) {
+        ctx.beginPath()
+        ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // Durante la invulnerabilidad la nave parpadea
+      const isBlinking = ship.invulnerable > 0 && Math.floor(ship.invulnerable * 8) % 2 === 0
+      if (ship.alive && state !== STATES.MENU && !isBlinking) {
+        drawShipShape(ship.x, ship.y, ship.angle, ship.radius, ship.thrusting)
+      }
+
+      ctx.shadowBlur = 0
+      for (const particle of particles) {
+        ctx.globalAlpha = particle.life / particle.maxLife
+        ctx.fillStyle = particle.color
+        ctx.fillRect(particle.x - 1, particle.y - 1, 2, 2)
+      }
+      ctx.globalAlpha = 1
+    }
+
+    function drawText(text, x, y, size, align = 'center', color = '#e8ecff') {
+      ctx.font = `700 ${size}px ui-monospace, 'SF Mono', Menlo, Consolas, monospace`
+      ctx.textAlign = align
+      ctx.fillStyle = color
+      ctx.fillText(text, x, y)
+    }
+
+    function drawHud() {
+      ctx.shadowColor = '#7aa2ff'
+      ctx.shadowBlur = 8
+      drawText(String(score).padStart(5, '0'), 24, 44, 28, 'left')
+      drawText(`MEJOR ${String(Math.max(best, score)).padStart(5, '0')}`, width / 2, 36, 14)
+      drawText(`NIVEL ${level}`, width - 24, 36, 14, 'right')
+
+      ctx.strokeStyle = '#e8ecff'
+      ctx.lineWidth = 1.4
+      for (let i = 0; i < lives; i++) {
+        drawShipShape(34 + i * 24, 70, -Math.PI / 2, 9, false)
+      }
+      ctx.shadowBlur = 0
+    }
+
+    function drawOverlay() {
+      const centerX = width / 2
+      const centerY = height / 2
+      const small = width < 640
+
+      ctx.shadowColor = '#7aa2ff'
+      ctx.shadowBlur = 16
+
+      if (state === STATES.MENU) {
+        drawText('ASTEROIDS', centerX, centerY - 40, small ? 44 : 76)
+        ctx.shadowBlur = 0
+        drawText('Pulsa ENTER o toca la pantalla para jugar', centerX, centerY + 20, small ? 13 : 17, 'center', '#aab8ff')
+        drawText('← → girar   ↑ propulsar   ESPACIO disparar   P pausa', centerX, centerY + 56, small ? 11 : 14, 'center', '#6b7699')
+        if (best > 0) drawText(`MEJOR PUNTUACIÓN ${best}`, centerX, centerY + 92, 14, 'center', '#6b7699')
+      } else if (state === STATES.GAME_OVER) {
+        drawText('GAME OVER', centerX, centerY - 20, small ? 40 : 64)
+        ctx.shadowBlur = 0
+        drawText(`Puntuación: ${score}`, centerX, centerY + 24, 18, 'center', '#aab8ff')
+        drawText('Pulsa ENTER para volver a jugar', centerX, centerY + 60, 15, 'center', '#6b7699')
+      } else if (state === STATES.PAUSED) {
+        drawText('PAUSA', centerX, centerY, 48)
+        ctx.shadowBlur = 0
+        drawText('Pulsa P para continuar', centerX, centerY + 40, 15, 'center', '#6b7699')
+      } else if (bannerTimer > 0) {
+        ctx.globalAlpha = Math.min(1, bannerTimer)
+        drawText(`NIVEL ${level}`, centerX, centerY - 60, 36)
+        ctx.globalAlpha = 1
+      }
+      ctx.shadowBlur = 0
+    }
+
+    function draw() {
+      drawStars()
+      drawWorld()
+      if (state !== STATES.MENU) drawHud()
+      drawOverlay()
+    }
+
+    function loop(time) {
+      // Delta time en segundos, limitado para evitar saltos tras cambiar de pestaña
+      const dt = Math.min((time - lastTime) / 1000, 0.05)
+      lastTime = time
+      update(dt)
+      draw()
+      requestAnimationFrame(loop)
+    }
+
+    // --- Pantalla y entrada ---
+
+    function resize() {
+      const ratio = window.devicePixelRatio || 1
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = width * ratio
+      canvas.height = height * ratio
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+
+      stars = Array.from({ length: Math.floor((width * height) / 5000) }, () => ({
+        x: random(0, width),
+        y: random(0, height),
+        size: Math.random() < 0.1 ? 2 : 1,
+        alpha: random(0.2, 0.8)
+      }))
+    }
+
+    function handleAction() {
+      if (state === STATES.MENU || state === STATES.GAME_OVER) startGame()
+    }
+
+    function togglePause() {
+      if (state === STATES.PLAYING) state = STATES.PAUSED
+      else if (state === STATES.PAUSED) state = STATES.PLAYING
+    }
+
+    const GAME_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space']
+
+    document.addEventListener('keydown', (event) => {
+      if (GAME_KEYS.includes(event.code)) event.preventDefault()
+      keys.add(event.code)
+
+      if (event.repeat) return
+      if (event.code === 'Enter') handleAction()
+      if (event.code === 'Space' && state === STATES.MENU) handleAction()
+      if (event.code === 'KeyP' || event.code === 'Escape') togglePause()
+    })
+
+    document.addEventListener('keyup', (event) => keys.delete(event.code))
+
+    // Si la pestaña se oculta o pierde el foco pausamos y soltamos todas las teclas
+    window.addEventListener('blur', () => keys.clear())
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && state === STATES.PLAYING) state = STATES.PAUSED
+    })
+
+    canvas.addEventListener('pointerdown', handleAction)
+
+    document.querySelectorAll('.touch button').forEach((button) => {
+      const { key } = button.dataset
+      button.addEventListener('pointerdown', (event) => {
+        event.preventDefault()
+        handleAction()
+        keys.add(key)
+      })
+      for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+        button.addEventListener(type, () => keys.delete(key))
+      }
+    })
+
+    window.addEventListener('resize', resize)
+
+    resize()
+    startMenu()
+    requestAnimationFrame((time) => {
+      lastTime = time
+      requestAnimationFrame(loop)
+    })
+  </script>
+</body>
+
+</html>

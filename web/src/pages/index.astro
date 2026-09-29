@@ -4,9 +4,41 @@ import Hero from "../components/Hero.astro"
 import Projects from "../components/Projects.astro"
 import Footer from "../components/Footer.astro"
 import GitHubStar from "../components/GitHubStar.astro"
+import { AUTHOR, PROJECTS, SITE_DESCRIPTION, SITE_NAME } from "../consts"
+
+const siteURL = new URL("/", Astro.site).href
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      name: SITE_NAME,
+      url: siteURL,
+      description: SITE_DESCRIPTION,
+      inLanguage: "es",
+      author: AUTHOR,
+    },
+    {
+      "@type": "ItemList",
+      name: `Proyectos de ${SITE_NAME}`,
+      itemListElement: PROJECTS.filter((project) => !project.hidden).map(
+        (project, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: project.title,
+          url: new URL(`/${project.slug}`, Astro.site).href,
+        })
+      ),
+    },
+  ],
+}
 ---
 
-<Layout title="100 proyectos de JavaScript - por @midudev">
+<Layout
+  title="100 proyectos de JavaScript gratis: código y vídeo | midudev"
+  jsonLd={jsonLd}
+>
   <main
     class="pt-12 min-h-screen flex gap-y-16 flex-col justify-between px-8 relative"
   >

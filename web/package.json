@@ -11,11 +11,11 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/check": "0.9.4",
-    "@midudev/tailwind-animations": "0.2.0",
-    "@tailwindcss/vite": "4.1.11",
-    "astro": "5.12.8",
-    "tailwindcss": "4.1.11",
-    "typescript": "5.9.2"
+    "@astrojs/check": "0.9.10",
+    "@tailwindcss/vite": "4.3.3",
+    "astro": "7.3.5",
+    "tailwind-animations": "1.0.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3"
   }
 }

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>54 - Lluvia de Matrix</title>
+  <style>
+    :root {
+      --accent: #00ff66;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #000;
+      color: #d9ffe6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .toggle {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 2;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      background: rgba(0, 12, 5, .75);
+      color: var(--accent);
+      font-size: 20px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: transform .2s;
+    }
+
+    .toggle:hover {
+      transform: rotate(45deg);
+    }
+
+    .panel {
+      position: fixed;
+      top: 72px;
+      right: 16px;
+      z-index: 2;
+      width: min(290px, calc(100vw - 32px));
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      border-radius: 16px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      background: rgba(0, 10, 4, .72);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 18%, transparent);
+      transition: opacity .25s, transform .25s;
+    }
+
+    .panel.is-hidden {
+      opacity: 0;
+      transform: translateY(-8px) scale(.98);
+      pointer-events: none;
+    }
+
+    .panel h1 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: 0 0 12px var(--accent);
+    }
+
+    .panel p {
+      margin: -8px 0 0;
+      font-size: 12px;
+      opacity: .7;
+    }
+
+    label,
+    .field {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      opacity: .9;
+    }
+
+    label span {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    output {
+      text-transform: none;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      background: rgba(0, 0, 0, .6);
+      color: var(--accent);
+      font: 14px ui-monospace, monospace;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .colors {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background: var(--color);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--color);
+    }
+
+    .swatch[aria-pressed="true"] {
+      border-color: #fff;
+    }
+
+    .swatch.rainbow {
+      background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+      box-shadow: none;
+    }
+
+    input[type="color"] {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+
+    .hint {
+      font-size: 11px;
+      opacity: .55;
+      margin: 0;
+    }
+
+    kbd {
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, .3);
+      font-size: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas></canvas>
+
+  <button class="toggle" aria-label="Mostrar u ocultar controles" title="Controles (H)">⚙</button>
+
+  <form class="panel" autocomplete="off">
+    <h1>Matrix</h1>
+    <p>Sigue al conejo blanco…</p>
+
+    <div class="field">
+      Color
+      <div class="colors">
+        <button type="button" class="swatch" style="--color: #00ff66" data-color="#00ff66" aria-label="Verde"></button>
+        <button type="button" class="swatch" style="--color: #2ee6ff" data-color="#2ee6ff" aria-label="Cian"></button>
+        <button type="button" class="swatch" style="--color: #ff3fa4" data-color="#ff3fa4" aria-label="Rosa"></button>
+        <button type="button" class="swatch" style="--color: #ffb000" data-color="#ffb000" aria-label="Ámbar"></button>
+        <button type="button" class="swatch rainbow" data-color="rainbow" aria-label="Arcoíris"></button>
+        <input type="color" name="color" value="#00ff66" aria-label="Color personalizado">
+      </div>
+    </div>
+
+    <label>
+      <span>Velocidad <output id="fps-value"></output></span>
+      <input type="range" name="fps" min="5" max="60" step="1" value="24">
+    </label>
+
+    <label>
+      <span>Tamaño de fuente <output id="size-value"></output></span>
+      <input type="range" name="size" min="10" max="36" step="1" value="18">
+    </label>
+
+    <label>
+      <span>Longitud del rastro <output id="trail-value"></output></span>
+      <input type="range" name="trail" min="1" max="10" step="1" value="6">
+    </label>
+
+    <label>
+      Texto personalizado
+      <input type="text" name="text" maxlength="40" placeholder="Vacío = katakana y números">
+    </label>
+
+    <p class="hint"><kbd>Espacio</kbd> pausa · <kbd>H</kbd> oculta el panel</p>
+  </form>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const context = canvas.getContext('2d')
+    const form = document.querySelector('.panel')
+    const toggleButton = document.querySelector('.toggle')
+
+    // Katakana de medio ancho (como en la película) + números y algunas letras
+    const KATAKANA = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ'
+    const DIGITS = '0123456789'
+    const DEFAULT_CHARS = Array.from(KATAKANA + DIGITS + 'Z:.=*+-<>¦')
+    const HEAD_COLOR = '#f2fff6'
+    const MIN_SPEED = 0.35
+    const MAX_SPEED = 1
+
+    const settings = {
+      color: '#00ff66',
+      fps: 24,
+      fontSize: 18,
+      trail: 6,
+      chars: DEFAULT_CHARS
+    }
+
+    let drops = []
+    let width = 0
+    let height = 0
+    let lastTime = 0
+    let hue = 0
+    let paused = false
+
+    // Cada columna es una "gota" independiente: su fila actual (con decimales),
+    // su velocidad en celdas por tick y el último carácter que pintó
+    function createDrop(randomStart = false) {
+      const rows = Math.ceil(height / settings.fontSize)
+      return {
+        y: randomStart ? -Math.random() * rows : -Math.random() * 20,
+        speed: MIN_SPEED + Math.random() * (MAX_SPEED - MIN_SPEED),
+        lastRow: -1,
+        char: randomChar(),
+        textIndex: Math.floor(Math.random() * 100)
+      }
+    }
+
+    function randomChar() {
+      const { chars } = settings
+      return chars[Math.floor(Math.random() * chars.length)]
+    }
+
+    // Con texto personalizado cada columna recorre el texto en orden,
+    // así las palabras se pueden leer de arriba abajo
+    function nextChar(drop) {
+      if (settings.chars === DEFAULT_CHARS) return randomChar()
+      const { chars } = settings
+      const char = chars[drop.textIndex % chars.length]
+      drop.textIndex++
+      return char
+    }
+
+    function columnColor(index) {
+      if (settings.color !== 'rainbow') return settings.color
+      return `hsl(${(hue + index * 6) % 360} 100% 60%)`
+    }
+
+    // Ajusta el canvas a la ventana teniendo en cuenta el devicePixelRatio
+    // para que el texto sea nítido en pantallas retina
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = Math.floor(width * dpr)
+      canvas.height = Math.floor(height * dpr)
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      // Cambiar el tamaño del canvas lo borra: lo repintamos de negro
+      context.fillStyle = '#000'
+      context.fillRect(0, 0, width, height)
+
+      // Conservamos las gotas existentes y solo añadimos o quitamos columnas
+      const columns = Math.ceil(width / settings.fontSize)
+      if (drops.length > columns) drops.length = columns
+      while (drops.length < columns) drops.push(createDrop(true))
+      drops.forEach(drop => { drop.lastRow = -1 })
+    }
+
+    // El truco del rastro: en vez de borrar el canvas en cada frame, pintamos
+    // encima un rectángulo negro semitransparente. Lo pintado antes se va
+    // oscureciendo poco a poco y deja una estela que se desvanece.
+    // Cuanto menor es la opacidad, más largo es el rastro.
+    // Curiosidad: por el redondeo a 8 bits los píxeles muy oscuros nunca llegan
+    // al negro puro, por eso no bajamos la opacidad demasiado.
+    function fadeCanvas() {
+      const alpha = 0.22 - settings.trail * 0.018
+      context.fillStyle = `rgba(0, 0, 0, ${alpha})`
+      context.fillRect(0, 0, width, height)
+    }
+
+    function step() {
+      const size = settings.fontSize
+      fadeCanvas()
+
+      context.font = `${size}px 'MS Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', monospace`
+      context.textBaseline = 'top'
+      context.textAlign = 'center'
+
+      drops.forEach((drop, index) => {
+        const x = index * size + size / 2
+        const row = Math.floor(drop.y)
+
+        if (row !== drop.lastRow) {
+          // La cabeza baja a una nueva celda: la celda anterior deja de ser
+          // la cabeza, así que la repintamos con el color normal
+          if (drop.lastRow >= 0) {
+            context.fillStyle = '#000'
+            context.fillRect(index * size, drop.lastRow * size, size, size)
+            context.fillStyle = columnColor(index)
+            context.fillText(drop.char, x, drop.lastRow * size)
+          }
+          drop.char = nextChar(drop)
+          drop.lastRow = row
+        }
+
+        // El primer carácter (la cabeza) es más brillante y con resplandor
+        if (row >= 0) {
+          context.shadowColor = columnColor(index)
+          context.shadowBlur = 10
+          context.fillStyle = HEAD_COLOR
+          context.fillText(drop.char, x, row * size)
+          context.shadowBlur = 0
+        }
+
+        drop.y += drop.speed
+
+        // Cuando sale por abajo, la gota vuelve arriba con cierta aleatoriedad
+        // para que las columnas no vayan sincronizadas
+        if (row * size > height && Math.random() > 0.96) {
+          Object.assign(drop, createDrop())
+        }
+      })
+
+      hue = (hue + 1.5) % 360
+    }
+
+    // requestAnimationFrame se llama ~60 veces por segundo (o más en pantallas
+    // de 120 Hz). Usamos su timestamp para limitar los FPS: solo avanzamos la
+    // animación cuando ha pasado suficiente tiempo desde el último paso
+    function loop(timestamp) {
+      window.requestAnimationFrame(loop)
+      if (paused) return
+
+      const interval = 1000 / settings.fps
+      const elapsed = timestamp - lastTime
+      if (elapsed < interval) return
+
+      // Restamos el sobrante para mantener un ritmo estable
+      lastTime = timestamp - (elapsed % interval)
+      step()
+    }
+
+    // Simulamos unos cuantos pasos antes de empezar para que la pantalla
+    // aparezca ya llena de lluvia en lugar de vacía
+    function prewarm() {
+      const rows = Math.ceil(height / settings.fontSize)
+      for (let i = 0; i < rows * 1.2; i++) step()
+    }
+
+    function updateOutputs() {
+      document.querySelector('#fps-value').textContent = `${settings.fps} fps`
+      document.querySelector('#size-value').textContent = `${settings.fontSize} px`
+      document.querySelector('#trail-value').textContent = settings.trail
+    }
+
+    function setColor(color) {
+      settings.color = color
+      const accent = color === 'rainbow' ? '#7dffb0' : color
+      document.documentElement.style.setProperty('--accent', accent)
+      document.querySelectorAll('.swatch').forEach(swatch => {
+        swatch.setAttribute('aria-pressed', swatch.dataset.color === color)
+      })
+    }
+
+    function handleInput(event) {
+      const { name, value } = event.target
+
+      if (name === 'fps') settings.fps = Number(value)
+      if (name === 'trail') settings.trail = Number(value)
+      if (name === 'color') setColor(value)
+
+      if (name === 'size') {
+        settings.fontSize = Number(value)
+        resize()
+      }
+
+      if (name === 'text') {
+        // Array.from separa por puntos de código, así los emojis no se parten
+        const chars = Array.from(value.replace(/\s+/g, ''))
+        settings.chars = chars.length > 0 ? chars : DEFAULT_CHARS
+      }
+
+      updateOutputs()
+    }
+
+    function togglePanel() {
+      form.classList.toggle('is-hidden')
+    }
+
+    form.addEventListener('input', handleInput)
+    form.addEventListener('submit', event => event.preventDefault())
+
+    form.querySelectorAll('.swatch').forEach(swatch => {
+      swatch.addEventListener('click', () => setColor(swatch.dataset.color))
+    })
+
+    toggleButton.addEventListener('click', togglePanel)
+
+    document.addEventListener('keydown', event => {
+      if (event.target.matches('input[type="text"]')) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        paused = !paused
+      }
+      if (event.key.toLowerCase() === 'h') togglePanel()
+    })
+
+    window.addEventListener('resize', resize)
+
+    setColor(settings.color)
+    updateOutputs()
+    resize()
+    prewarm()
+    window.requestAnimationFrame(loop)
+  </script>
+</body>
+
+</html>

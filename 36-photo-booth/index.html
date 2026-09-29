@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>36 - Fotomatón</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0c0a14;
+      --panel: #16131f;
+      --border: #2a2438;
+      --text: #f4f1fb;
+      --muted: #9a93ad;
+      --accent: #ff4d6d;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background:
+        radial-gradient(circle at 50% -20%, #2d1b4e 0, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .camera-button {
+      padding: 9px 16px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .camera-button.is-on {
+      border-color: #16a34a;
+      color: #86efac;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 210px;
+      gap: 20px;
+      min-height: 0;
+      padding: 0 24px 20px;
+    }
+
+    .filters {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-self: start;
+    }
+
+    .filters button {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 14px;
+      text-align: left;
+      transition: .15s;
+    }
+
+    .filters button:hover {
+      color: var(--text);
+    }
+
+    .filters button[aria-pressed='true'] {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+      color: var(--text);
+    }
+
+    .center {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 18px;
+      box-shadow: 0 0 0 1px var(--border), 0 30px 60px rgb(0 0 0 / .5);
+      background: #000;
+    }
+
+    .badge {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      translate: -50% 0;
+      padding: 6px 12px;
+      border-radius: 99px;
+      background: rgb(0 0 0 / .55);
+      backdrop-filter: blur(6px);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .message {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      translate: -50% 0;
+      width: min(92%, 460px);
+      padding: 12px 16px;
+      border: 1px solid #7f1d1d;
+      border-radius: 12px;
+      background: rgb(69 10 10 / .9);
+      color: #fecaca;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .countdown {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      font-size: clamp(80px, 18vw, 180px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 8px 40px rgb(0 0 0 / .6);
+      pointer-events: none;
+    }
+
+    .countdown.tick {
+      animation: tick 1s ease-out;
+    }
+
+    .flash {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .flash.is-active {
+      animation: flash .5s ease-out;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+    }
+
+    .shutter {
+      width: 74px;
+      height: 74px;
+      border: 5px solid #fff;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgb(255 77 109 / .25);
+      transition: scale .15s;
+    }
+
+    .shutter:hover {
+      scale: 1.06;
+    }
+
+    .shutter:disabled {
+      opacity: .5;
+      cursor: wait;
+    }
+
+    .strip {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: #f5f0e6;
+      overflow-y: auto;
+    }
+
+    .strip h2 {
+      margin: 0;
+      color: #3b3346;
+      font-size: 13px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .photo {
+      position: relative;
+      flex-shrink: 0;
+      animation: drop .4s ease-out;
+    }
+
+    .photo img {
+      display: block;
+      width: 100%;
+      border-radius: 4px;
+    }
+
+    .photo-actions {
+      position: absolute;
+      right: 6px;
+      bottom: 6px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .photo-actions a,
+    .photo-actions button {
+      display: grid;
+      place-content: center;
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 8px;
+      background: rgb(0 0 0 / .6);
+      color: #fff;
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .photo-actions a:hover,
+    .photo-actions button:hover {
+      background: var(--accent);
+    }
+
+    .empty {
+      margin: auto 0;
+      color: #8a8196;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @keyframes tick {
+      from {
+        scale: 1.6;
+        opacity: 0;
+      }
+
+      30% {
+        scale: 1;
+        opacity: 1;
+      }
+    }
+
+    @keyframes flash {
+      from {
+        opacity: 1;
+      }
+    }
+
+    @keyframes drop {
+      from {
+        translate: 0 -20px;
+        opacity: 0;
+      }
+    }
+
+    @media (width < 820px) {
+      body {
+        overflow: auto;
+      }
+
+      main {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0 16px 20px;
+      }
+
+      .badge {
+        white-space: normal;
+        width: max-content;
+        max-width: 90%;
+        text-align: center;
+      }
+
+      header {
+        padding: 12px 16px;
+      }
+
+      .filters {
+        flex-direction: row;
+        order: 2;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .filters button {
+        flex-shrink: 0;
+      }
+
+      .center {
+        height: 62dvh;
+      }
+
+      .strip {
+        order: 3;
+        flex-direction: row;
+        overflow-x: auto;
+      }
+
+      .strip h2 {
+        display: none;
+      }
+
+      .photo {
+        width: 140px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>📸 Fotomatón</h1>
+    <button class="camera-button" id="camera-button">🎥 Activar cámara</button>
+  </header>
+
+  <main>
+    <nav class="filters" id="filters" aria-label="Filtros"></nav>
+
+    <section class="center">
+      <div class="stage" id="stage">
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <span class="badge" id="badge">✨ Modo demo · activa la cámara para hacerte fotos</span>
+        <div class="countdown" id="countdown"></div>
+        <p class="message" id="message" hidden></p>
+      </div>
+      <div class="controls">
+        <button class="shutter" id="shutter" aria-label="Hacer foto"></button>
+      </div>
+    </section>
+
+    <aside class="strip" id="strip">
+      <h2>Tus fotos</h2>
+    </aside>
+  </main>
+
+  <div class="flash" id="flash"></div>
+
+  <script type="module">
+    const $canvas = document.querySelector('#canvas')
+    const $stage = document.querySelector('#stage')
+    const $filters = document.querySelector('#filters')
+    const $shutter = document.querySelector('#shutter')
+    const $strip = document.querySelector('#strip')
+    const $cameraButton = document.querySelector('#camera-button')
+    const $badge = document.querySelector('#badge')
+    const $message = document.querySelector('#message')
+    const $countdown = document.querySelector('#countdown')
+    const $flash = document.querySelector('#flash')
+
+    // willReadFrequently avisa al navegador de que vamos a leer píxeles
+    // (getImageData) en cada frame, así mantiene el canvas en la CPU
+    const ctx = $canvas.getContext('2d', { willReadFrequently: true })
+
+    const MAX_PHOTOS = 12
+    const COUNTDOWN_SECONDS = 3
+    const DEMO_SIZE = { width: 640, height: 480 }
+
+    // ---------- FILTROS ----------
+    // ImageData.data es un array plano de bytes: [R, G, B, A, R, G, B, A, ...]
+    // Cada píxel ocupa 4 posiciones, por eso los bucles avanzan de 4 en 4.
+    // Al ser un Uint8ClampedArray, los valores < 0 se guardan como 0 y los
+    // > 255 como 255: no hace falta limitar los resultados a mano.
+
+    // Luminancia: el ojo humano es más sensible al verde que al rojo o al azul,
+    // por eso no hacemos la media simple (R + G + B) / 3 sino una ponderada
+    function luminance(r, g, b) {
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    function grayscale({ data }) {
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = luminance(data[i], data[i + 1], data[i + 2])
+        data[i] = data[i + 1] = data[i + 2] = gray
+      }
+    }
+
+    function sepia({ data }) {
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        data[i] = 0.393 * r + 0.769 * g + 0.189 * b
+        data[i + 1] = 0.349 * r + 0.686 * g + 0.168 * b
+        data[i + 2] = 0.272 * r + 0.534 * g + 0.131 * b
+      }
+    }
+
+    function invert({ data }) {
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 255 - data[i]
+        data[i + 1] = 255 - data[i + 1]
+        data[i + 2] = 255 - data[i + 2]
+      }
+    }
+
+    function threshold({ data }) {
+      for (let i = 0; i < data.length; i += 4) {
+        const value = luminance(data[i], data[i + 1], data[i + 2]) > 110 ? 255 : 0
+        data[i] = data[i + 1] = data[i + 2] = value
+      }
+    }
+
+    function pixelate({ data, width, height }) {
+      const size = Math.max(6, Math.round(width / 64))
+      // Recorremos la imagen por bloques: calculamos el color medio del
+      // bloque y lo pintamos en todos sus píxeles
+      for (let by = 0; by < height; by += size) {
+        for (let bx = 0; bx < width; bx += size) {
+          const maxY = Math.min(by + size, height)
+          const maxX = Math.min(bx + size, width)
+          let r = 0
+          let g = 0
+          let b = 0
+          let count = 0
+          for (let y = by; y < maxY; y++) {
+            for (let x = bx; x < maxX; x++) {
+              const i = (y * width + x) * 4
+              r += data[i]
+              g += data[i + 1]
+              b += data[i + 2]
+              count++
+            }
+          }
+          r /= count
+          g /= count
+          b /= count
+          for (let y = by; y < maxY; y++) {
+            for (let x = bx; x < maxX; x++) {
+              const i = (y * width + x) * 4
+              data[i] = r
+              data[i + 1] = g
+              data[i + 2] = b
+            }
+          }
+        }
+      }
+    }
+
+    function rgbSplit({ data, width, height }) {
+      // Necesitamos una copia: si leyéramos del mismo array que modificamos,
+      // tomaríamos valores que ya hemos desplazado
+      const source = data.slice()
+      const offset = Math.round(width * 0.015)
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4
+          const redX = Math.min(width - 1, x + offset)
+          const blueX = Math.max(0, x - offset)
+          data[i] = source[(y * width + redX) * 4]
+          data[i + 2] = source[(y * width + blueX) * 4 + 2]
+        }
+      }
+    }
+
+    function mirror({ data, width, height }) {
+      // Copiamos la mitad izquierda sobre la derecha, reflejada
+      for (let y = 0; y < height; y++) {
+        for (let x = Math.ceil(width / 2); x < width; x++) {
+          const target = (y * width + x) * 4
+          const source = (y * width + (width - 1 - x)) * 4
+          data[target] = data[source]
+          data[target + 1] = data[source + 1]
+          data[target + 2] = data[source + 2]
+        }
+      }
+    }
+
+    const FILTERS = [
+      { id: 'normal', name: '🙂 Normal', apply: null },
+      { id: 'grayscale', name: '🌫️ Grises', apply: grayscale },
+      { id: 'sepia', name: '📜 Sepia', apply: sepia },
+      { id: 'invert', name: '🌀 Invertir', apply: invert },
+      { id: 'pixelate', name: '👾 Píxeles', apply: pixelate },
+      { id: 'threshold', name: '◐ Umbral', apply: threshold },
+      { id: 'rgb', name: '🎸 RGB split', apply: rgbSplit },
+      { id: 'mirror', name: '🪞 Espejo', apply: mirror }
+    ]
+
+    // ---------- ESTADO ----------
+    let currentFilter = FILTERS[0]
+    let stream = null
+    const $video = document.createElement('video')
+    $video.muted = true
+    $video.playsInline = true
+
+    // ---------- ESCENA DE DEMO (sin cámara) ----------
+    function drawDemoScene(time) {
+      const { width, height } = $canvas
+      const t = time / 1000
+      const gradient = ctx.createLinearGradient(0, 0, width, height)
+      gradient.addColorStop(0, `hsl(${(t * 20) % 360} 80% 55%)`)
+      gradient.addColorStop(1, `hsl(${(t * 20 + 120) % 360} 80% 40%)`)
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, width, height)
+
+      // Círculos de luz desenfocados (bokeh)
+      for (let i = 0; i < 14; i++) {
+        const x = (Math.sin(t * 0.4 + i * 1.7) * 0.5 + 0.5) * width
+        const y = (Math.cos(t * 0.3 + i * 2.3) * 0.5 + 0.5) * height
+        ctx.fillStyle = `hsl(${(i * 40 + t * 30) % 360} 90% 75% / .25)`
+        ctx.beginPath()
+        ctx.arc(x, y, 20 + (i % 5) * 14, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      ctx.save()
+      ctx.translate(width / 2, height / 2 + Math.sin(t * 2) * 12)
+      ctx.rotate(Math.sin(t * 1.3) * 0.08)
+      ctx.font = `${Math.round(height * 0.45)}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#000'
+      ctx.fillText('😎', 0, 0)
+      ctx.restore()
+    }
+
+    function drawVideoFrame() {
+      const { width, height } = $canvas
+      // Dibujamos el vídeo reflejado para que se comporte como un espejo
+      ctx.save()
+      ctx.translate(width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage($video, 0, 0, width, height)
+      ctx.restore()
+    }
+
+    function applyFilter(filter) {
+      if (!filter.apply) return
+      const imageData = ctx.getImageData(0, 0, $canvas.width, $canvas.height)
+      filter.apply(imageData)
+      ctx.putImageData(imageData, 0, 0)
+    }
+
+    function drawFrame(time) {
+      const hasVideo = stream && $video.readyState >= $video.HAVE_CURRENT_DATA
+      if (hasVideo) drawVideoFrame()
+      else drawDemoScene(time)
+      applyFilter(currentFilter)
+    }
+
+    function renderFrame(time) {
+      drawFrame(time)
+      requestAnimationFrame(renderFrame)
+    }
+
+    // ---------- TAMAÑO DEL CANVAS ----------
+    function fitCanvas() {
+      // Ajustamos el tamaño CSS del canvas manteniendo la proporción del vídeo
+      const { width, height } = $stage.getBoundingClientRect()
+      const ratio = $canvas.width / $canvas.height
+      const fitWidth = Math.min(width, height * ratio)
+      $canvas.style.width = `${Math.floor(fitWidth)}px`
+      $canvas.style.height = `${Math.floor(fitWidth / ratio)}px`
+    }
+
+    function setCanvasSize(width, height) {
+      $canvas.width = width
+      $canvas.height = height
+      fitCanvas()
+    }
+
+    // ---------- CÁMARA ----------
+    function getErrorMessage(error) {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return 'Tu navegador no permite acceder a la cámara. Recuerda que getUserMedia solo funciona en HTTPS o en localhost.'
+      }
+      const messages = {
+        NotAllowedError: '🚫 Has denegado el permiso de la cámara. Actívalo desde el icono del candado en la barra de direcciones y vuelve a intentarlo.',
+        SecurityError: '🔒 La página no tiene permiso para usar la cámara (¿está dentro de un iframe sin permisos?).',
+        NotFoundError: '📷 No se ha encontrado ninguna cámara conectada.',
+        OverconstrainedError: '📷 No hay ninguna cámara que cumpla los requisitos pedidos.',
+        NotReadableError: '⚠️ La cámara está siendo usada por otra aplicación.',
+        AbortError: '⚠️ Se ha interrumpido el acceso a la cámara.'
+      }
+      return messages[error?.name] ?? `No se ha podido acceder a la cámara: ${error?.message ?? error}`
+    }
+
+    function showMessage(text) {
+      $message.textContent = text
+      $message.hidden = !text
+    }
+
+    async function startCamera() {
+      showMessage('')
+      $cameraButton.disabled = true
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported')
+        // Pedimos solo vídeo. El navegador mostrará el diálogo de permisos
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          audio: false
+        })
+        $video.srcObject = stream
+        await $video.play()
+        setCanvasSize($video.videoWidth || 640, $video.videoHeight || 480)
+        $badge.hidden = true
+        $cameraButton.textContent = '⏹ Apagar cámara'
+        $cameraButton.classList.add('is-on')
+      } catch (error) {
+        stopCamera()
+        showMessage(getErrorMessage(error))
+      } finally {
+        $cameraButton.disabled = false
+      }
+    }
+
+    function stopCamera() {
+      // Detener cada pista apaga de verdad la cámara (y su luz indicadora).
+      // Quitar el vídeo del DOM NO es suficiente
+      stream?.getTracks().forEach(track => track.stop())
+      stream = null
+      $video.srcObject = null
+      setCanvasSize(DEMO_SIZE.width, DEMO_SIZE.height)
+      $badge.hidden = false
+      $cameraButton.textContent = '🎥 Activar cámara'
+      $cameraButton.classList.remove('is-on')
+    }
+
+    // ---------- FOTOS ----------
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+    function addPhoto(dataURL, filterName) {
+      const $photo = document.createElement('figure')
+      $photo.className = 'photo'
+      $photo.style.margin = '0'
+
+      const $img = document.createElement('img')
+      $img.src = dataURL
+      $img.alt = `Foto con filtro ${filterName}`
+
+      const $actions = document.createElement('div')
+      $actions.className = 'photo-actions'
+
+      // Un enlace con el atributo download descarga el data URL como archivo
+      const $download = document.createElement('a')
+      $download.href = dataURL
+      $download.download = `fotomaton-${Date.now()}.jpg`
+      $download.textContent = '⬇'
+      $download.title = 'Descargar'
+
+      const $remove = document.createElement('button')
+      $remove.textContent = '✕'
+      $remove.title = 'Borrar'
+      $remove.addEventListener('click', () => {
+        $photo.remove()
+        updateEmptyState()
+      })
+
+      $actions.append($download, $remove)
+      $photo.append($img, $actions)
+      $strip.querySelector('h2').after($photo)
+
+      // Limitamos la tira para no acumular megas de imágenes en memoria
+      const photos = $strip.querySelectorAll('.photo')
+      if (photos.length > MAX_PHOTOS) photos[photos.length - 1].remove()
+      updateEmptyState()
+    }
+
+    function updateEmptyState() {
+      const hasPhotos = $strip.querySelector('.photo')
+      let $empty = $strip.querySelector('.empty')
+      if (hasPhotos) {
+        $empty?.remove()
+      } else if (!$empty) {
+        $empty = document.createElement('p')
+        $empty.className = 'empty'
+        $empty.textContent = 'Aún no hay fotos. ¡Pulsa el botón rojo!'
+        $strip.append($empty)
+      }
+    }
+
+    function capture() {
+      // Pintamos un frame nuevo justo antes de capturar: si la pestaña estaba
+      // en segundo plano, requestAnimationFrame se pausa y el canvas podría
+      // contener una imagen antigua
+      drawFrame(performance.now())
+      // toDataURL convierte el contenido del canvas (ya filtrado) en una imagen
+      return $canvas.toDataURL('image/jpeg', 0.9)
+    }
+
+    async function takePhoto() {
+      $shutter.disabled = true
+      for (let n = COUNTDOWN_SECONDS; n > 0; n--) {
+        $countdown.textContent = n
+        $countdown.classList.remove('tick')
+        void $countdown.offsetWidth // fuerza un reflow para reiniciar la animación
+        $countdown.classList.add('tick')
+        await sleep(1000)
+      }
+      $countdown.textContent = ''
+
+      addPhoto(capture(), currentFilter.name)
+      $flash.classList.remove('is-active')
+      void $flash.offsetWidth
+      $flash.classList.add('is-active')
+      $shutter.disabled = false
+    }
+
+    // Unas fotos de ejemplo para que la tira no empiece vacía
+    function createSamplePhotos() {
+      const samples = [FILTERS[6], FILTERS[3], FILTERS[2]]
+      samples.forEach((filter, index) => {
+        drawDemoScene(index * 2400 + 800)
+        applyFilter(filter)
+        addPhoto($canvas.toDataURL('image/jpeg', 0.9), filter.name)
+      })
+    }
+
+    // ---------- UI ----------
+    function renderFilters() {
+      $filters.replaceChildren(...FILTERS.map((filter) => {
+        const $button = document.createElement('button')
+        $button.textContent = filter.name
+        $button.setAttribute('aria-pressed', filter === currentFilter)
+        $button.addEventListener('click', () => {
+          currentFilter = filter
+          renderFilters()
+        })
+        return $button
+      }))
+    }
+
+    $cameraButton.addEventListener('click', () => {
+      if (stream) stopCamera()
+      else startCamera()
+    })
+    $shutter.addEventListener('click', takePhoto)
+
+    // Al salir de la página liberamos la cámara
+    window.addEventListener('pagehide', stopCamera)
+
+    new ResizeObserver(fitCanvas).observe($stage)
+
+    renderFilters()
+    setCanvasSize(DEMO_SIZE.width, DEMO_SIZE.height)
+    createSamplePhotos()
+    requestAnimationFrame(renderFrame)
+  </script>
+</body>
+
+</html>

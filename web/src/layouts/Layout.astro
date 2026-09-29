@@ -1,44 +1,91 @@
 ---
 import { ClientRouter } from "astro:transitions"
+import { SITE_DESCRIPTION, SITE_NAME } from "../consts"
 
 interface Props {
   title: string
+  description?: string
+  image?: { src: string; alt: string; width?: number; height?: number }
+  type?: "website" | "article"
+  noindex?: boolean
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[]
 }
 
-const { title } = Astro.props
-const description =
-  "Proyectos prácticos para aprender JavaScript con código fuente y vídeo. Totalmente gratis."
+const {
+  title,
+  description = SITE_DESCRIPTION,
+  image = {
+    src: "/og.jpg",
+    alt: "100 proyectos de JavaScript por midudev",
+    width: 2400,
+    height: 1260,
+  },
+  type = "website",
+  noindex = false,
+  jsonLd,
+} = Astro.props
+
+// Sin barra final para que coincida con los enlaces internos (Vercel sirve ambas)
+const pathname = Astro.url.pathname.replace(/\/+$/, "") || "/"
+const canonicalURL = new URL(pathname, Astro.site)
+const imageURL = new URL(image.src, Astro.site)
+
+// Escapamos "<" para que ninguna descripción pueda cerrar el <script>
+const jsonLdString = jsonLd && JSON.stringify(jsonLd).replace(/</g, "\\u003c")
 ---
 
 <!doctype html>
 <html lang="es">
   <head>
-    <title>{title}</title>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
     <meta name="description" content={description} />
+    {!noindex && <link rel="canonical" href={canonicalURL} />}
+    <meta
+      name="robots"
+      content={noindex ? "noindex, follow" : "index, follow, max-image-preview:large"}
+    />
     <meta name="author" content="Miguel Ángel Durán" />
     <meta
       name="keywords"
       content="javascript, js, programación, desarrollo web"
     />
     <meta name="theme-color" content="#f7df1e" />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:locale" content="es_ES" />
+    {!noindex && <meta property="og:url" content={canonicalURL} />}
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={imageURL} />
+    <meta property="og:image:alt" content={image.alt} />
+    {image.width && <meta property="og:image:width" content={String(image.width)} />}
+    {image.height && <meta property="og:image:height" content={String(image.height)} />}
+
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@midudev" />
     <meta name="twitter:creator" content="@midudev" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content="https://javascript100.dev/og.jpg" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://javascript100.dev/og.jpg" />
-    <link rel="canonical" href="https://javascript100.dev" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="twitter:image" content={imageURL} />
+    <meta name="twitter:image:alt" content={image.alt} />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="sitemap" href="/sitemap.xml" />
+    {
+      jsonLdString && (
+        <script is:inline type="application/ld+json" set:html={jsonLdString} />
+      )
+    }
     <ClientRouter />
   </head>
   <body>
     <slot />
     <style is:global>
       @import "tailwindcss";
+      @import "tailwind-animations";
 
       html {
         font-family: system-ui, sans-serif;

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>84 - Mensajes cifrados</title>
+  <style>
+    :root {
+      --bg: #070b10;
+      --card: #0e151d;
+      --field: #0a1016;
+      --border: #1c2a36;
+      --text: #e3edf5;
+      --muted: #7d91a3;
+      --accent: #34e0a1;
+      --accent-soft: rgba(52, 224, 161, .12);
+      --salt: #ffb454;
+      --iv: #6fa8ff;
+      --cipher: #34e0a1;
+      --tag: #ff6f91;
+      --danger: #ff6f7d;
+      --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(800px 400px at 80% -10%, rgba(52, 224, 161, .12), transparent 70%),
+        radial-gradient(600px 400px at -10% 110%, rgba(111, 168, 255, .1), transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    main {
+      width: min(980px, 100%);
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px 24px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 32px);
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    [role="tablist"] {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    [role="tab"] {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 9px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    [role="tab"][aria-selected="true"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    textarea,
+    input {
+      width: 100%;
+      padding: 11px 12px;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 110px;
+      line-height: 1.5;
+    }
+
+    textarea.mono {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      word-break: break-all;
+    }
+
+    textarea:focus,
+    input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .password {
+      position: relative;
+    }
+
+    .password input {
+      padding-right: 48px;
+    }
+
+    .password button {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      translate: 0 -50%;
+      padding: 6px 8px;
+      background: transparent;
+      border: 0;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #13202b;
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, opacity .15s;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: progress;
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #03140d;
+    }
+
+    .primary:hover {
+      background: #5cf0b9;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    [role="tabpanel"][hidden] {
+      display: none;
+    }
+
+    /* ---------- Desglose del paquete ---------- */
+    .bytes {
+      display: flex;
+      height: 30px;
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: #071018;
+    }
+
+    .bytes span {
+      display: grid;
+      place-items: center;
+      min-width: 54px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .legend code {
+      display: block;
+      margin-top: 2px;
+      font-family: var(--mono);
+      color: var(--text);
+      font-size: 11px;
+      word-break: break-all;
+    }
+
+    .legend b {
+      font-weight: 700;
+    }
+
+    .steps {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: step;
+      font-size: 13px;
+    }
+
+    .steps li {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      color: var(--muted);
+    }
+
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .steps strong {
+      color: var(--text);
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .result {
+      min-height: 110px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: var(--field);
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.55;
+    }
+
+    .result.success {
+      border: 1px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .result.error {
+      border: 1px solid var(--danger);
+      background: rgba(255, 111, 125, .08);
+      color: #ffc2c8;
+    }
+
+    .hash {
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1.6;
+      word-break: break-all;
+      color: var(--accent);
+    }
+
+    .note {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .status {
+      min-height: 20px;
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    .warning {
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      background: rgba(255, 111, 125, .1);
+      border: 1px solid var(--danger);
+    }
+
+    @media (width < 760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    // CONSTANTES
+    // PBKDF2 es lento A PROPÓSITO: cada intento de adivinar la contraseña
+    // cuesta cientos de miles de hashes. OWASP recomienda 600.000 con SHA-256
+    const PBKDF2_ITERATIONS = 600_000
+    const SALT_BYTES = 16
+    const IV_BYTES = 12 // tamaño recomendado del IV (nonce) para AES-GCM
+    const TAG_BYTES = 16 // AES-GCM añade una etiqueta de autenticación de 128 bits
+    const DEMO_MESSAGE = 'Nos vemos a las 20:00 en la puerta del Sol. Trae los planos 🗺️'
+    const DEMO_PASSWORD = 'midudev-2026'
+
+    // TextEncoder convierte texto (UTF-16 en JS) en bytes UTF-8 y
+    // TextDecoder hace lo contrario. La criptografía trabaja con BYTES
+    const encoder = new TextEncoder()
+    const decoder = new TextDecoder()
+
+    let lastPackage = ''
+    let hashRequest = 0
+
+    // ---------- Base64 ----------
+
+    // btoa() solo acepta "cadenas binarias": cada carácter representa un
+    // byte (0-255). Así que primero convertimos cada byte en un carácter con
+    // String.fromCharCode y luego codificamos. Lo hacemos por trozos para no
+    // pasar demasiados argumentos de golpe con el spread.
+    // (Los navegadores más nuevos ya traen Uint8Array.prototype.toBase64)
+    function bytesToBase64 (bytes) {
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      }
+      return btoa(binary)
+    }
+
+    // El camino inverso: atob() devuelve una cadena binaria y sacamos el
+    // código de cada carácter para reconstruir los bytes originales.
+    // Aceptamos también Base64URL (- y _ en lugar de + y /, sin relleno =)
+    function base64ToBytes (base64) {
+      const normalized = base64.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')
+      const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+      const binary = atob(padded) // lanza un error si no es Base64 válido
+      return Uint8Array.from(binary, char => char.charCodeAt(0))
+    }
+
+    // Base64URL no usa caracteres con significado especial en una URL
+    function toBase64Url (base64) {
+      return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    }
+
+    function toHex (bytes) {
+      return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
+    }
+
+    function concatBytes (...parts) {
+      const result = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
+      let offset = 0
+      for (const part of parts) {
+        result.set(part, offset)
+        offset += part.length
+      }
+      return result
+    }
+
+    // ---------- Criptografía ----------
+
+    // Una contraseña NO es una clave: es corta y predecible. PBKDF2 la
+    // "estira" mezclándola con un salt aleatorio miles de veces para obtener
+    // una clave AES de 256 bits. El salt evita que dos personas con la misma
+    // contraseña obtengan la misma clave (y las tablas precalculadas)
+    async function deriveKey (password, salt) {
+      const baseKey = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        'PBKDF2',
+        false, // no exportable
+        ['deriveKey']
+      )
+
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      )
+    }
+
+    async function encryptMessage (message, password) {
+      const timings = {}
+      let start = performance.now()
+
+      // Salt e IV salen de un generador criptográficamente seguro.
+      // El IV NUNCA debe repetirse con la misma clave en AES-GCM
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES))
+      const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
+      const plain = encoder.encode(message)
+
+      const key = await deriveKey(password, salt)
+      timings.derive = performance.now() - start
+
+      start = performance.now()
+      // El resultado incluye el texto cifrado + la etiqueta de 16 bytes
+      const encrypted = new Uint8Array(
+        await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain)
+      )
+      timings.encrypt = performance.now() - start
+
+      // Empaquetamos todo junto: salt | iv | cifrado+etiqueta.
+      // El salt y el IV no son secretos, pero hacen falta para descifrar
+      const packed = concatBytes(salt, iv, encrypted)
+      const base64 = bytesToBase64(packed)
+
+      return { base64, salt, iv, encrypted, plain, timings }
+    }
+
+    async function decryptMessage (packageText, password) {
+      let bytes
+      try {
+        bytes = base64ToBytes(packageText)
+      } catch {
+        throw new Error('El mensaje no es Base64 válido. ¿Lo has copiado entero?')
+      }
+
+      if (bytes.length < SALT_BYTES + IV_BYTES + TAG_BYTES) {
+        throw new Error('El mensaje es demasiado corto para ser un paquete cifrado.')
+      }
+
+      // Deshacemos el paquete leyendo cada parte por su posición
+      const salt = bytes.slice(0, SALT_BYTES)
+      const iv = bytes.slice(SALT_BYTES, SALT_BYTES + IV_BYTES)
+      const encrypted = bytes.slice(SALT_BYTES + IV_BYTES)
+
+      const key = await deriveKey(password, salt)
+
+      try {
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted)
+        return decoder.decode(plain)
+      } catch {
+        // AES-GCM es "cifrado autenticado": si la clave es otra (contraseña
+        // incorrecta) o alguien ha tocado un solo bit, la etiqueta no cuadra
+        // y decrypt() falla en lugar de devolver basura
+        throw new Error('Contraseña incorrecta o mensaje manipulado. La etiqueta de autenticación de AES-GCM no coincide.')
+      }
+    }
+
+    async function sha256 (text) {
+      const digest = await crypto.subtle.digest('SHA-256', encoder.encode(text))
+      return toHex(new Uint8Array(digest))
+    }
+
+    // ---------- Interfaz: cifrar ----------
+
+    function formatMs (ms) {
+      return `${Math.round(ms).toLocaleString('es-ES')} ms`
+    }
+
+    function renderBreakdown ({ base64, salt, iv, encrypted, plain, timings }) {
+      const cipherLength = encrypted.length - TAG_BYTES
+      const total = salt.length + iv.length + encrypted.length
+      const parts = [
+        { label: `salt ${salt.length} B`, size: salt.length, color: 'var(--salt)' },
+        { label: `iv ${iv.length} B`, size: iv.length, color: 'var(--iv)' },
+        { label: `cifrado ${cipherLength} B`, size: cipherLength, color: 'var(--cipher)' },
+        { label: `tag ${TAG_BYTES} B`, size: TAG_BYTES, color: 'var(--tag)' }
+      ]
+
+      $('.bytes').replaceChildren(...parts.map(({ label, size, color }) => {
+        const span = document.createElement('span')
+        span.textContent = label
+        span.style.background = color
+        span.style.flex = `${size} 1 0`
+        return span
+      }))
+
+      $('#salt-hex').textContent = toHex(salt)
+      $('#iv-hex').textContent = toHex(iv)
+      $('#cipher-hex').textContent = `${toHex(encrypted.subarray(0, 12))}…`
+      $('#tag-hex').textContent = toHex(encrypted.subarray(-TAG_BYTES))
+
+      $('.steps').innerHTML = `
+        <li><span>TextEncoder: el texto pasa a <strong>${plain.length} bytes</strong> UTF-8</span></li>
+        <li><span>PBKDF2 · ${PBKDF2_ITERATIONS.toLocaleString('es-ES')} iteraciones SHA-256 → clave AES-256 en <strong>${formatMs(timings.derive)}</strong></span></li>
+        <li><span>AES-GCM cifra y autentica: <strong>${encrypted.length} bytes</strong> en ${formatMs(timings.encrypt)}</span></li>
+        <li><span>salt + iv + cifrado = ${total} bytes → <strong>${base64.length} caracteres</strong> Base64</span></li>
+      `
+    }
+
+    async function handleEncrypt (event) {
+      event.preventDefault()
+      const message = $('#message').value
+      const password = $('#password').value
+      const button = $('#encrypt-button')
+
+      if (!message.trim() || !password) {
+        setStatus('#encrypt-status', 'Escribe un mensaje y una contraseña.')
+        return
+      }
+
+      button.disabled = true
+      button.textContent = 'Cifrando…'
+      try {
+        const result = await encryptMessage(message, password)
+        lastPackage = result.base64
+        $('#package').value = result.base64
+        renderBreakdown(result)
+        setStatus('#encrypt-status', 'Listo. Cifra otra vez y verás que el resultado cambia: salt e IV son aleatorios.')
+      } catch (error) {
+        setStatus('#encrypt-status', `Error al cifrar: ${error.message}`)
+      } finally {
+        button.disabled = false
+        button.textContent = '🔒 Cifrar mensaje'
+      }
+    }
+
+    async function copyText (text, statusSelector, successMessage) {
+      if (!text) return
+      try {
+        await navigator.clipboard.writeText(text)
+        setStatus(statusSelector, successMessage)
+      } catch {
+        setStatus(statusSelector, 'No se ha podido copiar automáticamente. Selecciona el texto y cópialo a mano.')
+      }
+    }
+
+    function createShareLink () {
+      if (!lastPackage) return
+      // Todo lo que va después de # (el "fragmento") NUNCA se envía al
+      // servidor: se queda en el navegador de quien abre el enlace
+      const url = new URL(location.href)
+      url.hash = `m=${toBase64Url(lastPackage)}`
+      copyText(url.href, '#encrypt-status', '🔗 Enlace copiado. Comparte la contraseña por otro canal.')
+    }
+
+    // ---------- Interfaz: descifrar ----------
+
+    async function handleDecrypt (event) {
+      event.preventDefault()
+      const packageText = $('#cipher-input').value.trim()
+      const password = $('#decrypt-password').value
+      const result = $('#plain-output')
+      const button = $('#decrypt-button')
+
+      if (!packageText || !password) {
+        showResult('Pega un mensaje cifrado y escribe la contraseña.', 'error')
+        return
+      }
+
+      button.disabled = true
+      button.textContent = 'Descifrando…'
+      result.className = 'result'
+      result.textContent = 'Derivando la clave con PBKDF2…'
+
+      try {
+        const plain = await decryptMessage(packageText, password)
+        showResult(plain, 'success')
+      } catch (error) {
+        showResult(`⛔ ${error.message}`, 'error')
+      } finally {
+        button.disabled = false
+        button.textContent = '🔓 Descifrar'
+      }
+    }
+
+    function showResult (text, type) {
+      const result = $('#plain-output')
+      result.className = `result ${type}`
+      result.textContent = text
+    }
+
+    // ---------- Interfaz: hash ----------
+
+    async function updateHash () {
+      // digest() es asíncrono: si escribimos rápido, una respuesta antigua
+      // podría llegar después de una nueva. Con un contador descartamos
+      // los resultados que ya no corresponden a la última petición
+      const requestId = ++hashRequest
+      const hash = await sha256($('#hash-input').value)
+      if (requestId !== hashRequest) return
+      $('#hash-output').textContent = hash
+    }
+
+    // ---------- Pestañas ----------
+
+    function selectTab (name) {
+      document.querySelectorAll('[role="tab"]').forEach(tab => {
+        const selected = tab.dataset.tab === name
+        tab.setAttribute('aria-selected', String(selected))
+        tab.tabIndex = selected ? 0 : -1
+      })
+      document.querySelectorAll('[role="tabpanel"]').forEach(panel => {
+        panel.hidden = panel.id !== `panel-${name}`
+      })
+    }
+
+    function handleTabKeys (event) {
+      const tabs = [...document.querySelectorAll('[role="tab"]')]
+      const index = tabs.indexOf(document.activeElement)
+      if (index === -1) return
+      const delta = { ArrowRight: 1, ArrowLeft: -1 }[event.key]
+      if (!delta) return
+      const next = tabs.at((index + delta) % tabs.length)
+      next.focus()
+      selectTab(next.dataset.tab)
+    }
+
+    function setStatus (selector, message) {
+      $(selector).textContent = message
+    }
+
+    function togglePassword (event) {
+      const input = event.currentTarget.previousElementSibling
+      const visible = input.type === 'text'
+      input.type = visible ? 'password' : 'text'
+      event.currentTarget.textContent = visible ? '👁️' : '🙈'
+      event.currentTarget.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña')
+    }
+
+    function tryInDecrypt () {
+      if (!lastPackage) return
+      $('#cipher-input').value = lastPackage
+      $('#decrypt-password').value = ''
+      showResult('Escribe la contraseña y pulsa descifrar. Prueba también con una incorrecta.', '')
+      selectTab('decrypt')
+      $('#decrypt-password').focus()
+    }
+
+    // Si alguien abre un enlace compartido, el mensaje viene en el hash
+    function loadFromHash () {
+      const params = new URLSearchParams(location.hash.slice(1))
+      const message = params.get('m')
+      if (!message) return false
+
+      $('#cipher-input').value = message
+      showResult('Te han enviado un mensaje cifrado. Escribe la contraseña para leerlo.', '')
+      selectTab('decrypt')
+      return true
+    }
+
+    function init () {
+      if (!window.crypto?.subtle) {
+        $('.warning').hidden = false
+        document.querySelectorAll('form button').forEach(button => { button.disabled = true })
+        return
+      }
+
+      $('#encrypt-form').addEventListener('submit', handleEncrypt)
+      $('#decrypt-form').addEventListener('submit', handleDecrypt)
+      $('#copy-button').addEventListener('click', () => copyText($('#package').value, '#encrypt-status', '📋 Mensaje cifrado copiado.'))
+      $('#link-button').addEventListener('click', createShareLink)
+      $('#try-button').addEventListener('click', tryInDecrypt)
+      $('#hash-input').addEventListener('input', updateHash)
+      $('[role="tablist"]').addEventListener('keydown', handleTabKeys)
+      document.querySelectorAll('[role="tab"]').forEach(tab => {
+        tab.addEventListener('click', () => selectTab(tab.dataset.tab))
+      })
+      document.querySelectorAll('.toggle-password').forEach(button => {
+        button.addEventListener('click', togglePassword)
+      })
+      window.addEventListener('hashchange', loadFromHash)
+
+      // Estado inicial con un ejemplo ya cifrado
+      $('#message').value = DEMO_MESSAGE
+      $('#password').value = DEMO_PASSWORD
+      $('#hash-input').value = 'hola'
+      updateHash()
+      loadFromHash()
+      $('#encrypt-form').requestSubmit()
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Mensajes <span>cifrados</span> 🔐</h1>
+        <p class="subtitle">AES-GCM + PBKDF2 con la Web Crypto API. Todo ocurre en tu navegador.</p>
+      </div>
+      <div role="tablist" aria-label="Modo">
+        <button role="tab" id="tab-encrypt" data-tab="encrypt" aria-selected="true" aria-controls="panel-encrypt">Cifrar</button>
+        <button role="tab" id="tab-decrypt" data-tab="decrypt" aria-selected="false" aria-controls="panel-decrypt" tabindex="-1">Descifrar</button>
+        <button role="tab" id="tab-hash" data-tab="hash" aria-selected="false" aria-controls="panel-hash" tabindex="-1">Hash SHA-256</button>
+      </div>
+    </header>
+
+    <div class="warning" hidden>
+      ⚠️ Tu navegador no ofrece <code>crypto.subtle</code>. La Web Crypto API solo está disponible en contextos seguros (HTTPS o localhost).
+    </div>
+
+    <!-- CIFRAR -->
+    <section class="card" role="tabpanel" id="panel-encrypt" aria-labelledby="tab-encrypt">
+      <div class="grid">
+        <form id="encrypt-form" class="stack">
+          <label>
+            Mensaje secreto
+            <textarea id="message" rows="4" placeholder="Escribe aquí tu mensaje…"></textarea>
+          </label>
+          <label>
+            Contraseña
+            <span class="password">
+              <input id="password" type="password" autocomplete="new-password" placeholder="Algo difícil de adivinar">
+              <button type="button" class="toggle-password" aria-label="Mostrar contraseña">👁️</button>
+            </span>
+          </label>
+          <button id="encrypt-button" class="primary">🔒 Cifrar mensaje</button>
+        </form>
+
+        <div class="stack">
+          <label>
+            Mensaje cifrado (salt + iv + cifrado en Base64)
+            <textarea id="package" class="mono" rows="4" readonly></textarea>
+          </label>
+          <div class="row">
+            <button id="copy-button" type="button">📋 Copiar</button>
+            <button id="link-button" type="button">🔗 Copiar enlace</button>
+            <button id="try-button" type="button">Probar a descifrar →</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="status" id="encrypt-status" role="status"></p>
+
+      <div class="grid" style="margin-top: 8px">
+        <div>
+          <h2 class="section-title">Qué ha pasado</h2>
+          <ol class="steps"></ol>
+        </div>
+        <div>
+          <h2 class="section-title">Anatomía del paquete</h2>
+          <div class="bytes"></div>
+          <div class="legend">
+            <div><b style="color: var(--salt)">Salt</b> (para PBKDF2)<code id="salt-hex"></code></div>
+            <div><b style="color: var(--iv)">IV</b> (nonce de AES-GCM)<code id="iv-hex"></code></div>
+            <div><b style="color: var(--cipher)">Texto cifrado</b><code id="cipher-hex"></code></div>
+            <div><b style="color: var(--tag)">Etiqueta</b> (autenticación)<code id="tag-hex"></code></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DESCIFRAR -->
+    <section class="card" role="tabpanel" id="panel-decrypt" aria-labelledby="tab-decrypt" hidden>
+      <div class="grid">
+        <form id="decrypt-form" class="stack">
+          <label>
+            Mensaje cifrado
+            <textarea id="cipher-input" class="mono" rows="5" placeholder="Pega aquí el mensaje en Base64…"></textarea>
+          </label>
+          <label>
+            Contraseña
+            <span class="password">
+              <input id="decrypt-password" type="password" autocomplete="off">
+              <button type="button" class="toggle-password" aria-label="Mostrar contraseña">👁️</button>
+            </span>
+          </label>
+          <button id="decrypt-button" class="primary">🔓 Descifrar</button>
+        </form>
+
+        <div class="stack">
+          <h2 class="section-title">Resultado</h2>
+          <div id="plain-output" class="result" role="status">Pega un mensaje cifrado para leerlo.</div>
+          <p class="note">Si la contraseña no es la correcta, AES-GCM no devuelve texto sin sentido: se niega a descifrar porque la etiqueta de autenticación no coincide.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HASH -->
+    <section class="card" role="tabpanel" id="panel-hash" aria-labelledby="tab-hash" hidden>
+      <div class="grid">
+        <label>
+          Texto
+          <textarea id="hash-input" rows="5"></textarea>
+        </label>
+        <div class="stack">
+          <h2 class="section-title">SHA-256 (hexadecimal)</h2>
+          <div id="hash-output" class="hash" aria-live="polite"></div>
+          <p class="note">Un hash es de un solo sentido: no se puede "descifrar". Cambia una sola letra y el resultado cambia por completo (efecto avalancha). Siempre mide 256 bits = 64 caracteres hexadecimales.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+
+</html>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>25 - Machaca el topo</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #2d2016;
+      background:
+        radial-gradient(circle at 20% 10%, #ffffff66 0 12%, transparent 30%),
+        linear-gradient(#bfe7ff 0 22%, #9bd66a 22% 100%);
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 40px);
+      font-weight: 900;
+      letter-spacing: -.02em;
+      color: #5a3a1e;
+      text-shadow: 0 3px 0 #fff;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+    }
+
+    .stat {
+      min-width: 96px;
+      padding: 6px 14px;
+      border-radius: 14px;
+      background: #fffbf2;
+      box-shadow: 0 4px 0 #0000001f;
+      text-align: center;
+    }
+
+    .stat small {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #9a7b5c;
+      letter-spacing: .06em;
+    }
+
+    .stat strong {
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timebar {
+      width: min(460px, 90vw);
+      height: 8px;
+      border-radius: 99px;
+      background: #0000001a;
+      overflow: hidden;
+    }
+
+    .timebar div {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff7a45, #ffc53d);
+      transform-origin: left;
+    }
+
+    /* ---------- Tablero ---------- */
+
+    .board {
+      --size: min(460px, 90vw, 58dvh);
+      width: var(--size);
+      height: var(--size);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4%;
+      padding: 4%;
+      border-radius: 28px;
+      background: #7cc04b;
+      box-shadow: inset 0 -8px 0 #5f9c36, 0 10px 30px #3d6b2033;
+      touch-action: manipulation;
+    }
+
+    .board.playing {
+      /* Ocultamos el cursor real: lo sustituye el martillo */
+      cursor: none;
+    }
+
+    .hole {
+      position: relative;
+    }
+
+    /* El agujero de tierra */
+    .hole::before {
+      content: '';
+      position: absolute;
+      left: 4%;
+      right: 4%;
+      bottom: 6%;
+      height: 34%;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 50% 35%, #2a170a 0 55%, #5b3a1d 70%, #7a5230 100%);
+    }
+
+    /* Recorte: el topo solo se ve por encima de la mitad del agujero */
+    .clip {
+      position: absolute;
+      inset: 0 0 23% 0;
+      overflow: hidden;
+    }
+
+    .mole {
+      position: absolute;
+      left: 15%;
+      width: 70%;
+      height: 92%;
+      bottom: 0;
+      translate: 0 105%;
+      /* La transición hace que el topo "suba" y "baje" */
+      transition: translate .18s ease-out;
+      border-radius: 50% 50% 38% 38% / 58% 58% 42% 42%;
+      background: radial-gradient(circle at 35% 25%, #b07a4a, #8a5a32 45%, #6b4424);
+      box-shadow: inset 0 -10px 0 #0000001a;
+      cursor: inherit;
+    }
+
+    .hole.up .mole {
+      translate: 0 8%;
+    }
+
+    .eye {
+      position: absolute;
+      top: 28%;
+      width: 12%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #1b120b;
+      box-shadow: inset 2px 2px 0 #fff8;
+    }
+
+    .eye.left {
+      left: 28%;
+    }
+
+    .eye.right {
+      right: 28%;
+    }
+
+    .snout {
+      position: absolute;
+      top: 44%;
+      left: 50%;
+      translate: -50% 0;
+      width: 46%;
+      height: 26%;
+      border-radius: 50%;
+      background: #e9b98b;
+    }
+
+    .snout::before {
+      content: '';
+      position: absolute;
+      top: 8%;
+      left: 50%;
+      translate: -50% 0;
+      width: 38%;
+      height: 42%;
+      border-radius: 50%;
+      background: #e0607e;
+    }
+
+    .snout::after {
+      content: '';
+      position: absolute;
+      bottom: -26%;
+      left: 50%;
+      translate: -50% 0;
+      width: 26%;
+      height: 34%;
+      border-radius: 0 0 4px 4px;
+      background: #fff;
+      border: 1px solid #0002;
+    }
+
+    /* Topo dorado: vale más puntos */
+    .mole.golden {
+      background: radial-gradient(circle at 35% 25%, #fff3b0, #ffcc33 45%, #d99a00);
+    }
+
+    /* Animación al golpear: se aplasta y se ve mareado */
+    .hole.hit .mole {
+      animation: bonk .3s ease-out;
+    }
+
+    .hole.hit .eye {
+      background: none;
+      box-shadow: none;
+    }
+
+    .hole.hit .eye::before {
+      content: '✕';
+      position: absolute;
+      inset: -40%;
+      display: grid;
+      place-items: center;
+      font-size: clamp(10px, 2.2vw, 16px);
+      font-weight: 900;
+      color: #1b120b;
+    }
+
+    @keyframes bonk {
+      0% {
+        scale: 1.15 .7;
+      }
+
+      60% {
+        scale: .95 1.05;
+      }
+
+      100% {
+        scale: 1;
+      }
+    }
+
+    .points {
+      position: absolute;
+      left: 50%;
+      top: 10%;
+      translate: -50% 0;
+      font-weight: 900;
+      font-size: clamp(18px, 3vw, 26px);
+      color: #fff;
+      text-shadow: 0 2px 0 #b3541e;
+      pointer-events: none;
+      animation: float-up .7s ease-out forwards;
+    }
+
+    @keyframes float-up {
+      to {
+        translate: -50% -60px;
+        opacity: 0;
+      }
+    }
+
+    /* ---------- Martillo ---------- */
+
+    .hammer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 80px;
+      height: 80px;
+      pointer-events: none;
+      z-index: 10;
+      transform-origin: 80% 80%;
+      transition: rotate .08s;
+      rotate: 25deg;
+      display: none;
+    }
+
+    .hammer.visible {
+      display: block;
+    }
+
+    .hammer.smash {
+      rotate: -35deg;
+    }
+
+    button.start {
+      font: inherit;
+      font-size: 18px;
+      font-weight: 800;
+      padding: 12px 30px;
+      border: 0;
+      border-radius: 999px;
+      background: #ff7a45;
+      color: #fff;
+      box-shadow: 0 5px 0 #c4501f;
+      cursor: pointer;
+      transition: translate .1s, box-shadow .1s;
+    }
+
+    button.start:active {
+      translate: 0 3px;
+      box-shadow: 0 2px 0 #c4501f;
+    }
+
+    button.start:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+
+    .message {
+      margin: 0;
+      min-height: 1.4em;
+      font-weight: 600;
+      color: #3e5f24;
+    }
+
+    @media (max-height: 560px) {
+      h1 {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🔨 Machaca el topo</h1>
+
+  <div class="stats">
+    <div class="stat"><small>Puntos</small><strong id="score">0</strong></div>
+    <div class="stat"><small>Tiempo</small><strong id="time">30</strong></div>
+    <div class="stat"><small>Récord</small><strong id="best">0</strong></div>
+  </div>
+
+  <div class="timebar"><div id="timebar"></div></div>
+
+  <div class="board" id="board"></div>
+
+  <p class="message" id="message">Los topos están practicando… ¡pulsa jugar!</p>
+  <button class="start" id="start">Jugar</button>
+
+  <!-- Martillo dibujado con SVG que sigue al puntero -->
+  <svg class="hammer" id="hammer" viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="34" y="18" width="7" height="44" rx="3" fill="#a0652f" transform="rotate(-45 37 40)" />
+    <rect x="6" y="6" width="36" height="20" rx="5" fill="#6f7780" transform="rotate(-45 24 16)" />
+    <rect x="6" y="6" width="8" height="20" rx="3" fill="#4b525a" transform="rotate(-45 24 16)" />
+  </svg>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const HOLES = 9
+    const GAME_DURATION = 30_000
+    const BEST_KEY = 'whack-a-mole-best'
+    const GOLDEN_CHANCE = 0.12
+    // Tiempo que un topo está fuera: al principio más lento, al final más rápido
+    const SPEED = {
+      start: { min: 700, max: 1300 },
+      end: { min: 380, max: 750 }
+    }
+    const DEMO_SPEED = { min: 900, max: 1600 }
+    const PAUSE_BETWEEN = { min: 120, max: 450 }
+
+    const $board = $('#board')
+    const $score = $('#score')
+    const $time = $('#time')
+    const $best = $('#best')
+    const $timebar = $('#timebar')
+    const $message = $('#message')
+    const $start = $('#start')
+    const $hammer = $('#hammer')
+
+    let score = 0
+    let playing = false
+    let lastHole = -1
+    let moleTimeout = null
+    let gameTimeout = null
+    let startTime = 0
+    let best = Number(localStorage.getItem(BEST_KEY)) || 0
+
+    const random = (min, max) => Math.round(Math.random() * (max - min) + min)
+
+    function createBoard() {
+      const fragment = document.createDocumentFragment()
+      for (let index = 0; index < HOLES; index++) {
+        const hole = document.createElement('div')
+        hole.className = 'hole'
+        hole.dataset.index = index
+        hole.innerHTML = `
+          <div class="clip">
+            <div class="mole">
+              <span class="eye left"></span>
+              <span class="eye right"></span>
+              <span class="snout"></span>
+            </div>
+          </div>`
+        fragment.append(hole)
+      }
+      $board.append(fragment)
+    }
+
+    // Elegimos un agujero al azar que NO sea el anterior. Si sale el mismo,
+    // volvemos a tirar (para 9 agujeros casi nunca hacen falta más intentos)
+    function randomHole() {
+      let index
+      do {
+        index = Math.floor(Math.random() * HOLES)
+      } while (index === lastHole)
+      lastHole = index
+      return $board.children[index]
+    }
+
+    // Interpola la velocidad según el progreso de la partida (0 → 1)
+    function getUpTime() {
+      if (!playing) return random(DEMO_SPEED.min, DEMO_SPEED.max)
+      const progress = Math.min(1, (performance.now() - startTime) / GAME_DURATION)
+      const min = SPEED.start.min + (SPEED.end.min - SPEED.start.min) * progress
+      const max = SPEED.start.max + (SPEED.end.max - SPEED.start.max) * progress
+      return random(min, max)
+    }
+
+    // La clave del juego: setTimeout encadenados. Cada topo, al esconderse,
+    // programa la aparición del siguiente con un retardo aleatorio.
+    // Al no usar setInterval, cada paso puede durar un tiempo distinto.
+    function popUp() {
+      const hole = randomHole()
+      const mole = hole.querySelector('.mole')
+      mole.classList.toggle('golden', playing && Math.random() < GOLDEN_CHANCE)
+      hole.classList.remove('hit')
+      hole.classList.add('up')
+
+      moleTimeout = setTimeout(() => {
+        hole.classList.remove('up')
+        // Pequeña pausa con el tablero vacío antes del siguiente topo
+        moleTimeout = setTimeout(popUp, random(PAUSE_BETWEEN.min, PAUSE_BETWEEN.max))
+      }, getUpTime())
+    }
+
+    function hideAll() {
+      clearTimeout(moleTimeout)
+      for (const hole of $board.children) hole.classList.remove('up', 'hit')
+    }
+
+    function startGame() {
+      hideAll()
+      score = 0
+      lastHole = -1
+      playing = true
+      startTime = performance.now()
+      $score.textContent = score
+      $message.textContent = '¡Dale! Cada topo dorado vale 3 puntos'
+      $start.disabled = true
+      $board.classList.add('playing')
+
+      // El fin de la partida es otro setTimeout
+      gameTimeout = setTimeout(endGame, GAME_DURATION)
+      requestAnimationFrame(updateTimer)
+      moleTimeout = setTimeout(popUp, 400)
+    }
+
+    function endGame() {
+      playing = false
+      hideAll()
+      clearTimeout(gameTimeout)
+      $board.classList.remove('playing')
+      $hammer.classList.remove('visible')
+      $start.disabled = false
+      $start.textContent = 'Jugar otra vez'
+
+      if (score > best) {
+        best = score
+        localStorage.setItem(BEST_KEY, best)
+        $best.textContent = best
+        $message.textContent = `🏆 ¡Nuevo récord: ${score} puntos!`
+      } else {
+        $message.textContent = `Has conseguido ${score} puntos. ¡Inténtalo otra vez!`
+      }
+
+      // Tras la partida, los topos vuelven a su modo "demo"
+      moleTimeout = setTimeout(popUp, 1500)
+    }
+
+    function updateTimer() {
+      if (!playing) {
+        $time.textContent = 0
+        $timebar.style.transform = 'scaleX(0)'
+        return
+      }
+      const elapsed = performance.now() - startTime
+      const remaining = Math.max(0, GAME_DURATION - elapsed)
+      $time.textContent = Math.ceil(remaining / 1000)
+      $timebar.style.transform = `scaleX(${remaining / GAME_DURATION})`
+      requestAnimationFrame(updateTimer)
+    }
+
+    function showPoints(hole, points) {
+      const label = document.createElement('span')
+      label.className = 'points'
+      label.textContent = `+${points}`
+      hole.append(label)
+      label.addEventListener('animationend', () => label.remove())
+    }
+
+    // Delegación de eventos: UN solo listener en el tablero en lugar de
+    // uno por topo. Con closest() averiguamos si se ha pulsado un topo.
+    $board.addEventListener('pointerdown', (event) => {
+      // isTrusted es false si el evento lo ha creado un script
+      // (element.click() o dispatchEvent). Así evitamos trampas desde la consola.
+      if (!event.isTrusted || !playing) return
+
+      smashHammer(event)
+
+      const mole = event.target.closest('.mole')
+      if (!mole) return
+
+      const hole = mole.closest('.hole')
+      // Solo cuenta si el topo está fuera y no lo hemos golpeado ya
+      if (!hole.classList.contains('up') || hole.classList.contains('hit')) return
+
+      const points = mole.classList.contains('golden') ? 3 : 1
+      score += points
+      $score.textContent = score
+      hole.classList.add('hit')
+      showPoints(hole, points)
+
+      // Escondemos el topo golpeado un poco antes de lo previsto
+      clearTimeout(moleTimeout)
+      moleTimeout = setTimeout(() => {
+        hole.classList.remove('up')
+        moleTimeout = setTimeout(popUp, random(PAUSE_BETWEEN.min, PAUSE_BETWEEN.max))
+      }, 250)
+    })
+
+    /* ---------- Martillo que sigue al puntero ---------- */
+
+    function moveHammer(x, y) {
+      $hammer.style.translate = `${x - 52}px ${y - 60}px`
+    }
+
+    function smashHammer(event) {
+      moveHammer(event.clientX, event.clientY)
+      $hammer.classList.add('visible', 'smash')
+      setTimeout(() => {
+        $hammer.classList.remove('smash')
+        // En pantallas táctiles no hay "hover", escondemos el martillo
+        if (event.pointerType !== 'mouse') $hammer.classList.remove('visible')
+      }, 110)
+    }
+
+    $board.addEventListener('pointermove', (event) => {
+      if (!playing || event.pointerType !== 'mouse') return
+      $hammer.classList.add('visible')
+      moveHammer(event.clientX, event.clientY)
+    })
+
+    $board.addEventListener('pointerleave', () => $hammer.classList.remove('visible'))
+
+    $start.addEventListener('click', startGame)
+
+    /* ---------- Inicio ---------- */
+
+    createBoard()
+    $best.textContent = best
+    // Modo demo: los topos asoman aunque no estés jugando
+    popUp()
+  </script>
+</body>
+
+</html>

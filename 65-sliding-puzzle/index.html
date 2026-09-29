@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>65 - Puzzle deslizante</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #ffffff;
+      --ink: #1f2330;
+      --muted: #6b7080;
+      --line: #e5e0d6;
+      --accent: #ff6b4a;
+      --accent-dark: #e24c2c;
+      --board: #2a2440;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(circle at 15% 20%, #ffe3d1 0, transparent 40%),
+        radial-gradient(circle at 90% 90%, #e2dcff 0, transparent 45%),
+        var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .panel {
+      width: 330px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 14px;
+    }
+
+    .stat span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .stat strong {
+      font-size: 26px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .record {
+      margin: -8px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .group>span {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    button,
+    .file-label {
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, transform .1s;
+    }
+
+    button:hover,
+    .file-label:hover {
+      border-color: #cfc7b8;
+    }
+
+    button:active {
+      transform: scale(.97);
+    }
+
+    button[aria-pressed="true"] {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+
+    .file-label input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+
+    .file-label:focus-within {
+      outline: 2px solid var(--accent);
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      padding: 12px 16px;
+      font-size: 15px;
+    }
+
+    .primary:hover {
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .switch input {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status {
+      min-height: 18px;
+      margin: 0;
+      font-size: 13px;
+      color: var(--accent-dark);
+    }
+
+    /* --- Tablero --- */
+    .board-wrapper {
+      position: relative;
+      width: min(540px, 92vw, calc(100dvh - 80px));
+      aspect-ratio: 1;
+      flex-shrink: 0;
+    }
+
+    .board {
+      --size: 4;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(var(--size), 1fr);
+      grid-template-rows: repeat(var(--size), 1fr);
+      gap: 4px;
+      padding: 8px;
+      background: var(--board);
+      border-radius: 20px;
+      box-shadow: 0 30px 60px -20px #2a244088, inset 0 0 0 1px #ffffff14;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    /*
+      Cada pieza muestra la MISMA imagen, pero ampliada N veces
+      (background-size: N·100%) y desplazada con background-position
+      para que solo se vea su trocito. En porcentajes, la columna c
+      corresponde a c / (N - 1) · 100%.
+    */
+    .tile {
+      position: relative;
+      border-radius: 8px;
+      background-image: var(--image);
+      background-size: calc(var(--size) * 100%) calc(var(--size) * 100%);
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px #ffffff30, inset 0 -3px 0 #0002;
+      will-change: transform;
+    }
+
+    .tile.is-movable:hover {
+      filter: brightness(1.08);
+    }
+
+    .tile .number {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      min-width: 22px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #0009;
+      color: #fff;
+      font-size: clamp(10px, 2.2vw, 14px);
+      font-weight: 700;
+      text-align: center;
+      transition: opacity .2s;
+    }
+
+    .board.hide-numbers .number,
+    .board.is-solved .number {
+      opacity: 0;
+    }
+
+    .tile.is-last {
+      animation: reveal .5s ease both;
+    }
+
+    @keyframes reveal {
+      from {
+        opacity: 0;
+        transform: scale(.8);
+      }
+    }
+
+    .win {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: end center;
+      gap: 12px;
+      padding-bottom: 48px;
+      text-align: center;
+      border-radius: 20px;
+      background: linear-gradient(#1f233000, #1f2330cc);
+      backdrop-filter: blur(2px);
+      color: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .4s .4s;
+    }
+
+    .win.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .win h2 {
+      margin: 0;
+      font-size: 36px;
+    }
+
+    .win p {
+      margin: 0;
+    }
+
+    /* En la web se superpone un logo abajo a la izquierda: dejamos ese hueco libre */
+    @media (min-width: 861px) {
+      body {
+        padding-bottom: 150px;
+      }
+
+      .board-wrapper {
+        width: min(540px, calc(100dvh - 180px));
+        min-width: 360px;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        flex-direction: column-reverse;
+        gap: 24px;
+      }
+
+      .panel {
+        width: min(540px, 92vw);
+      }
+
+      .board-wrapper {
+        width: min(540px, 92vw);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <aside class="panel">
+      <header>
+        <h1>Puzzle <span>deslizante</span></h1>
+        <p class="subtitle">Ordena las piezas. Haz click o usa las flechas del teclado.</p>
+      </header>
+
+      <div class="stats">
+        <div class="stat"><span>Movimientos</span><strong id="moves">0</strong></div>
+        <div class="stat"><span>Tiempo</span><strong id="time">00:00</strong></div>
+      </div>
+      <p class="record" id="record"></p>
+
+      <div class="group">
+        <span>Tamaño</span>
+        <div class="segmented" id="sizes">
+          <button type="button" data-size="3">3 × 3</button>
+          <button type="button" data-size="4">4 × 4</button>
+          <button type="button" data-size="5">5 × 5</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <span>Imagen</span>
+        <div class="segmented">
+          <button type="button" id="generated">🎨 Generada</button>
+          <button type="button" id="random-photo">📷 Aleatoria</button>
+          <label class="file-label">⬆️ Subir<input type="file" id="upload" accept="image/*"></label>
+        </div>
+        <p class="status" id="status" role="status"></p>
+      </div>
+
+      <label class="switch"><input type="checkbox" id="numbers" checked> Mostrar números</label>
+
+      <button type="button" class="primary" id="shuffle">🔀 Barajar</button>
+    </aside>
+
+    <div class="board-wrapper">
+      <div class="board" id="board" aria-label="Tablero del puzzle"></div>
+      <div class="win" id="win" aria-live="polite">
+        <h2>¡Resuelto! 🎉</h2>
+        <p id="win-text"></p>
+        <div><button type="button" class="primary" id="play-again">Jugar otra vez</button></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    const IMAGE_SIZE = 600
+    const ANIMATION_MS = 160
+    const RECORD_KEY = 'sliding-puzzle:record:'
+    const KEY_TO_OFFSET = {
+      // La flecha indica hacia dónde se mueve la PIEZA: con ← se mueve
+      // hacia la izquierda la pieza que está a la derecha del hueco
+      ArrowLeft: { dx: 1, dy: 0 },
+      ArrowRight: { dx: -1, dy: 0 },
+      ArrowUp: { dx: 0, dy: 1 },
+      ArrowDown: { dx: 0, dy: -1 }
+    }
+
+    const $board = document.querySelector('#board')
+    const $moves = document.querySelector('#moves')
+    const $time = document.querySelector('#time')
+    const $record = document.querySelector('#record')
+    const $status = document.querySelector('#status')
+    const $win = document.querySelector('#win')
+    const $winText = document.querySelector('#win-text')
+    const $numbers = document.querySelector('#numbers')
+
+    // tiles[posición] = número de pieza (1..N²-1) y 0 para el hueco
+    let size = 4
+    let tiles = []
+    let tileElements = new Map()
+    let moves = 0
+    let startTime = 0
+    let timerId = null
+    let isSolved = false
+
+    // --- Imagen por defecto generada con canvas ---
+
+    function createGeneratedImage() {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = IMAGE_SIZE
+      const ctx = canvas.getContext('2d')
+
+      const sky = ctx.createLinearGradient(0, 0, 0, IMAGE_SIZE)
+      sky.addColorStop(0, '#2b1d5c')
+      sky.addColorStop(0.45, '#c2417a')
+      sky.addColorStop(0.7, '#ff9a5a')
+      sky.addColorStop(1, '#ffd08a')
+      ctx.fillStyle = sky
+      ctx.fillRect(0, 0, IMAGE_SIZE, IMAGE_SIZE)
+
+      // Estrellas (con una semilla fija para que siempre sea igual)
+      let seed = 7
+      const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+      ctx.fillStyle = '#fff'
+      for (let i = 0; i < 80; i++) {
+        ctx.globalAlpha = random() * 0.8
+        ctx.fillRect(random() * IMAGE_SIZE, random() * IMAGE_SIZE * 0.4, 2, 2)
+      }
+      ctx.globalAlpha = 1
+
+      // Sol retro con franjas: lo pintamos en otro canvas para poder
+      // "recortar" las franjas sin agujerear también el cielo
+      const sunCanvas = document.createElement('canvas')
+      sunCanvas.width = sunCanvas.height = IMAGE_SIZE
+      const sunCtx = sunCanvas.getContext('2d')
+      const sun = sunCtx.createLinearGradient(0, 200, 0, 460)
+      sun.addColorStop(0, '#fff3a8')
+      sun.addColorStop(1, '#ff5e7e')
+      sunCtx.fillStyle = sun
+      sunCtx.beginPath()
+      sunCtx.arc(300, 330, 130, 0, Math.PI * 2)
+      sunCtx.fill()
+      sunCtx.globalCompositeOperation = 'destination-out'
+      for (let y = 330, h = 4; y < 460; y += 22, h += 2) sunCtx.fillRect(160, y, 280, h)
+      ctx.drawImage(sunCanvas, 0, 0)
+
+      // Tres capas de montañas
+      const layers = [
+        { color: '#7a2f6f', base: 400, amplitude: 90, peaks: 5 },
+        { color: '#4b1f5e', base: 450, amplitude: 70, peaks: 7 },
+        { color: '#261440', base: 500, amplitude: 50, peaks: 9 }
+      ]
+      for (const { color, base, amplitude, peaks } of layers) {
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(0, IMAGE_SIZE)
+        for (let i = 0; i <= peaks; i++) {
+          const x = (i / peaks) * IMAGE_SIZE
+          const y = base - (i % 2 === 0 ? amplitude * (0.4 + random() * 0.6) : amplitude * random() * 0.3)
+          ctx.lineTo(x, y)
+        }
+        ctx.lineTo(IMAGE_SIZE, IMAGE_SIZE)
+        ctx.fill()
+      }
+
+      // Rejilla en perspectiva en el suelo
+      ctx.strokeStyle = '#ff7ac866'
+      ctx.lineWidth = 2
+      for (let i = -10; i <= 10; i++) {
+        ctx.beginPath()
+        ctx.moveTo(300 + i * 12, 520)
+        ctx.lineTo(300 + i * 90, IMAGE_SIZE)
+        ctx.stroke()
+      }
+      for (let y = 530, step = 6; y < IMAGE_SIZE; y += step, step *= 1.5) {
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(IMAGE_SIZE, y)
+        ctx.stroke()
+      }
+
+      return canvas.toDataURL('image/png')
+    }
+
+    function setImage(url) {
+      $board.style.setProperty('--image', `url("${url}")`)
+    }
+
+    // --- Lógica del puzzle ---
+
+    function getSolvedTiles(n) {
+      return Array.from({ length: n * n }, (_, i) => (i === n * n - 1 ? 0 : i + 1))
+    }
+
+    /*
+      Una "inversión" es un par de piezas (a, b) donde a aparece antes
+      que b al leer el tablero fila a fila, pero a > b. El hueco no cuenta.
+    */
+    function countInversions(list) {
+      const pieces = list.filter(value => value !== 0)
+      let inversions = 0
+      for (let i = 0; i < pieces.length; i++) {
+        for (let j = i + 1; j < pieces.length; j++) {
+          if (pieces[i] > pieces[j]) inversions++
+        }
+      }
+      return inversions
+    }
+
+    /*
+      La mitad de las permutaciones posibles NO se pueden resolver
+      (el famoso 14-15 de Sam Loyd). La regla:
+      - Ancho impar (3x3, 5x5): resoluble si el nº de inversiones es par.
+      - Ancho par (4x4): cuenta la fila del hueco desde abajo (empezando en 1).
+        Es resoluble si inversiones + filaDelHueco es IMPAR.
+      Motivo: cada movimiento horizontal no cambia las inversiones y cada
+      movimiento vertical salta N-1 piezas, cambiando la paridad si N es par.
+    */
+    function isSolvable(list, n) {
+      const inversions = countInversions(list)
+      if (n % 2 === 1) return inversions % 2 === 0
+      const blankRowFromBottom = n - Math.floor(list.indexOf(0) / n)
+      return (inversions + blankRowFromBottom) % 2 === 1
+    }
+
+    function isSolvedState(list) {
+      return list.every((value, index) => value === (index === list.length - 1 ? 0 : index + 1))
+    }
+
+    function shuffleArray(list) {
+      // Fisher-Yates: cada permutación tiene la misma probabilidad
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[list[i], list[j]] = [list[j], list[i]]
+      }
+      return list
+    }
+
+    function createShuffledTiles(n) {
+      let list
+      do {
+        list = shuffleArray(getSolvedTiles(n))
+        if (!isSolvable(list, n)) {
+          // Intercambiar dos piezas (que no sean el hueco) cambia la
+          // paridad de las inversiones: convierte un puzzle imposible en resoluble
+          const [a, b] = list.map((value, index) => (value ? index : -1)).filter(index => index >= 0)
+          ;[list[a], list[b]] = [list[b], list[a]]
+        }
+      } while (isSolvedState(list))
+      return list
+    }
+
+    // Devuelve las posiciones de las piezas que se deslizarían al pulsar en `pos`
+    // (se pueden mover varias a la vez si están en la misma fila/columna que el hueco)
+    function getMovePath(pos) {
+      const blank = tiles.indexOf(0)
+      const [row, col] = [Math.floor(pos / size), pos % size]
+      const [blankRow, blankCol] = [Math.floor(blank / size), blank % size]
+      if (pos === blank || (row !== blankRow && col !== blankCol)) return []
+
+      const step = row === blankRow ? Math.sign(pos - blank) : Math.sign(pos - blank) * size
+      const path = []
+      for (let p = blank + step; p !== pos + step; p += step) path.push(p)
+      return path
+    }
+
+    // --- Renderizado y animación FLIP ---
+
+    function createTileElements() {
+      tileElements = new Map()
+      const fragment = document.createDocumentFragment()
+
+      for (let value = 1; value < size * size; value++) {
+        const tile = document.createElement('div')
+        const home = value - 1
+        const col = home % size
+        const row = Math.floor(home / size)
+        tile.className = 'tile'
+        tile.dataset.value = value
+        tile.style.backgroundPosition = `${(col / (size - 1)) * 100}% ${(row / (size - 1)) * 100}%`
+        tile.innerHTML = `<span class="number">${value}</span>`
+        tileElements.set(value, tile)
+        fragment.append(tile)
+      }
+
+      $board.style.setProperty('--size', size)
+      $board.replaceChildren(fragment)
+    }
+
+    function placeTiles() {
+      tiles.forEach((value, pos) => {
+        if (!value) return
+        const tile = tileElements.get(value)
+        tile.style.gridRow = Math.floor(pos / size) + 1
+        tile.style.gridColumn = (pos % size) + 1
+      })
+      const movable = new Set(
+        tiles.map((_, pos) => getMovePath(pos).length ? tiles[pos] : null)
+      )
+      for (const [value, tile] of tileElements) tile.classList.toggle('is-movable', movable.has(value))
+    }
+
+    /*
+      FLIP = First, Last, Invert, Play.
+      1. First: medimos dónde está cada pieza ANTES del cambio.
+      2. Last: aplicamos el cambio de verdad (nueva celda del grid) y medimos otra vez.
+      3. Invert: con un transform la devolvemos visualmente a su posición inicial.
+      4. Play: animamos ese transform hasta 0.
+      Así el layout cambia de golpe (barato) y solo animamos transform,
+      que el navegador compone en la GPU sin recalcular el layout.
+    */
+    function updateWithFlip(duration = ANIMATION_MS) {
+      const elements = [...tileElements.values()]
+      const first = new Map(elements.map(el => [el, el.getBoundingClientRect()]))
+
+      placeTiles()
+
+      for (const el of elements) {
+        const last = el.getBoundingClientRect()
+        const start = first.get(el)
+        const dx = start.left - last.left
+        const dy = start.top - last.top
+        if (!dx && !dy) continue
+        // Si había una animación a medias, la cancelamos: la medida "First"
+        // ya incluía su posición visual, así que la nueva continúa desde ahí
+        el.getAnimations().forEach(animation => animation.cancel())
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+          { duration, easing: 'cubic-bezier(.2, .8, .2, 1)' }
+        )
+      }
+    }
+
+    // --- Partida ---
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000)
+      return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`
+    }
+
+    function startTimer() {
+      startTime = performance.now()
+      timerId = setInterval(() => {
+        $time.textContent = formatTime(performance.now() - startTime)
+      }, 250)
+    }
+
+    function stopTimer() {
+      clearInterval(timerId)
+      timerId = null
+    }
+
+    function loadRecord() {
+      try {
+        return JSON.parse(localStorage.getItem(RECORD_KEY + size))
+      } catch {
+        return null
+      }
+    }
+
+    function renderRecord() {
+      const record = loadRecord()
+      $record.textContent = record
+        ? `🏆 Récord ${size}×${size}: ${record.moves} movimientos · ${formatTime(record.time)}`
+        : `Aún no tienes récord en ${size}×${size}`
+    }
+
+    function saveRecord(time) {
+      const record = loadRecord()
+      const isBetter = !record || moves < record.moves || (moves === record.moves && time < record.time)
+      if (!isBetter) return false
+      try {
+        localStorage.setItem(RECORD_KEY + size, JSON.stringify({ moves, time }))
+      } catch { }
+      return true
+    }
+
+    function newGame(newSize = size) {
+      const sizeChanged = newSize !== size || !tileElements.size
+      size = newSize
+      stopTimer()
+      moves = 0
+      isSolved = false
+      $moves.textContent = '0'
+      $time.textContent = '00:00'
+      $win.classList.remove('is-visible')
+      $board.querySelector('.is-last')?.remove()
+      $board.classList.remove('is-solved')
+
+      document.querySelectorAll('#sizes button').forEach(button => {
+        button.setAttribute('aria-pressed', Number(button.dataset.size) === size)
+      })
+
+      if (sizeChanged) {
+        createTileElements()
+        tiles = getSolvedTiles(size)
+        placeTiles()
+      }
+
+      tiles = createShuffledTiles(size)
+      updateWithFlip(sizeChanged ? 0 : 450)
+      renderRecord()
+    }
+
+    function moveFrom(pos) {
+      if (isSolved) return
+      const path = getMovePath(pos)
+      if (!path.length) return
+
+      if (!timerId) startTimer()
+
+      // Deslizamos: el hueco va "saltando" por el camino hasta llegar a pos
+      let blank = tiles.indexOf(0)
+      for (const p of path) {
+        tiles[blank] = tiles[p]
+        tiles[p] = 0
+        blank = p
+      }
+
+      moves += path.length
+      $moves.textContent = moves
+      updateWithFlip()
+
+      if (isSolvedState(tiles)) win()
+    }
+
+    function win() {
+      isSolved = true
+      stopTimer()
+      const time = performance.now() - startTime
+      $time.textContent = formatTime(time)
+
+      // Colocamos la pieza que faltaba para completar la imagen
+      const last = document.createElement('div')
+      last.className = 'tile is-last'
+      last.style.backgroundPosition = '100% 100%'
+      last.style.gridRow = size
+      last.style.gridColumn = size
+      $board.append(last)
+      $board.classList.add('is-solved')
+
+      const isRecord = saveRecord(time)
+      $winText.textContent = `${moves} movimientos en ${formatTime(time)}${isRecord ? ' · ¡Nuevo récord!' : ''}`
+      $win.classList.add('is-visible')
+      renderRecord()
+    }
+
+    // --- Imágenes ---
+
+    function showStatus(message) {
+      $status.textContent = message
+    }
+
+    function loadRandomPhoto() {
+      const seed = Math.random().toString(36).slice(2, 8)
+      const url = `https://picsum.photos/seed/${seed}/${IMAGE_SIZE}/${IMAGE_SIZE}`
+      const img = new Image()
+      showStatus('Cargando foto…')
+      img.onload = () => {
+        setImage(url)
+        showStatus('')
+      }
+      img.onerror = () => showStatus('No se pudo cargar la foto. ¿Estás sin conexión?')
+      img.src = url
+    }
+
+    async function loadUploadedImage(file) {
+      if (!file?.type.startsWith('image/')) {
+        showStatus('Ese archivo no es una imagen')
+        return
+      }
+      try {
+        // Recortamos la imagen al cuadrado central para que las piezas no se deformen
+        const bitmap = await createImageBitmap(file)
+        const side = Math.min(bitmap.width, bitmap.height)
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = IMAGE_SIZE
+        canvas.getContext('2d').drawImage(
+          bitmap,
+          (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side,
+          0, 0, IMAGE_SIZE, IMAGE_SIZE
+        )
+        bitmap.close()
+        setImage(canvas.toDataURL('image/jpeg', 0.9))
+        showStatus('')
+      } catch {
+        showStatus('No se pudo leer la imagen')
+      }
+    }
+
+    // --- Eventos ---
+
+    $board.addEventListener('click', (event) => {
+      const tile = event.target.closest('.tile')
+      if (!tile || !tile.dataset.value) return
+      moveFrom(tiles.indexOf(Number(tile.dataset.value)))
+    })
+
+    document.addEventListener('keydown', (event) => {
+      const offset = KEY_TO_OFFSET[event.key]
+      if (!offset) return
+      event.preventDefault()
+      const blank = tiles.indexOf(0)
+      const row = Math.floor(blank / size) + offset.dy
+      const col = (blank % size) + offset.dx
+      if (row < 0 || row >= size || col < 0 || col >= size) return
+      moveFrom(row * size + col)
+    })
+
+    document.querySelector('#sizes').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (button) newGame(Number(button.dataset.size))
+    })
+
+    document.querySelector('#shuffle').addEventListener('click', () => newGame())
+    document.querySelector('#play-again').addEventListener('click', () => newGame())
+    document.querySelector('#generated').addEventListener('click', () => setImage(GENERATED_IMAGE))
+    document.querySelector('#random-photo').addEventListener('click', loadRandomPhoto)
+    document.querySelector('#upload').addEventListener('change', (event) => {
+      loadUploadedImage(event.target.files[0])
+      event.target.value = ''
+    })
+
+    $numbers.addEventListener('change', () => {
+      $board.classList.toggle('hide-numbers', !$numbers.checked)
+    })
+
+    const GENERATED_IMAGE = createGeneratedImage()
+    setImage(GENERATED_IMAGE)
+    newGame(4)
+  </script>
+</body>
+
+</html>

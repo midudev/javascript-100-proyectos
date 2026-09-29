@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>73 - Afinador de guitarra</title>
+  <style>
+    :root {
+      --bg: #070b14;
+      --card: #0f1626;
+      --card-border: #1d2940;
+      --text: #e6edf7;
+      --muted: #7d8aa5;
+      --accent: #22d3ee;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --bad: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(ellipse at 50% -10%, #12305233 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 110%, #0e749033 0%, transparent 50%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    main {
+      width: min(680px, 100%);
+      background: linear-gradient(180deg, #111a2d, var(--card));
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 20px 24px 24px;
+      box-shadow: 0 30px 80px -20px #000c, inset 0 1px 0 #ffffff0d;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: .02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h1 span {
+      font-size: 1.4rem;
+    }
+
+    .calibration {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    .calibration button {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: #16213a;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .calibration output {
+      min-width: 58px;
+      text-align: center;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .gauge {
+      position: relative;
+      margin: 8px auto 0;
+      max-width: 420px;
+    }
+
+    .gauge-center {
+      position: absolute;
+      inset: auto 0 0;
+      text-align: center;
+    }
+
+    .gauge svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .tick {
+      stroke: #3a4966;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    .tick.major {
+      stroke: #7d8aa5;
+      stroke-width: 3;
+    }
+
+    .tick-label {
+      fill: var(--muted);
+      font-size: 11px;
+      text-anchor: middle;
+    }
+
+    #needle {
+      stroke: var(--muted);
+      stroke-width: 5;
+      stroke-linecap: round;
+      transition: stroke .2s;
+      filter: drop-shadow(0 0 6px currentColor);
+    }
+
+    .readout {
+      text-align: center;
+    }
+
+    .note {
+      font-size: clamp(2.8rem, 11vw, 4.4rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.02em;
+      transition: color .2s, opacity .3s;
+    }
+
+    .note sup {
+      font-size: .4em;
+      vertical-align: top;
+      margin-left: 2px;
+    }
+
+    .note sub {
+      font-size: .35em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .solfege {
+      color: var(--muted);
+      font-size: .95rem;
+      min-height: 1.2em;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      margin-top: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stats div {
+      display: grid;
+      gap: 2px;
+      text-align: center;
+    }
+
+    .stats small {
+      color: var(--muted);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .stats strong {
+      font-size: 1.1rem;
+    }
+
+    .hint {
+      text-align: center;
+      margin: 10px 0 0;
+      min-height: 1.4em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .idle .note,
+    .idle .stats {
+      opacity: .35;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 56px;
+      margin: 14px 0;
+      border-radius: 12px;
+      background: #0a1120;
+      border: 1px solid var(--card-border);
+    }
+
+    .strings {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+
+    .string {
+      display: grid;
+      gap: 2px;
+      justify-items: center;
+      padding: 10px 4px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: #121c31;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      transition: border-color .2s, background .2s, transform .1s;
+    }
+
+    .string:hover {
+      border-color: #33476b;
+    }
+
+    .string:active {
+      transform: scale(.96);
+    }
+
+    .string b {
+      font-size: 1.15rem;
+    }
+
+    .string small {
+      color: var(--muted);
+      font-size: .7rem;
+    }
+
+    .string.is-target {
+      border-color: var(--accent);
+      background: #0e2a3a;
+    }
+
+    .string.is-tuned {
+      border-color: var(--ok);
+      background: #0f2e22;
+    }
+
+    .string.is-playing {
+      box-shadow: 0 0 0 2px var(--accent), 0 0 18px -2px var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    #mic {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 999px;
+      border: 0;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: #03222b;
+      background: linear-gradient(135deg, #67e8f9, var(--accent));
+      box-shadow: 0 10px 30px -10px var(--accent);
+    }
+
+    #mic.is-active {
+      color: var(--text);
+      background: #2a1620;
+      box-shadow: inset 0 0 0 1px var(--bad);
+    }
+
+    #mic.is-active::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--bad);
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: .3;
+      }
+    }
+
+    .status {
+      text-align: center;
+      color: var(--muted);
+      font-size: .82rem;
+      margin: 10px 0 0;
+      min-height: 1.2em;
+    }
+
+    .status.error {
+      color: var(--bad);
+    }
+
+    @media (max-width: 520px) {
+      main {
+        padding: 16px;
+      }
+
+      .strings {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .stats {
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main id="tuner" class="idle">
+    <header>
+      <h1><span>🎸</span> Afinador cromático</h1>
+      <div class="calibration" title="Frecuencia de referencia del La central">
+        La<sub>4</sub> =
+        <button id="a4-down" aria-label="Bajar referencia">−</button>
+        <output id="a4">440 Hz</output>
+        <button id="a4-up" aria-label="Subir referencia">+</button>
+      </div>
+    </header>
+
+    <div class="gauge">
+      <svg viewBox="0 0 300 160" aria-hidden="true">
+        <defs>
+          <linearGradient id="arc-gradient" x1="0" x2="1">
+            <stop offset="0" stop-color="#f87171" />
+            <stop offset=".35" stop-color="#fbbf24" />
+            <stop offset=".5" stop-color="#4ade80" />
+            <stop offset=".65" stop-color="#fbbf24" />
+            <stop offset="1" stop-color="#f87171" />
+          </linearGradient>
+        </defs>
+        <path id="arc" fill="none" stroke="url(#arc-gradient)" stroke-width="6" stroke-linecap="round" opacity=".55" />
+        <g id="ticks"></g>
+        <line id="needle" x1="150" y1="20" x2="150" y2="56" />
+      </svg>
+      <div class="gauge-center">
+        <div class="note" id="note">♪</div>
+        <div class="solfege" id="solfege">Toca una cuerda</div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="stats">
+        <div><small>Frecuencia</small><strong id="frequency">— Hz</strong></div>
+        <div><small>Desviación</small><strong id="cents">— ¢</strong></div>
+        <div><small>Objetivo</small><strong id="target">— Hz</strong></div>
+      </div>
+      <p class="hint" id="hint"></p>
+    </div>
+
+    <canvas id="wave" aria-hidden="true"></canvas>
+
+    <div class="strings" id="strings"></div>
+
+    <div class="actions">
+      <button id="mic">🎙️ Activar micrófono</button>
+    </div>
+    <p class="status" id="status">Pulsa una cuerda para escuchar su tono de referencia (teclas 1-6)</p>
+  </main>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    const SOLFEGE = ['Do', 'Do♯', 'Re', 'Re♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si']
+
+    // Afinación estándar de la guitarra (de la 6ª a la 1ª cuerda) en notación MIDI
+    const GUITAR_STRINGS = [
+      { label: '6ª', midi: 40 }, // E2
+      { label: '5ª', midi: 45 }, // A2
+      { label: '4ª', midi: 50 }, // D3
+      { label: '3ª', midi: 55 }, // G3
+      { label: '2ª', midi: 59 }, // B3
+      { label: '1ª', midi: 64 } // E4
+    ]
+
+    const RMS_THRESHOLD = 0.01 // por debajo consideramos que hay silencio
+    const CLARITY_THRESHOLD = 0.8 // correlación mínima para fiarnos del resultado
+    const PEAK_RATIO = 0.9 // primer pico que alcance el 90% del máximo
+    const MIN_FREQUENCY = 60
+    const MAX_FREQUENCY = 1400
+    const IN_TUNE_CENTS = 5
+    const MAX_GAUGE_CENTS = 50
+    const MAX_NEEDLE_ANGLE = 60
+    const SILENCE_HOLD_MS = 500
+    const REFERENCE_DURATION = 3
+
+    // ESTADO
+    let a4 = 440
+    let audioContext = null
+    let analyser = null
+    let inputBus = null
+    let micStream = null
+    let micSource = null
+    let reference = null
+    let buffer = null
+    let rafId = null
+
+    let smoothedFrequency = null
+    let lastDetection = 0
+    let needleCents = 0
+    let needleTarget = 0
+
+    const tuner = $('#tuner')
+    const needle = $('#needle')
+    const canvas = $('#wave')
+    const context = canvas.getContext('2d')
+    const micButton = $('#mic')
+    const status = $('#status')
+
+    // --- Utilidades musicales ---
+
+    // Frecuencia de una nota MIDI: cada semitono multiplica por 2^(1/12)
+    function midiToFrequency(midi) {
+      return a4 * 2 ** ((midi - 69) / 12)
+    }
+
+    // Convierte una frecuencia a la nota más cercana y su desviación en cents.
+    // Un semitono son 100 cents y una octava 1200: cents = 1200 * log2(f / ref)
+    function frequencyToNote(frequency) {
+      const midi = Math.round(69 + 12 * Math.log2(frequency / a4))
+      const target = midiToFrequency(midi)
+      const cents = 1200 * Math.log2(frequency / target)
+      const index = ((midi % 12) + 12) % 12
+
+      return {
+        midi,
+        name: NOTE_NAMES[index],
+        solfege: SOLFEGE[index],
+        octave: Math.floor(midi / 12) - 1,
+        target,
+        cents
+      }
+    }
+
+    function noteLabel(midi) {
+      const index = ((midi % 12) + 12) % 12
+      return `${NOTE_NAMES[index]}${Math.floor(midi / 12) - 1}`
+    }
+
+    // --- Detección de tono por autocorrelación ---
+    // La idea: una señal periódica se parece a sí misma desplazada un periodo.
+    // Comparamos el buffer consigo mismo con distintos desfases (lags) y buscamos
+    // el desfase en el que la similitud es máxima: ese es el periodo (T).
+    // La frecuencia fundamental es entonces sampleRate / T.
+    function detectPitch(samples, sampleRate) {
+      const size = samples.length
+
+      // 1. Umbral de silencio: la raíz de la media de los cuadrados (RMS)
+      //    mide la "energía" de la señal. Si es muy baja solo hay ruido de fondo
+      //    y cualquier resultado sería basura, así que no calculamos nada.
+      let sumSquares = 0
+      for (let i = 0; i < size; i++) sumSquares += samples[i] * samples[i]
+      const rms = Math.sqrt(sumSquares / size)
+      if (rms < RMS_THRESHOLD) return null
+
+      // Sumas acumuladas de cuadrados para normalizar cada lag en O(1)
+      const squares = new Float64Array(size + 1)
+      for (let i = 0; i < size; i++) squares[i + 1] = squares[i] + samples[i] * samples[i]
+
+      const minLag = Math.floor(sampleRate / MAX_FREQUENCY)
+      const maxLag = Math.min(Math.ceil(sampleRate / MIN_FREQUENCY), size - 2)
+      const correlations = new Float64Array(maxLag + 2)
+
+      // 2. Autocorrelación normalizada: r(lag) = Σ x[i]·x[i+lag] / energía.
+      //    Normalizar deja los valores entre -1 y 1 y evita que los lags grandes
+      //    salgan perjudicados por tener menos muestras solapadas.
+      for (let lag = 0; lag <= maxLag + 1; lag++) {
+        let sum = 0
+        for (let i = 0; i < size - lag; i++) sum += samples[i] * samples[i + lag]
+        const energy = Math.sqrt(squares[size - lag] * (squares[size] - squares[lag]))
+        correlations[lag] = energy > 0 ? sum / energy : 0
+      }
+
+      // 3. Saltamos el lóbulo inicial: con desfases pequeños la señal siempre
+      //    se parece a sí misma. Empezamos a buscar cuando la correlación cae bajo 0.
+      let start = 1
+      while (start < maxLag && correlations[start] > 0) start++
+      start = Math.max(start, minLag)
+
+      let best = -1
+      for (let lag = start; lag <= maxLag; lag++) {
+        if (correlations[lag] > best) best = correlations[lag]
+      }
+      if (best < CLARITY_THRESHOLD) return null
+
+      // 4. Evitar errores de octava: en T, 2T, 3T... hay picos casi iguales.
+      //    Nos quedamos con el PRIMER pico local que llegue al 90% del máximo.
+      let period = -1
+      for (let lag = start; lag <= maxLag; lag++) {
+        const value = correlations[lag]
+        const isPeak = value >= correlations[lag - 1] && value >= correlations[lag + 1]
+        if (isPeak && value >= best * PEAK_RATIO) {
+          period = lag
+          break
+        }
+      }
+      if (period === -1) return null
+
+      // 5. Interpolación parabólica entre el pico y sus vecinos para obtener
+      //    un periodo con decimales (más precisión que una muestra entera)
+      const left = correlations[period - 1]
+      const center = correlations[period]
+      const right = correlations[period + 1]
+      const denominator = left - 2 * center + right
+      const shift = denominator === 0 ? 0 : 0.5 * (left - right) / denominator
+
+      return sampleRate / (period + shift)
+    }
+
+    // --- Audio ---
+
+    function ensureAudio() {
+      if (audioContext) return
+      audioContext = new AudioContext()
+      analyser = audioContext.createAnalyser()
+      // Con 2048 muestras a 48kHz tenemos ~43ms de señal: caben varios periodos
+      // incluso de la cuerda más grave (Mi2 ≈ 82Hz → periodo de ~12ms)
+      analyser.fftSize = audioContext.sampleRate > 50000 ? 4096 : 2048
+      buffer = new Float32Array(analyser.fftSize)
+
+      // Bus de entrada: aquí se mezclan micrófono y tonos de referencia
+      inputBus = audioContext.createGain()
+      inputBus.connect(analyser)
+    }
+
+    async function toggleMicrophone() {
+      if (micStream) return stopMicrophone()
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return setStatus('Tu navegador no permite acceder al micrófono (¿estás en HTTPS?)', true)
+      }
+
+      ensureAudio()
+      await audioContext.resume()
+      setStatus('Esperando permiso para usar el micrófono…')
+
+      try {
+        // Desactivamos el procesado de voz: altera la señal y empeora la detección
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        })
+      } catch (error) {
+        const message = error.name === 'NotAllowedError'
+          ? 'Permiso denegado. Actívalo en la configuración del navegador para usar el micrófono.'
+          : error.name === 'NotFoundError'
+            ? 'No se ha encontrado ningún micrófono.'
+            : `No se pudo acceder al micrófono (${error.name}).`
+        return setStatus(message, true)
+      }
+
+      micSource = audioContext.createMediaStreamSource(micStream)
+      micSource.connect(inputBus)
+      micButton.classList.add('is-active')
+      micButton.textContent = 'Detener micrófono'
+      setStatus('Escuchando… toca una cuerda al aire')
+      startLoop()
+    }
+
+    function stopMicrophone() {
+      micSource?.disconnect()
+      micStream?.getTracks().forEach((track) => track.stop())
+      micStream = null
+      micSource = null
+      micButton.classList.remove('is-active')
+      micButton.textContent = '🎙️ Activar micrófono'
+      setStatus('Micrófono desactivado')
+    }
+
+    // Una onda con algunos armónicos suena más a cuerda que un seno puro
+    // y además pone a prueba el algoritmo (tiene que ignorar los armónicos)
+    function createStringWave() {
+      const real = new Float32Array([0, 1, 0.6, 0.35, 0.2, 0.1])
+      const imag = new Float32Array(real.length)
+      return audioContext.createPeriodicWave(real, imag)
+    }
+
+    async function playReference(stringIndex) {
+      ensureAudio()
+      await audioContext.resume()
+      stopReference()
+
+      const { midi } = GUITAR_STRINGS[stringIndex]
+      const now = audioContext.currentTime
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+
+      oscillator.setPeriodicWave(createStringWave())
+      oscillator.frequency.value = midiToFrequency(midi)
+
+      // Envolvente tipo "pulsación": ataque rápido y caída exponencial
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(0.35, now + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + REFERENCE_DURATION)
+
+      oscillator.connect(gain)
+      gain.connect(audioContext.destination) // lo escuchamos...
+      gain.connect(inputBus) // ...y también lo analizamos, para probar sin guitarra
+
+      oscillator.start(now)
+      oscillator.stop(now + REFERENCE_DURATION)
+
+      reference = { oscillator, gain, stringIndex }
+      oscillator.onended = () => {
+        if (reference?.oscillator !== oscillator) return
+        gain.disconnect()
+        reference = null
+        renderStrings()
+      }
+
+      renderStrings()
+      startLoop()
+    }
+
+    function stopReference() {
+      if (!reference) return
+      const { oscillator, gain } = reference
+      reference = null
+      oscillator.onended = null
+      oscillator.stop()
+      gain.disconnect()
+    }
+
+    // --- Bucle de análisis ---
+
+    function startLoop() {
+      if (rafId === null) rafId = requestAnimationFrame(tick)
+    }
+
+    function tick(time) {
+      analyser.getFloatTimeDomainData(buffer)
+      const frequency = detectPitch(buffer, audioContext.sampleRate)
+
+      if (frequency) {
+        // Suavizado en escala logarítmica: si el salto es de más de medio
+        // semitono asumimos una nota nueva y no suavizamos
+        if (smoothedFrequency === null || Math.abs(1200 * Math.log2(frequency / smoothedFrequency)) > 50) {
+          smoothedFrequency = frequency
+        } else {
+          smoothedFrequency = 2 ** (Math.log2(smoothedFrequency) * 0.8 + Math.log2(frequency) * 0.2)
+        }
+        lastDetection = time
+        renderNote(smoothedFrequency)
+      } else if (time - lastDetection > SILENCE_HOLD_MS) {
+        smoothedFrequency = null
+        renderSilence()
+      }
+
+      // La aguja persigue su objetivo poco a poco (interpolación lineal)
+      needleCents += (needleTarget - needleCents) * 0.18
+      drawNeedle()
+      drawWave(true)
+
+      const isRunning = micStream || reference || smoothedFrequency !== null || Math.abs(needleTarget - needleCents) > 0.1
+      rafId = isRunning ? requestAnimationFrame(tick) : null
+      if (!isRunning) drawWave(false)
+    }
+
+    // --- Render ---
+
+    function colorForCents(cents) {
+      const distance = Math.abs(cents)
+      if (distance <= IN_TUNE_CENTS) return 'var(--ok)'
+      if (distance <= 15) return 'var(--warn)'
+      return 'var(--bad)'
+    }
+
+    function renderNote(frequency) {
+      const note = frequencyToNote(frequency)
+      const color = colorForCents(note.cents)
+      const [letter, sharp = ''] = note.name.split('')
+
+      tuner.classList.remove('idle')
+      $('#note').innerHTML = `${letter}${sharp ? '<sup>♯</sup>' : ''}<sub>${note.octave}</sub>`
+      $('#note').style.color = color
+      $('#solfege').textContent = note.solfege
+      $('#frequency').textContent = `${frequency.toFixed(1)} Hz`
+      const roundedCents = Math.round(note.cents) || 0 // evita mostrar "-0"
+      $('#cents').textContent = `${roundedCents > 0 ? '+' : ''}${roundedCents} ¢`
+      $('#target').textContent = `${note.target.toFixed(1)} Hz`
+
+      const hint = $('#hint')
+      hint.style.color = color
+      if (Math.abs(note.cents) <= IN_TUNE_CENTS) hint.textContent = '✓ ¡Afinada!'
+      else if (note.cents < 0) hint.textContent = '↑ Demasiado grave: tensa la cuerda'
+      else hint.textContent = '↓ Demasiado aguda: destensa la cuerda'
+
+      needleTarget = Math.max(-MAX_GAUGE_CENTS, Math.min(MAX_GAUGE_CENTS, note.cents))
+      needle.style.stroke = color
+      renderStrings(frequency)
+    }
+
+    function renderSilence() {
+      tuner.classList.add('idle')
+      $('#hint').textContent = ''
+      $('#note').style.color = ''
+      needleTarget = 0
+      needle.style.stroke = ''
+      renderStrings()
+    }
+
+    // Resalta la cuerda más cercana a la frecuencia detectada
+    function renderStrings(frequency) {
+      let closest = -1
+      let closestCents = Infinity
+
+      if (frequency) {
+        GUITAR_STRINGS.forEach(({ midi }, index) => {
+          const cents = 1200 * Math.log2(frequency / midiToFrequency(midi))
+          if (Math.abs(cents) < Math.abs(closestCents)) {
+            closest = index
+            closestCents = cents
+          }
+        })
+        // Si está a más de 3 semitonos de cualquier cuerda no resaltamos ninguna
+        if (Math.abs(closestCents) > 300) closest = -1
+      }
+
+      document.querySelectorAll('.string').forEach((button, index) => {
+        const isTarget = index === closest
+        button.classList.toggle('is-target', isTarget)
+        button.classList.toggle('is-tuned', isTarget && Math.abs(closestCents) <= IN_TUNE_CENTS)
+        button.classList.toggle('is-playing', reference?.stringIndex === index)
+        button.querySelector('small').textContent = `${midiToFrequency(GUITAR_STRINGS[index].midi).toFixed(2)} Hz`
+      })
+    }
+
+    function drawNeedle() {
+      const angle = (needleCents / MAX_GAUGE_CENTS) * MAX_NEEDLE_ANGLE
+      needle.setAttribute('transform', `rotate(${angle} 150 155)`)
+    }
+
+    function drawWave(live) {
+      const ratio = window.devicePixelRatio || 1
+      const width = canvas.clientWidth * ratio
+      const height = canvas.clientHeight * ratio
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width
+        canvas.height = height
+      }
+
+      context.clearRect(0, 0, width, height)
+      context.lineWidth = 2 * ratio
+      context.strokeStyle = '#22d3ee'
+      context.shadowColor = '#22d3ee'
+      context.shadowBlur = 8 * ratio
+      context.beginPath()
+
+      // Solo dibujamos una parte del buffer para que la onda se vea "ampliada"
+      const visible = live && buffer ? Math.min(buffer.length, 1024) : 0
+      if (!visible) {
+        context.moveTo(0, height / 2)
+        context.lineTo(width, height / 2)
+      } else {
+        // Autoescalado: ampliamos la onda según su pico para que siempre se vea bien
+        let peak = 0
+        for (let i = 0; i < visible; i++) peak = Math.max(peak, Math.abs(buffer[i]))
+        const scale = (height * 0.42) / Math.max(peak, 0.05)
+
+        for (let i = 0; i < visible; i++) {
+          const x = (i / (visible - 1)) * width
+          const y = height / 2 - buffer[i] * scale
+          i === 0 ? context.moveTo(x, y) : context.lineTo(x, y)
+        }
+      }
+      context.stroke()
+    }
+
+    function polar(angleDegrees, radius) {
+      const radians = (angleDegrees - 90) * Math.PI / 180
+      return [150 + radius * Math.cos(radians), 155 + radius * Math.sin(radians)]
+    }
+
+    // Dibuja el arco y las marcas del indicador (cada 5 cents)
+    function buildGauge() {
+      const [x1, y1] = polar(-MAX_NEEDLE_ANGLE, 128)
+      const [x2, y2] = polar(MAX_NEEDLE_ANGLE, 128)
+      $('#arc').setAttribute('d', `M ${x1} ${y1} A 128 128 0 0 1 ${x2} ${y2}`)
+
+      let ticks = ''
+      for (let cents = -MAX_GAUGE_CENTS; cents <= MAX_GAUGE_CENTS; cents += 5) {
+        const angle = (cents / MAX_GAUGE_CENTS) * MAX_NEEDLE_ANGLE
+        const isMajor = cents % 25 === 0
+        const [ax, ay] = polar(angle, 116)
+        const [bx, by] = polar(angle, isMajor ? 100 : 108)
+        ticks += `<line class="tick ${isMajor ? 'major' : ''}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" />`
+        if (isMajor) {
+          const [lx, ly] = polar(angle, 88)
+          ticks += `<text class="tick-label" x="${lx}" y="${ly + 4}">${cents > 0 ? '+' : ''}${cents}</text>`
+        }
+      }
+      $('#ticks').innerHTML = ticks
+    }
+
+    function buildStrings() {
+      $('#strings').innerHTML = GUITAR_STRINGS.map(({ label, midi }, index) => `
+        <button class="string" data-index="${index}" title="Reproducir ${noteLabel(midi)} (tecla ${index + 1})">
+          <b>${noteLabel(midi)}</b>
+          <span>${label} · ${SOLFEGE[midi % 12]}</span>
+          <small></small>
+        </button>
+      `).join('')
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message
+      status.classList.toggle('error', isError)
+    }
+
+    function changeA4(delta) {
+      a4 = Math.min(450, Math.max(430, a4 + delta))
+      $('#a4').textContent = `${a4} Hz`
+      renderStrings()
+    }
+
+    // --- Eventos ---
+
+    $('#strings').addEventListener('click', (event) => {
+      const button = event.target.closest('.string')
+      if (button) playReference(Number(button.dataset.index))
+    })
+
+    document.addEventListener('keydown', (event) => {
+      // Si se mantiene pulsada la tecla, ignoramos las repeticiones automáticas
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+      const index = Number(event.key) - 1
+      if (index >= 0 && index < GUITAR_STRINGS.length) playReference(index)
+    })
+
+    micButton.addEventListener('click', toggleMicrophone)
+    $('#a4-down').addEventListener('click', () => changeA4(-1))
+    $('#a4-up').addEventListener('click', () => changeA4(1))
+    window.addEventListener('resize', () => drawWave(false))
+
+    buildGauge()
+    buildStrings()
+    renderStrings()
+    drawNeedle()
+    drawWave(false)
+  </script>
+</body>
+
+</html>

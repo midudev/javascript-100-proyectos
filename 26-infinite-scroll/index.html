@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>26 - Scroll infinito</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f14;
+      --card: #151b23;
+      --border: #232c38;
+      --muted: #8b98a8;
+      --accent: #97ce4c;
+      --alive: #55cc44;
+      --dead: #ff5c5c;
+      --unknown: #9aa4b1;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(900px 400px at 80% -10%, #97ce4c22, transparent),
+        radial-gradient(700px 400px at 0% 0%, #00b5cc1f, transparent),
+        var(--bg);
+      background-attachment: fixed;
+      color: #e8edf2;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px clamp(16px, 4vw, 40px);
+      background: #0b0f14cc;
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    h1 small {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filters button {
+      font: inherit;
+      font-size: 14px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filters button[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0b0f14;
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--status-color);
+    }
+
+    [data-status="alive"] {
+      --status-color: var(--alive);
+    }
+
+    [data-status="dead"] {
+      --status-color: var(--dead);
+    }
+
+    [data-status="unknown"] {
+      --status-color: var(--unknown);
+    }
+
+    main {
+      padding: 24px clamp(16px, 4vw, 40px) 40px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 18px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: appear .4s ease-out both;
+      transition: translate .2s, border-color .2s;
+    }
+
+    .card:hover {
+      translate: 0 -4px;
+      border-color: #3a4757;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        translate: 0 12px;
+      }
+    }
+
+    .card figure {
+      margin: 0;
+      aspect-ratio: 1;
+      background: #1c2430;
+      position: relative;
+    }
+
+    .card img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    .card img.loaded {
+      opacity: 1;
+    }
+
+    .status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #0b0f14cc;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .card .info {
+      padding: 12px 14px 16px;
+    }
+
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card p span {
+      color: #c5ced8;
+    }
+
+    /* Skeletons: huecos animados mientras llegan los datos */
+    .skeleton figure,
+    .skeleton .line {
+      background: linear-gradient(90deg, #1c2430 20%, #263140 40%, #1c2430 60%);
+      background-size: 300% 100%;
+      animation: shimmer 1.2s linear infinite;
+    }
+
+    .skeleton .line {
+      height: 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .skeleton .line:first-child {
+      width: 70%;
+      height: 16px;
+      margin-top: 0;
+    }
+
+    .skeleton .line:last-child {
+      width: 50%;
+    }
+
+    @keyframes shimmer {
+      from {
+        background-position: 100% 0;
+      }
+
+      to {
+        background-position: 0 0;
+      }
+    }
+
+    .sentinel {
+      height: 1px;
+    }
+
+    .footer-message {
+      margin: 32px 0 8px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .footer-message button {
+      font: inherit;
+      margin-left: 8px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: inherit;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Rick and Morty <small id="counter">Cargando…</small></h1>
+    <nav class="filters" id="filters" aria-label="Filtrar por estado">
+      <button data-filter="" aria-pressed="true">Todos</button>
+      <button data-filter="alive" data-status="alive" aria-pressed="false"><i class="dot"></i>Vivos</button>
+      <button data-filter="dead" data-status="dead" aria-pressed="false"><i class="dot"></i>Muertos</button>
+      <button data-filter="unknown" data-status="unknown" aria-pressed="false"><i class="dot"></i>Desconocido</button>
+    </nav>
+  </header>
+
+  <main>
+    <ul class="grid" id="grid"></ul>
+    <!-- El centinela: cuando entra en pantalla, cargamos la siguiente página -->
+    <div class="sentinel" id="sentinel"></div>
+    <p class="footer-message" id="footer-message" hidden></p>
+  </main>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const API_URL = 'https://rickandmortyapi.com/api/character'
+    const SKELETON_COUNT = 8
+    const MAX_RETRIES = 3
+    const STATUS_LABELS = { Alive: 'Vivo', Dead: 'Muerto', unknown: 'Desconocido' }
+    const GENDER_LABELS = { Male: 'Masculino', Female: 'Femenino', Genderless: 'Sin género', unknown: 'Desconocido' }
+
+    const $grid = $('#grid')
+    const $sentinel = $('#sentinel')
+    const $counter = $('#counter')
+    const $footer = $('#footer-message')
+    const $filters = $('#filters')
+
+    // Estado de la paginación
+    let nextUrl = null
+    let isLoading = false
+    let total = 0
+    let status = ''
+    let controller = null
+
+    function buildFirstPageUrl() {
+      const url = new URL(API_URL)
+      if (status) url.searchParams.set('status', status)
+      return url.href
+    }
+
+    function createSkeletons() {
+      return Array.from({ length: SKELETON_COUNT }, () => {
+        const item = document.createElement('li')
+        item.className = 'card skeleton'
+        item.innerHTML = `
+          <figure></figure>
+          <div class="info">
+            <div class="line"></div><div class="line"></div><div class="line"></div>
+          </div>`
+        return item
+      })
+    }
+
+    function createCard(character) {
+      const { name, image, status, species, gender, location } = character
+      const item = document.createElement('li')
+      item.className = 'card'
+      // loading="lazy": el navegador solo descarga la imagen cuando está
+      // cerca de verse. width/height reservan el hueco (sin saltos de layout)
+      item.innerHTML = `
+        <figure>
+          <img loading="lazy" width="300" height="300" alt="">
+          <span class="status" data-status="${status.toLowerCase()}">
+            <i class="dot"></i>${STATUS_LABELS[status] ?? 'Desconocido'}
+          </span>
+        </figure>
+        <div class="info">
+          <h2></h2>
+          <p class="species"></p>
+          <p>📍 <span></span></p>
+        </div>`
+
+      // Los textos que vienen de la API los asignamos con textContent
+      // para no inyectar HTML por accidente
+      const img = item.querySelector('img')
+      img.alt = name
+      img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
+      img.src = image
+      item.querySelector('h2').textContent = name
+      item.querySelector('.species').textContent = `${species} · ${GENDER_LABELS[gender] ?? gender}`
+      item.querySelector('p span').textContent = location.name
+      return item
+    }
+
+    function showFooter(html) {
+      $footer.innerHTML = html
+      $footer.hidden = false
+    }
+
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+    // Las APIs públicas a veces fallan puntualmente (o limitan peticiones).
+    // Reintentamos un par de veces esperando un poco más cada vez
+    async function fetchJSON(url, { signal, retries = MAX_RETRIES } = {}) {
+      try {
+        const response = await fetch(url, { signal })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return await response.json()
+      } catch (error) {
+        if (signal?.aborted || retries === 0) throw error
+        await wait(1000 * 2 ** (MAX_RETRIES - retries)) // 1s, 2s, 4s…
+        return fetchJSON(url, { signal, retries: retries - 1 })
+      }
+    }
+
+    async function loadNextPage() {
+      // Evitamos peticiones duplicadas: si ya estamos cargando
+      // o no hay más páginas, no hacemos nada
+      if (isLoading || !nextUrl) return
+      isLoading = true
+      $footer.hidden = true
+
+      const skeletons = createSkeletons()
+      $grid.append(...skeletons)
+
+      // AbortController nos permite cancelar la petición si el usuario
+      // cambia de filtro mientras aún se está cargando
+      controller = new AbortController()
+      const { signal } = controller
+
+      try {
+        const { info, results } = await fetchJSON(nextUrl, { signal })
+
+        skeletons.forEach(skeleton => skeleton.remove())
+        $grid.append(...results.map(createCard))
+
+        // La API nos da directamente la URL de la siguiente página
+        // (o null cuando hemos llegado a la última)
+        nextUrl = info.next
+        total = info.count
+        updateCounter()
+
+        if (!nextUrl) {
+          showFooter('Has llegado al final del multiverso 🛸')
+          observer.disconnect()
+        } else {
+          // Si tras cargar el centinela SIGUE visible (pantallas muy altas)
+          // el observer no volverá a avisar, porque solo avisa cuando CAMBIA
+          // la intersección. Volviendo a observarlo recibimos su estado actual.
+          observer.unobserve($sentinel)
+          observer.observe($sentinel)
+        }
+      } catch (error) {
+        skeletons.forEach(skeleton => skeleton.remove())
+        if (error.name === 'AbortError') return
+        console.error(error)
+        // Dejamos de observar para no reintentar en bucle: reintenta el usuario
+        observer.unobserve($sentinel)
+        showFooter('No se han podido cargar más personajes. <button id="retry">Reintentar</button>')
+      } finally {
+        // Si se abortó, resetAndLoad ya ha reiniciado el estado
+        if (!signal.aborted) isLoading = false
+      }
+    }
+
+    function updateCounter() {
+      $counter.textContent = `${$grid.querySelectorAll('.card:not(.skeleton)').length} de ${total} personajes`
+    }
+
+    // IntersectionObserver avisa cuando un elemento entra o sale del viewport
+    // sin tener que escuchar el evento scroll (que se dispara cientos de veces).
+    // rootMargin amplía el área 600px por abajo: empezamos a cargar ANTES
+    // de que el usuario llegue al final, así nunca ve la página vacía.
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries
+      if (entry.isIntersecting) loadNextPage()
+    }, { rootMargin: '0px 0px 600px 0px' })
+
+    // Cambiar el filtro reinicia la paginación desde la página 1
+    function resetAndLoad() {
+      controller?.abort()
+      isLoading = false
+      $grid.replaceChildren()
+      $footer.hidden = true
+      $counter.textContent = 'Cargando…'
+      nextUrl = buildFirstPageUrl()
+      window.scrollTo({ top: 0 })
+      observer.disconnect()
+      observer.observe($sentinel)
+    }
+
+    $filters.addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button || button.getAttribute('aria-pressed') === 'true') return
+
+      $filters.querySelectorAll('button').forEach(item => {
+        item.setAttribute('aria-pressed', item === button)
+      })
+      status = button.dataset.filter
+      resetAndLoad()
+    })
+
+    $footer.addEventListener('click', (event) => {
+      if (event.target.id === 'retry') loadNextPage()
+    })
+
+    resetAndLoad()
+  </script>
+</body>
+
+</html>

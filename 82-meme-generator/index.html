@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>82 - Generador de memes</title>
+  <style>
+    :root {
+      --bg: #f5f1ea;
+      --panel: #ffffff;
+      --text: #1f1b16;
+      --muted: #75695c;
+      --border: #e7dfd3;
+      --accent: #ff5b1f;
+      --accent-dark: #e0470f;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ---------- Escenario con el canvas ---------- */
+    .stage {
+      position: relative;
+      min-height: 0;
+      display: grid;
+      /* Filas y columnas con tamaño definido para que el max-height: 100%
+         del canvas se pueda resolver */
+      grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+      place-items: center;
+      padding: 48px 28px 28px;
+      background-image: radial-gradient(#d9cfc1 1px, transparent 1px);
+      background-size: 18px 18px;
+      transition: background-color .2s;
+    }
+
+    .stage.dragging {
+      background-color: #ffe7dc;
+      outline: 3px dashed var(--accent);
+      outline-offset: -14px;
+    }
+
+    #meme {
+      display: block;
+      /* El canvas conserva su resolución real (width/height) y con CSS
+         solo lo escalamos para que quepa en pantalla */
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px -18px rgba(60, 40, 20, .45);
+      cursor: default;
+      touch-action: none;
+      background: #fff;
+    }
+
+    #meme:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .stage-hint {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .8);
+      border-radius: 999px;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+    }
+
+    /* ---------- Panel lateral ---------- */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px 20px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button,
+    .button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s, background .15s, transform .1s;
+    }
+
+    button:hover,
+    .button:hover {
+      border-color: var(--accent);
+    }
+
+    button:active,
+    .button:active {
+      transform: scale(.97);
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .primary:hover {
+      background: var(--accent-dark);
+    }
+
+    .download {
+      margin-top: auto;
+      padding: 14px;
+      font-size: 16px;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    #file-input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+
+    .samples {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .sample {
+      aspect-ratio: 9 / 7;
+      padding: 0;
+      border: 2px solid transparent;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .sample[aria-pressed="true"] {
+      border-color: var(--accent);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      max-width: 100%;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chip[aria-pressed="true"] {
+      background: var(--text);
+      border-color: var(--text);
+      color: #fff;
+    }
+
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    fieldset:disabled {
+      opacity: .45;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 52px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    textarea:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+      width: 100%;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      padding: 2px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .colors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .check input {
+      accent-color: var(--accent);
+    }
+
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      translate: -50% -80px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--text);
+      color: #fff;
+      font-size: 14px;
+      transition: translate .3s;
+      z-index: 10;
+    }
+
+    .toast.visible {
+      translate: -50% 0;
+    }
+
+    @media (width < 760px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+        grid-template-columns: 1fr;
+        grid-template-rows: 58dvh auto;
+        overflow: auto;
+      }
+
+      .stage {
+        padding: 48px 14px 14px;
+      }
+
+      .stage-hint {
+        width: calc(100% - 28px);
+        white-space: normal;
+        text-align: center;
+        font-size: 11px;
+      }
+
+      .panel {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+      }
+    }
+  </style>
+
+  <script type="module">
+    const canvas = document.querySelector('#meme')
+    const ctx = canvas.getContext('2d')
+
+    const stage = document.querySelector('.stage')
+    const fileInput = document.querySelector('#file-input')
+    const samplesList = document.querySelector('.samples')
+    const chips = document.querySelector('.chips')
+    const editor = document.querySelector('#editor')
+    const textInput = document.querySelector('#text-input')
+    const sizeInput = document.querySelector('#size-input')
+    const sizeValue = document.querySelector('#size-value')
+    const fillInput = document.querySelector('#fill-input')
+    const strokeInput = document.querySelector('#stroke-input')
+    const upperInput = document.querySelector('#upper-input')
+    const toast = document.querySelector('.toast')
+
+    // CONSTANTES
+    // Impact es la fuente clásica de los memes. Si el sistema no la tiene,
+    // el navegador probará las siguientes de la lista
+    const FONT_FAMILY = 'Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif'
+    const LINE_HEIGHT = 1.12
+    const STROKE_RATIO = 0.14 // grosor del contorno respecto al tamaño de letra
+    const MAX_WIDTH_RATIO = 0.92 // el texto puede ocupar el 92% del ancho
+    const SAMPLE_WIDTH = 900
+    const SAMPLE_HEIGHT = 700
+
+    const SAMPLES = [
+      { name: 'Pensativo', emoji: '🤔', colors: ['#fbd786', '#f7797d'] },
+      { name: 'Fuego', emoji: '🔥', colors: ['#3a1c71', '#d76d77'] },
+      { name: 'Espacio', emoji: '🚀', colors: ['#0f2027', '#2c5364'], stars: true },
+      { name: 'Perrete', emoji: '🐶', colors: ['#a8e063', '#3f8f2a'] }
+    ]
+
+    const DEFAULT_TEXTS = [
+      { text: 'Cuando el código funciona a la primera', y: 0.14 },
+      { text: 'y no sabes por qué', y: 0.86 }
+    ]
+
+    // ESTADO
+    let background = null // imagen o canvas que se dibuja de fondo
+    let texts = []
+    let selectedId = null
+    let drag = null
+    let nextId = 1
+    let toastTimeout = null
+
+    // ---------- Fondos de ejemplo generados con canvas ----------
+
+    function createSampleBackground ({ emoji, colors, stars }) {
+      const sample = document.createElement('canvas')
+      sample.width = SAMPLE_WIDTH
+      sample.height = SAMPLE_HEIGHT
+      const sctx = sample.getContext('2d')
+
+      const gradient = sctx.createLinearGradient(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT)
+      gradient.addColorStop(0, colors[0])
+      gradient.addColorStop(1, colors[1])
+      sctx.fillStyle = gradient
+      sctx.fillRect(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT)
+
+      if (stars) {
+        sctx.fillStyle = 'rgba(255, 255, 255, .85)'
+        for (let i = 0; i < 160; i++) {
+          const radius = Math.random() * 1.8
+          sctx.beginPath()
+          sctx.arc(Math.random() * SAMPLE_WIDTH, Math.random() * SAMPLE_HEIGHT, radius, 0, Math.PI * 2)
+          sctx.fill()
+        }
+      } else {
+        // Rayos decorativos saliendo del centro
+        sctx.save()
+        sctx.translate(SAMPLE_WIDTH / 2, SAMPLE_HEIGHT / 2)
+        sctx.fillStyle = 'rgba(255, 255, 255, .12)'
+        for (let i = 0; i < 16; i++) {
+          sctx.rotate(Math.PI / 8)
+          sctx.beginPath()
+          sctx.moveTo(0, 0)
+          sctx.lineTo(900, -90)
+          sctx.lineTo(900, 90)
+          sctx.fill()
+        }
+        sctx.restore()
+      }
+
+      sctx.font = '300px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif'
+      sctx.textAlign = 'center'
+      sctx.textBaseline = 'middle'
+      sctx.shadowColor = 'rgba(0, 0, 0, .35)'
+      sctx.shadowBlur = 40
+      sctx.fillText(emoji, SAMPLE_WIDTH / 2, SAMPLE_HEIGHT / 2 + 20)
+
+      return sample
+    }
+
+    function renderSamples () {
+      SAMPLES.forEach((sample, index) => {
+        const image = createSampleBackground(sample)
+        const button = document.createElement('button')
+        button.className = 'sample'
+        button.title = sample.name
+        button.setAttribute('aria-label', `Fondo de ejemplo: ${sample.name}`)
+        button.setAttribute('aria-pressed', 'false')
+        button.style.backgroundImage = `url(${image.toDataURL('image/jpeg', 0.6)})`
+        button.addEventListener('click', () => {
+          setBackground(image)
+          markSample(index)
+        })
+        samplesList.append(button)
+      })
+    }
+
+    function markSample (index) {
+      samplesList.querySelectorAll('.sample').forEach((button, i) => {
+        button.setAttribute('aria-pressed', String(i === index))
+      })
+    }
+
+    // ---------- Fondo e imágenes del usuario ----------
+
+    function setBackground (source) {
+      // El canvas adopta la resolución ORIGINAL de la imagen, así el PNG
+      // descargado tiene la misma calidad que la foto de partida
+      canvas.width = source.naturalWidth ?? source.width
+      canvas.height = source.naturalHeight ?? source.height
+      background = source
+      render()
+    }
+
+    async function loadImageFile (file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('Eso no parece una imagen 🤨')
+        return
+      }
+
+      // Creamos una URL temporal que apunta al archivo en memoria
+      const url = URL.createObjectURL(file)
+      const image = new Image()
+      image.src = url
+
+      try {
+        await image.decode()
+        setBackground(image)
+        markSample(-1)
+        showToast('Imagen cargada ✅')
+      } catch {
+        showToast('No se ha podido leer la imagen')
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+
+    // ---------- Textos ----------
+
+    function createText ({ text = 'Nuevo texto', x = 0.5, y = 0.5 } = {}) {
+      const item = {
+        id: nextId++,
+        text,
+        x, // posición relativa (0-1) para que no dependa de la resolución
+        y,
+        size: 8, // % del ancho de la imagen
+        color: '#ffffff',
+        stroke: '#000000',
+        upper: true,
+        box: null
+      }
+      texts.push(item)
+      return item
+    }
+
+    function getSelected () {
+      return texts.find(item => item.id === selectedId)
+    }
+
+    // measureText devuelve el ancho que ocupará un texto con la fuente que
+    // tenga el contexto en ese momento. Vamos metiendo palabras en la línea
+    // mientras quepan en maxWidth; cuando la siguiente no cabe, cerramos la
+    // línea y empezamos una nueva. Canvas NO hace esto por nosotros.
+    function wrapText (text, maxWidth) {
+      const lines = []
+
+      for (const paragraph of text.split('\n')) {
+        const words = paragraph.split(/\s+/).filter(Boolean)
+        let line = ''
+
+        for (const word of words) {
+          const candidate = line ? `${line} ${word}` : word
+          if (ctx.measureText(candidate).width <= maxWidth) {
+            line = candidate
+            continue
+          }
+
+          if (line) lines.push(line)
+
+          // Una palabra que por sí sola no cabe se parte letra a letra
+          if (ctx.measureText(word).width > maxWidth) {
+            const pieces = breakWord(word, maxWidth)
+            line = pieces.pop()
+            lines.push(...pieces)
+          } else {
+            line = word
+          }
+        }
+
+        lines.push(line)
+      }
+
+      return lines
+    }
+
+    function breakWord (word, maxWidth) {
+      const pieces = []
+      let piece = ''
+
+      for (const char of word) {
+        if (piece && ctx.measureText(piece + char).width > maxWidth) {
+          pieces.push(piece)
+          piece = char
+        } else {
+          piece += char
+        }
+      }
+
+      pieces.push(piece)
+      return pieces
+    }
+
+    function drawText (item) {
+      const size = item.size / 100 * canvas.width
+      const lineHeight = size * LINE_HEIGHT
+      const content = item.upper ? item.text.toLocaleUpperCase('es') : item.text
+
+      ctx.font = `${size}px ${FONT_FAMILY}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      // lineJoin 'round' evita los picos que salen en las esquinas de
+      // letras como la M o la A cuando el contorno es grueso
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = size * STROKE_RATIO
+      ctx.strokeStyle = item.stroke
+      ctx.fillStyle = item.color
+
+      const lines = wrapText(content, canvas.width * MAX_WIDTH_RATIO)
+      const centerX = item.x * canvas.width
+      const blockHeight = lines.length * lineHeight
+      const top = item.y * canvas.height - blockHeight / 2
+
+      lines.forEach((line, index) => {
+        const lineY = top + lineHeight * (index + 0.5)
+        // Primero el contorno y luego el relleno encima: así el relleno
+        // tapa la mitad interior del trazo y las letras se leen mejor
+        ctx.strokeText(line, centerX, lineY)
+        ctx.fillText(line, centerX, lineY)
+      })
+
+      // Guardamos la caja que ocupa el texto para poder detectar clicks
+      const width = Math.max(size, ...lines.map(line => ctx.measureText(line).width))
+      item.box = { x: centerX - width / 2, y: top, width, height: blockHeight }
+    }
+
+    function drawSelection () {
+      const item = getSelected()
+      if (!item?.box) return
+
+      const padding = canvas.width * 0.012
+      const { x, y, width, height } = item.box
+
+      ctx.save()
+      ctx.lineWidth = Math.max(2, canvas.width / 350)
+      ctx.setLineDash([ctx.lineWidth * 4, ctx.lineWidth * 3])
+      ctx.strokeStyle = '#ff5b1f'
+      ctx.strokeRect(x - padding, y - padding, width + padding * 2, height + padding * 2)
+      ctx.restore()
+    }
+
+    function render ({ showSelection = true } = {}) {
+      if (!background) return
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(background, 0, 0, canvas.width, canvas.height)
+      texts.forEach(drawText)
+
+      if (showSelection) drawSelection()
+    }
+
+    // ---------- Arrastrar textos sobre el canvas ----------
+
+    // El canvas se ve más pequeño (o más grande) de lo que es en realidad.
+    // Convertimos la posición del puntero en píxeles de pantalla a píxeles
+    // internos del canvas usando la proporción entre ambos tamaños
+    function getCanvasPoint (event) {
+      const rect = canvas.getBoundingClientRect()
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      }
+    }
+
+    function hitTest (point) {
+      const padding = canvas.width * 0.015
+      // Recorremos al revés: el último texto dibujado es el que está encima
+      for (let i = texts.length - 1; i >= 0; i--) {
+        const { box } = texts[i]
+        if (!box) continue
+        const inside = point.x >= box.x - padding &&
+          point.x <= box.x + box.width + padding &&
+          point.y >= box.y - padding &&
+          point.y <= box.y + box.height + padding
+        if (inside) return texts[i]
+      }
+      return null
+    }
+
+    function clamp (value, min, max) {
+      return Math.min(max, Math.max(min, value))
+    }
+
+    function handlePointerDown (event) {
+      const point = getCanvasPoint(event)
+      const item = hitTest(point)
+
+      selectText(item?.id ?? null)
+      if (!item) return
+
+      drag = {
+        item,
+        offsetX: point.x - item.x * canvas.width,
+        offsetY: point.y - item.y * canvas.height
+      }
+      // Con pointer capture seguimos recibiendo eventos aunque el puntero
+      // salga del canvas mientras arrastramos
+      canvas.setPointerCapture(event.pointerId)
+      canvas.style.cursor = 'grabbing'
+    }
+
+    function handlePointerMove (event) {
+      const point = getCanvasPoint(event)
+
+      if (!drag) {
+        canvas.style.cursor = hitTest(point) ? 'grab' : 'default'
+        return
+      }
+
+      drag.item.x = clamp((point.x - drag.offsetX) / canvas.width, 0, 1)
+      drag.item.y = clamp((point.y - drag.offsetY) / canvas.height, 0, 1)
+      render()
+    }
+
+    function handlePointerUp () {
+      drag = null
+      canvas.style.cursor = 'grab'
+    }
+
+    function handleKeyboardMove (event) {
+      const item = getSelected()
+      const MOVES = {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0]
+      }
+      const move = MOVES[event.key]
+      if (!item || !move) return
+
+      event.preventDefault()
+      const step = event.shiftKey ? 0.05 : 0.01
+      item.x = clamp(item.x + move[0] * step, 0, 1)
+      item.y = clamp(item.y + move[1] * step, 0, 1)
+      render()
+    }
+
+    // ---------- Panel de edición ----------
+
+    function selectText (id) {
+      selectedId = id
+      syncEditor()
+      renderChips()
+      render()
+    }
+
+    function syncEditor () {
+      const item = getSelected()
+      editor.disabled = !item
+      if (!item) return
+
+      textInput.value = item.text
+      sizeInput.value = item.size
+      sizeValue.textContent = `${item.size}%`
+      fillInput.value = item.color
+      strokeInput.value = item.stroke
+      upperInput.checked = item.upper
+    }
+
+    function renderChips () {
+      chips.replaceChildren(...texts.map((item, index) => {
+        const chip = document.createElement('button')
+        chip.className = 'chip'
+        chip.textContent = item.text.trim() || `Texto ${index + 1}`
+        chip.setAttribute('aria-pressed', String(item.id === selectedId))
+        chip.addEventListener('click', () => selectText(item.id))
+        return chip
+      }))
+    }
+
+    function updateSelected (changes) {
+      const item = getSelected()
+      if (!item) return
+      Object.assign(item, changes)
+      render()
+    }
+
+    function addText () {
+      const item = createText({ y: 0.5 })
+      selectText(item.id)
+      textInput.focus()
+      textInput.select()
+    }
+
+    function deleteText () {
+      texts = texts.filter(item => item.id !== selectedId)
+      selectText(texts.at(-1)?.id ?? null)
+    }
+
+    // ---------- Descarga ----------
+
+    function download () {
+      // Volvemos a dibujar SIN el recuadro de selección antes de exportar
+      render({ showSelection: false })
+
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `meme-${Date.now()}.png`
+        link.click()
+        // Liberamos la memoria del blob cuando ya ha empezado la descarga
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        render()
+      }, 'image/png')
+    }
+
+    // ---------- Subida: input, drag & drop y portapapeles ----------
+
+    function handleDrop (event) {
+      event.preventDefault()
+      stage.classList.remove('dragging')
+      loadImageFile(event.dataTransfer.files[0])
+    }
+
+    function handlePaste (event) {
+      // El portapapeles puede traer texto, HTML o archivos. Buscamos
+      // un elemento de tipo imagen y lo convertimos en File
+      const imageItem = [...event.clipboardData.items]
+        .find(item => item.type.startsWith('image/'))
+      if (!imageItem) return
+
+      event.preventDefault()
+      loadImageFile(imageItem.getAsFile())
+    }
+
+    function showToast (message) {
+      toast.textContent = message
+      toast.classList.add('visible')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => toast.classList.remove('visible'), 2200)
+    }
+
+    // ---------- Eventos ----------
+
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointermove', handlePointerMove)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerUp)
+    canvas.addEventListener('keydown', handleKeyboardMove)
+    canvas.addEventListener('dblclick', () => getSelected() && textInput.focus())
+
+    fileInput.addEventListener('change', () => {
+      loadImageFile(fileInput.files[0])
+      fileInput.value = ''
+    })
+
+    stage.addEventListener('dragover', (event) => {
+      event.preventDefault()
+      stage.classList.add('dragging')
+    })
+    stage.addEventListener('dragleave', (event) => {
+      if (!stage.contains(event.relatedTarget)) stage.classList.remove('dragging')
+    })
+    stage.addEventListener('drop', handleDrop)
+    document.addEventListener('paste', handlePaste)
+
+    textInput.addEventListener('input', () => {
+      updateSelected({ text: textInput.value })
+      renderChips()
+    })
+    sizeInput.addEventListener('input', () => {
+      const size = Number(sizeInput.value)
+      sizeValue.textContent = `${size}%`
+      updateSelected({ size })
+    })
+    fillInput.addEventListener('input', () => updateSelected({ color: fillInput.value }))
+    strokeInput.addEventListener('input', () => updateSelected({ stroke: strokeInput.value }))
+    upperInput.addEventListener('change', () => updateSelected({ upper: upperInput.checked }))
+
+    document.querySelector('#add-text').addEventListener('click', addText)
+    document.querySelector('#delete-text').addEventListener('click', deleteText)
+    document.querySelector('#download').addEventListener('click', download)
+
+    // ---------- Inicio ----------
+
+    function init () {
+      renderSamples()
+      DEFAULT_TEXTS.forEach(createText)
+      samplesList.querySelector('.sample').click()
+      selectText(texts[0].id)
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <main class="stage">
+    <p class="stage-hint">Arrastra los textos · Suelta una imagen aquí · Ctrl+V para pegar</p>
+    <canvas id="meme" tabindex="0" aria-label="Lienzo del meme. Usa las flechas para mover el texto seleccionado"></canvas>
+  </main>
+
+  <aside class="panel">
+    <h1>Generador de <span>memes</span> 😂</h1>
+
+    <section>
+      <h2>Imagen</h2>
+      <label class="button primary" for="file-input" style="display: inline-flex">📁 Subir imagen</label>
+      <input id="file-input" type="file" accept="image/*">
+      <p class="hint">También puedes arrastrarla al lienzo o pegarla con Ctrl+V.</p>
+      <div class="samples"></div>
+    </section>
+
+    <section>
+      <h2>Textos</h2>
+      <div class="chips"></div>
+      <div class="row" style="margin-bottom: 14px">
+        <button id="add-text">＋ Añadir texto</button>
+        <button id="delete-text">🗑️ Borrar</button>
+      </div>
+
+      <fieldset id="editor">
+        <label>
+          Texto
+          <textarea id="text-input" rows="2"></textarea>
+        </label>
+
+        <label>
+          <span>Tamaño <small id="size-value"></small></span>
+          <input id="size-input" type="range" min="3" max="20" step="0.5">
+        </label>
+
+        <div class="colors">
+          <label>Relleno <input id="fill-input" type="color"></label>
+          <label>Contorno <input id="stroke-input" type="color"></label>
+        </div>
+
+        <label class="check">
+          <input id="upper-input" type="checkbox"> Todo en MAYÚSCULAS
+        </label>
+      </fieldset>
+    </section>
+
+    <button id="download" class="primary download">⬇️ Descargar PNG</button>
+  </aside>
+
+  <div class="toast" role="status"></div>
+</body>
+
+</html>

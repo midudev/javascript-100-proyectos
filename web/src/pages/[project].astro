@@ -1,5 +1,5 @@
 ---
-import { PROJECTS } from "../consts"
+import { AUTHOR, PROJECTS, REPO_URL, SITE_NAME } from "../consts"
 import InfoProject from "../components/InfoProject.astro"
 import Layout from "../layouts/Layout.astro"
 
@@ -17,10 +17,76 @@ const { project } = Astro.params
 const index = PROJECTS.findIndex((p) => p.slug === project)
 const info = PROJECTS[index]
 const number = `${index + 1}`.padStart(2, "0")
+
+const pageURL = new URL(`/${info.slug}`, Astro.site).href
+const learnings = new Intl.ListFormat("es", { type: "conjunction" }).format(
+  info.learnings
+)
+const description = `${info.description.trim().replace(/\.?$/, ".")} Practica ${learnings}. Código fuente${info.youtube ? " y vídeo" : ""} gratis.`
+const image = {
+  src: `/projects/${number}.webp`,
+  alt: `Captura de pantalla del proyecto ${info.title}`,
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "LearningResource",
+      name: info.title,
+      description,
+      url: pageURL,
+      image: new URL(image.src, Astro.site).href,
+      inLanguage: "es",
+      isAccessibleForFree: true,
+      learningResourceType: "Proyecto práctico",
+      teaches: info.learnings,
+      keywords: ["JavaScript", ...info.learnings].join(", "),
+      author: AUTHOR,
+      isPartOf: {
+        "@type": "WebSite",
+        name: SITE_NAME,
+        url: new URL("/", Astro.site).href,
+      },
+      hasPart: {
+        "@type": "SoftwareSourceCode",
+        codeRepository: `${REPO_URL}/tree/main/${info.slug}`,
+        programmingLanguage: ["JavaScript", "HTML", "CSS"],
+      },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: SITE_NAME,
+          item: new URL("/", Astro.site).href,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: info.title,
+          item: pageURL,
+        },
+      ],
+    },
+  ],
+}
 ---
 
-<Layout title={`Proyecto de JavaScript - ${number}: ${info.title}`}>
-  <iframe title={`${info.title}`}class="w-screen h-dvh" src={`/projects/${project}/index.html`}
+<Layout
+  title={`${info.title} · Proyecto de JavaScript #${number} | midudev`}
+  description={description}
+  image={image}
+  type="article"
+  noindex={info.hidden === true}
+  jsonLd={jsonLd}
+>
+  <iframe
+    title={`Demo del proyecto ${info.title}`}
+    class="w-screen h-dvh"
+    src={`/projects/${project}/index.html`}
   ></iframe>
   <InfoProject info={{ ...info, number }} />
 </Layout>
