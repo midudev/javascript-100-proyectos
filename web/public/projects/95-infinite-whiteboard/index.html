@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>95 - Pizarra infinita</title>
+  <style>
+    :root {
+      --bg: #f8f9fb;
+      --panel: #ffffff;
+      --text: #1e1e24;
+      --muted: #868e96;
+      --line: #e5e7eb;
+      --accent: #5b5bd6;
+      --accent-soft: #ebebfd;
+      --shadow: 0 6px 24px -8px rgb(20 20 50 / 25%), 0 0 0 1px rgb(20 20 50 / 6%);
+      --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    canvas[data-cursor='grab'] {
+      cursor: grab;
+    }
+
+    canvas[data-cursor='grabbing'] {
+      cursor: grabbing;
+    }
+
+    canvas[data-cursor='text'] {
+      cursor: text;
+    }
+
+    canvas[data-cursor='eraser'] {
+      cursor: cell;
+    }
+
+    .toolbar {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      max-width: calc(100vw - 20px);
+      padding: 6px;
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      transform: translateX(-50%);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tool {
+      position: relative;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .tool:hover {
+      background: #f1f3f5;
+    }
+
+    .tool[aria-pressed='true'] {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .tool svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .tool kbd {
+      position: absolute;
+      right: 3px;
+      bottom: 1px;
+      color: var(--muted);
+      font-size: 0.55rem;
+      font-family: var(--font);
+    }
+
+    .separator {
+      flex-shrink: 0;
+      width: 1px;
+      height: 26px;
+      margin: 0 4px;
+      background: var(--line);
+    }
+
+    .swatch {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      margin: 0 2px;
+      padding: 0;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--color);
+      box-shadow: 0 0 0 1px var(--line);
+      cursor: pointer;
+    }
+
+    .swatch[aria-pressed='true'] {
+      box-shadow: 0 0 0 2px var(--color);
+    }
+
+    .size span {
+      width: var(--size);
+      height: var(--size);
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .zoom {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .zoom button {
+      min-width: 34px;
+      height: 32px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .zoom button:hover {
+      background: #f1f3f5;
+    }
+
+    .coords {
+      position: fixed;
+      right: 14px;
+      bottom: 62px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 85%);
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      line-height: 1.6;
+      pointer-events: none;
+    }
+
+    .coords b {
+      color: var(--text);
+    }
+
+    .hint {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      margin: 0;
+      padding: 6px 12px;
+      border-radius: 99px;
+      background: rgb(255 255 255 / 85%);
+      color: var(--muted);
+      font-size: 0.8rem;
+      transform: translateX(-50%);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .text-editor {
+      position: fixed;
+      min-width: 40px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      outline: 1px dashed var(--accent);
+      background: transparent;
+      font-family: var(--font);
+      line-height: 1.25;
+      white-space: pre;
+      resize: none;
+      overflow: hidden;
+    }
+
+    @media (width < 720px) {
+      .hint,
+      .coords {
+        display: none;
+      }
+
+      .tool kbd {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="board" aria-label="Pizarra"></canvas>
+
+  <nav class="toolbar" aria-label="Herramientas">
+    <button class="tool" data-tool="hand" title="Mover (H)"><svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11.5v-7a1.5 1.5 0 0 1 3 0V12M14 11.5v-5a1.5 1.5 0 0 1 3 0V13M17 12.5v-2a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-2.7L4.3 14a1.5 1.5 0 0 1 2.5-1.6L8 14" /></svg><kbd>H</kbd></button>
+    <button class="tool" data-tool="pen" title="Lápiz (P)"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg><kbd>P</kbd></button>
+    <button class="tool" data-tool="rect" title="Rectángulo (R)"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" /></svg><kbd>R</kbd></button>
+    <button class="tool" data-tool="ellipse" title="Elipse (O)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7" /></svg><kbd>O</kbd></button>
+    <button class="tool" data-tool="arrow" title="Flecha (A)"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M9 5h10v10" /></svg><kbd>A</kbd></button>
+    <button class="tool" data-tool="text" title="Texto (T)"><svg viewBox="0 0 24 24"><path d="M5 7V4h14v3M12 4v16M9 20h6" /></svg><kbd>T</kbd></button>
+    <button class="tool" data-tool="eraser" title="Goma (E)"><svg viewBox="0 0 24 24"><path d="M7 21h10M5.5 13.5l6-6a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8.5L5.5 16a1.8 1.8 0 0 1 0-2.5Z" /></svg><kbd>E</kbd></button>
+    <span class="separator"></span>
+    <div id="swatches" style="display: contents"></div>
+    <span class="separator"></span>
+    <div id="sizes" style="display: contents"></div>
+    <span class="separator"></span>
+    <button class="tool" id="undo-button" title="Deshacer (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg></button>
+    <button class="tool" id="clear-button" title="Borrar todo"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg></button>
+    <button class="tool" id="export-button" title="Exportar PNG"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg></button>
+  </nav>
+
+  <div class="coords" id="coords"></div>
+
+  <div class="zoom">
+    <button id="zoom-out" aria-label="Alejar">−</button>
+    <button id="zoom-reset" title="Volver al 100%">100%</button>
+    <button id="zoom-in" aria-label="Acercar">+</button>
+    <button id="zoom-fit" title="Ajustar al contenido">Ajustar</button>
+  </div>
+
+  <p class="hint">Rueda: zoom · Espacio + arrastrar o botón central: mover · Dos dedos en móvil</p>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const STORAGE_KEY = 'infinite-whiteboard'
+    const COLORS = ['#1e1e24', '#e03131', '#1971c2', '#2f9e44', '#f08c00', '#9c36b5']
+    const SIZES = [2, 4, 8]
+    const TEXT_SIZE = 24
+    const GRID_SIZE = 24
+    const MIN_GRID_SPACING = 14
+    const MIN_ZOOM = 0.1
+    const MAX_ZOOM = 8
+    const ERASER_RADIUS = 10
+    const MAX_HISTORY = 100
+    const SHORTCUTS = { h: 'hand', p: 'pen', r: 'rect', o: 'ellipse', a: 'arrow', t: 'text', e: 'eraser' }
+
+    const canvas = $('#board')
+    const ctx = canvas.getContext('2d')
+    const FONT_FAMILY = getComputedStyle(document.body).fontFamily
+    const LINE_HEIGHT = 1.25
+
+    // La cámara: dónde cae el origen del mundo en la pantalla (x, y) y cuánto ampliamos (zoom)
+    const camera = { x: 0, y: 0, zoom: 1 }
+
+    let elements = []
+    let history = []
+    let tool = 'pen'
+    let color = COLORS[0]
+    let size = SIZES[1]
+    let draft = null // elemento que estamos dibujando ahora mismo
+    let pan = null
+    let pinch = null
+    let erasing = null // pasada de goma en curso: { saved } indica si ya guardamos en el historial
+    let isSpacePressed = false
+    let renderRequested = false
+    let saveTimeout = null
+    let lastPointer = { x: 0, y: 0 }
+    const pointers = new Map()
+
+    // ---------- Transformaciones de coordenadas ----------
+    // Los elementos se guardan en coordenadas del MUNDO, que no cambian al mover o hacer zoom.
+    // Para pintarlos o para saber qué hay bajo el ratón convertimos entre los dos sistemas:
+    //   pantalla = mundo * zoom + offset      mundo = (pantalla - offset) / zoom
+
+    function screenToWorld(x, y) {
+      return { x: (x - camera.x) / camera.zoom, y: (y - camera.y) / camera.zoom }
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value))
+    }
+
+    function zoomAt(screenX, screenY, newZoom) {
+      // Queremos que el punto del mundo que está bajo el cursor siga bajo el cursor tras el zoom:
+      // 1. averiguamos qué punto del mundo hay ahí con el zoom actual
+      const world = screenToWorld(screenX, screenY)
+      camera.zoom = clamp(newZoom, MIN_ZOOM, MAX_ZOOM)
+      // 2. despejamos el offset de: screen = world * zoom + offset
+      camera.x = screenX - world.x * camera.zoom
+      camera.y = screenY - world.y * camera.zoom
+      onCameraChange()
+    }
+
+    function onCameraChange() {
+      $('#zoom-reset').textContent = `${Math.round(camera.zoom * 100)}%`
+      updateCoords()
+      scheduleSave()
+      requestRender()
+    }
+
+    // ---------- Dibujo ----------
+
+    function resizeCanvas() {
+      const ratio = window.devicePixelRatio || 1
+      canvas.width = Math.round(innerWidth * ratio)
+      canvas.height = Math.round(innerHeight * ratio)
+      requestRender()
+    }
+
+    function requestRender() {
+      if (renderRequested) return
+      renderRequested = true
+      requestAnimationFrame(render)
+    }
+
+    function drawGrid(ratio) {
+      // La rejilla se pinta en coordenadas de PANTALLA: así los puntos siempre miden lo mismo.
+      // Si al alejarnos quedan muy juntos, doblamos la separación
+      let spacing = GRID_SIZE * camera.zoom
+      while (spacing < MIN_GRID_SPACING) spacing *= 2
+
+      const startX = ((camera.x % spacing) + spacing) % spacing
+      const startY = ((camera.y % spacing) + spacing) % spacing
+
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+      ctx.fillStyle = '#d0d4da'
+      for (let x = startX; x < innerWidth; x += spacing) {
+        for (let y = startY; y < innerHeight; y += spacing) {
+          ctx.fillRect(x - 1, y - 1, 2, 2)
+        }
+      }
+    }
+
+    function drawElement(context, element) {
+      context.strokeStyle = element.color
+      context.fillStyle = element.color
+      context.lineWidth = element.width
+      context.lineCap = 'round'
+      context.lineJoin = 'round'
+      context.beginPath()
+
+      if (element.type === 'pen') {
+        const [first, ...rest] = element.points
+        if (rest.length === 0) {
+          context.arc(first[0], first[1], element.width / 2, 0, Math.PI * 2)
+          context.fill()
+          return
+        }
+        // Suavizamos el trazo con curvas que pasan por el punto medio de cada segmento
+        context.moveTo(first[0], first[1])
+        for (let i = 0; i < rest.length - 1; i++) {
+          const [x, y] = rest[i]
+          const [nextX, nextY] = rest[i + 1]
+          context.quadraticCurveTo(x, y, (x + nextX) / 2, (y + nextY) / 2)
+        }
+        const [lastX, lastY] = rest.at(-1)
+        context.lineTo(lastX, lastY)
+        context.stroke()
+      } else if (element.type === 'rect') {
+        const { x, y, width, height } = normalizeBox(element)
+        context.rect(x, y, width, height)
+        context.stroke()
+      } else if (element.type === 'ellipse') {
+        const { x, y, width, height } = normalizeBox(element)
+        context.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2)
+        context.stroke()
+      } else if (element.type === 'arrow') {
+        const { x1, y1, x2, y2 } = element
+        const angle = Math.atan2(y2 - y1, x2 - x1)
+        const head = Math.max(12, element.width * 4)
+        context.moveTo(x1, y1)
+        context.lineTo(x2, y2)
+        context.moveTo(x2 - head * Math.cos(angle - Math.PI / 7), y2 - head * Math.sin(angle - Math.PI / 7))
+        context.lineTo(x2, y2)
+        context.lineTo(x2 - head * Math.cos(angle + Math.PI / 7), y2 - head * Math.sin(angle + Math.PI / 7))
+        context.stroke()
+      } else if (element.type === 'text') {
+        context.font = `${element.size}px ${FONT_FAMILY}`
+        context.textBaseline = 'top'
+        // Sumamos el medio interlineado para que coincida con la posición del <textarea> de edición
+        const halfLeading = (element.size * (LINE_HEIGHT - 1)) / 2
+        element.text.split('\n').forEach((line, index) => {
+          context.fillText(line, element.x, element.y + halfLeading + index * element.size * LINE_HEIGHT)
+        })
+      }
+    }
+
+    function render() {
+      renderRequested = false
+      const ratio = window.devicePixelRatio || 1
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      drawGrid(ratio)
+
+      // setTransform aplica a la vez el devicePixelRatio, el zoom y el desplazamiento.
+      // A partir de aquí dibujamos directamente con coordenadas del mundo
+      ctx.setTransform(ratio * camera.zoom, 0, 0, ratio * camera.zoom, ratio * camera.x, ratio * camera.y)
+      elements.forEach(element => drawElement(ctx, element))
+      if (draft) drawElement(ctx, draft)
+    }
+
+    // ---------- Geometría (goma y límites) ----------
+
+    function normalizeBox({ x1, y1, x2, y2 }) {
+      return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) }
+    }
+
+    function distanceToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const lengthSquared = dx * dx + dy * dy
+      // t = proyección del punto sobre el segmento (0 = inicio, 1 = final)
+      const t = lengthSquared === 0 ? 0 : clamp(((px - x1) * dx + (py - y1) * dy) / lengthSquared, 0, 1)
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
+    }
+
+    function measureText(element) {
+      ctx.font = `${element.size}px ${FONT_FAMILY}`
+      const lines = element.text.split('\n')
+      const width = Math.max(...lines.map(line => ctx.measureText(line).width))
+      return { width, height: lines.length * element.size * LINE_HEIGHT }
+    }
+
+    function getBounds(element) {
+      if (element.type === 'pen') {
+        const xs = element.points.map(point => point[0])
+        const ys = element.points.map(point => point[1])
+        return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
+      }
+      if (element.type === 'text') {
+        const { width, height } = measureText(element)
+        return { minX: element.x, minY: element.y, maxX: element.x + width, maxY: element.y + height }
+      }
+      const { x, y, width, height } = normalizeBox(element)
+      return { minX: x, minY: y, maxX: x + width, maxY: y + height }
+    }
+
+    function getContentBounds() {
+      if (elements.length === 0) return null
+      return elements.map(getBounds).reduce((total, bounds) => ({
+        minX: Math.min(total.minX, bounds.minX),
+        minY: Math.min(total.minY, bounds.minY),
+        maxX: Math.max(total.maxX, bounds.maxX),
+        maxY: Math.max(total.maxY, bounds.maxY)
+      }))
+    }
+
+    function hitTest(element, x, y, tolerance) {
+      const reach = tolerance + (element.width ?? 0) / 2
+
+      if (element.type === 'pen') {
+        const { points } = element
+        if (points.length === 1) return Math.hypot(x - points[0][0], y - points[0][1]) <= reach
+        return points.some((point, i) => i > 0 && distanceToSegment(x, y, ...points[i - 1], ...point) <= reach)
+      }
+      if (element.type === 'arrow') {
+        return distanceToSegment(x, y, element.x1, element.y1, element.x2, element.y2) <= reach
+      }
+      if (element.type === 'rect') {
+        const { x: left, y: top, width, height } = normalizeBox(element)
+        const right = left + width
+        const bottom = top + height
+        return [
+          [left, top, right, top], [right, top, right, bottom],
+          [right, bottom, left, bottom], [left, bottom, left, top]
+        ].some(edge => distanceToSegment(x, y, ...edge) <= reach)
+      }
+      if (element.type === 'ellipse') {
+        const { x: left, y: top, width, height } = normalizeBox(element)
+        const rx = width / 2
+        const ry = height / 2
+        if (rx < 1 || ry < 1) return distanceToSegment(x, y, left, top, left + width, top + height) <= reach
+        // Distancia aproximada al contorno: en la elipse "normalizada" el contorno está a radio 1
+        const normalized = Math.hypot((x - left - rx) / rx, (y - top - ry) / ry)
+        return Math.abs(normalized - 1) * Math.min(rx, ry) <= reach
+      }
+      if (element.type === 'text') {
+        const { minX, minY, maxX, maxY } = getBounds(element)
+        return x >= minX - tolerance && x <= maxX + tolerance && y >= minY - tolerance && y <= maxY + tolerance
+      }
+      return false
+    }
+
+    // ---------- Historial y guardado ----------
+
+    function pushHistory() {
+      history.push(JSON.stringify(elements))
+      if (history.length > MAX_HISTORY) history.shift()
+    }
+
+    function undo() {
+      if (history.length === 0) return
+      elements = JSON.parse(history.pop())
+      scheduleSave()
+      requestRender()
+    }
+
+    function commitElements(update) {
+      pushHistory()
+      update()
+      scheduleSave()
+      requestRender()
+    }
+
+    function scheduleSave() {
+      clearTimeout(saveTimeout)
+      saveTimeout = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ elements, camera }))
+        } catch {
+          // sin localStorage (modo privado): la pizarra sigue funcionando sin guardar
+        }
+      }, 300)
+    }
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        if (saved?.elements) {
+          elements = saved.elements
+          Object.assign(camera, saved.camera)
+          return true
+        }
+      } catch {
+        // datos corruptos: empezamos con la demo
+      }
+      return false
+    }
+
+    // ---------- Herramientas ----------
+
+    function setTool(newTool) {
+      tool = newTool
+      document.querySelectorAll('[data-tool]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.tool === tool)
+      })
+      updateCursor()
+    }
+
+    function updateCursor() {
+      let cursor = 'crosshair'
+      if (pan) cursor = 'grabbing'
+      else if (tool === 'hand' || isSpacePressed) cursor = 'grab'
+      else if (tool === 'text') cursor = 'text'
+      else if (tool === 'eraser') cursor = 'eraser'
+      canvas.dataset.cursor = cursor
+    }
+
+    function eraseAt(x, y) {
+      const world = screenToWorld(x, y)
+      const tolerance = ERASER_RADIUS / camera.zoom
+      const remaining = elements.filter(element => !hitTest(element, world.x, world.y, tolerance))
+      if (remaining.length === elements.length) return
+
+      // Guardamos en el historial solo una vez por "pasada" de goma
+      if (!erasing.saved) {
+        pushHistory()
+        erasing.saved = true
+      }
+      elements = remaining
+      scheduleSave()
+      requestRender()
+    }
+
+    function openTextEditor(screenX, screenY) {
+      const world = screenToWorld(screenX, screenY)
+      const editor = document.createElement('textarea')
+      editor.className = 'text-editor'
+      editor.rows = 1
+      editor.style.left = `${screenX}px`
+      editor.style.top = `${screenY}px`
+      editor.style.fontSize = `${TEXT_SIZE}px`
+      editor.style.color = color
+      document.body.append(editor)
+      setTimeout(() => editor.focus())
+
+      let committed = false
+      function commit() {
+        if (committed) return
+        committed = true
+        const text = editor.value.trimEnd()
+        editor.remove()
+        if (!text.trim()) return
+        // Dividimos por el zoom para que el texto se vea al tamaño elegido con el zoom actual
+        commitElements(() => elements.push({ type: 'text', x: world.x, y: world.y, text, size: TEXT_SIZE / camera.zoom, color }))
+      }
+
+      function autosize() {
+        editor.style.width = '0'
+        editor.style.height = '0'
+        editor.style.width = `${editor.scrollWidth + 8}px`
+        editor.style.height = `${editor.scrollHeight}px`
+      }
+
+      editor.addEventListener('input', autosize)
+      editor.addEventListener('blur', commit)
+      editor.addEventListener('keydown', event => {
+        event.stopPropagation()
+        if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+          event.preventDefault()
+          editor.blur()
+        }
+      })
+      autosize()
+    }
+
+    // ---------- Pointer Events: ratón, lápiz y dedos con el mismo código ----------
+
+    function startPinch() {
+      const [a, b] = [...pointers.values()]
+      pinch = {
+        distance: Math.hypot(b.x - a.x, b.y - a.y),
+        center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+        camera: { ...camera }
+      }
+    }
+
+    function updatePinch() {
+      const [a, b] = [...pointers.values()]
+      const distance = Math.hypot(b.x - a.x, b.y - a.y)
+      const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const start = pinch.camera
+
+      // El punto del mundo que estaba bajo el centro de los dedos al empezar
+      // debe quedar bajo el centro actual: así hacemos zoom y desplazamiento a la vez
+      const worldX = (pinch.center.x - start.x) / start.zoom
+      const worldY = (pinch.center.y - start.y) / start.zoom
+      camera.zoom = clamp(start.zoom * (distance / pinch.distance), MIN_ZOOM, MAX_ZOOM)
+      camera.x = center.x - worldX * camera.zoom
+      camera.y = center.y - worldY * camera.zoom
+      onCameraChange()
+    }
+
+    function handlePointerDown(event) {
+      canvas.setPointerCapture(event.pointerId)
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+      // Segundo dedo: cancelamos lo que estuviera dibujando el primero y pasamos a pellizcar
+      if (pointers.size === 2) {
+        draft = null
+        pan = null
+        erasing = null
+        startPinch()
+        requestRender()
+        return
+      }
+      if (pointers.size > 2) return
+
+      if (event.button === 1 || isSpacePressed || tool === 'hand') {
+        event.preventDefault()
+        pan = { x: event.clientX, y: event.clientY, cameraX: camera.x, cameraY: camera.y }
+        updateCursor()
+        return
+      }
+      if (event.button !== 0) return
+
+      const { x, y } = screenToWorld(event.clientX, event.clientY)
+      // El grosor también se guarda en unidades del mundo, compensando el zoom actual
+      const width = size / camera.zoom
+
+      if (tool === 'pen') {
+        draft = { type: 'pen', points: [[x, y]], color, width }
+      } else if (tool === 'rect' || tool === 'ellipse' || tool === 'arrow') {
+        draft = { type: tool, x1: x, y1: y, x2: x, y2: y, color, width }
+      } else if (tool === 'eraser') {
+        erasing = { saved: false }
+        eraseAt(event.clientX, event.clientY)
+      } else if (tool === 'text') {
+        event.preventDefault()
+        openTextEditor(event.clientX, event.clientY)
+      }
+    }
+
+    function handlePointerMove(event) {
+      lastPointer = { x: event.clientX, y: event.clientY }
+      updateCoords()
+      if (!pointers.has(event.pointerId)) return
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+      if (pinch && pointers.size === 2) {
+        updatePinch()
+        return
+      }
+
+      if (pan) {
+        camera.x = pan.cameraX + (event.clientX - pan.x)
+        camera.y = pan.cameraY + (event.clientY - pan.y)
+        onCameraChange()
+        return
+      }
+
+      if (erasing) {
+        eraseAt(event.clientX, event.clientY)
+        return
+      }
+
+      if (!draft) return
+
+      if (draft.type === 'pen') {
+        // getCoalescedEvents devuelve los puntos intermedios que el navegador agrupó en este evento
+        const events = event.getCoalescedEvents?.() ?? []
+        for (const pointerEvent of events.length > 0 ? events : [event]) {
+          const { x, y } = screenToWorld(pointerEvent.clientX, pointerEvent.clientY)
+          draft.points.push([x, y])
+        }
+      } else {
+        let { x, y } = screenToWorld(event.clientX, event.clientY)
+        // Con Shift, rectángulos y elipses quedan perfectos (cuadrado y círculo)
+        if (event.shiftKey && draft.type !== 'arrow') {
+          const side = Math.max(Math.abs(x - draft.x1), Math.abs(y - draft.y1))
+          x = draft.x1 + side * Math.sign(x - draft.x1 || 1)
+          y = draft.y1 + side * Math.sign(y - draft.y1 || 1)
+        }
+        draft.x2 = x
+        draft.y2 = y
+      }
+      requestRender()
+    }
+
+    function handlePointerUp(event) {
+      pointers.delete(event.pointerId)
+
+      if (pinch) {
+        if (pointers.size < 2) pinch = null
+        return
+      }
+
+      if (pan) {
+        pan = null
+        updateCursor()
+      }
+      erasing = null
+
+      if (draft) {
+        const element = draft
+        draft = null
+        const isTooSmall = element.type !== 'pen' &&
+          Math.hypot(element.x2 - element.x1, element.y2 - element.y1) * camera.zoom < 3
+        if (!isTooSmall) commitElements(() => elements.push(element))
+        requestRender()
+      }
+    }
+
+    function handleWheel(event) {
+      event.preventDefault()
+      // deltaMode 1 = el ratón informa en líneas en vez de píxeles (algunos Firefox)
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY
+      // Con el pellizco del trackpad el navegador manda wheel + ctrlKey con deltas pequeños
+      const intensity = event.ctrlKey ? 0.01 : 0.0015
+      zoomAt(event.clientX, event.clientY, camera.zoom * Math.exp(-delta * intensity))
+    }
+
+    // ---------- Zoom y exportar ----------
+
+    function zoomFromCenter(factor) {
+      zoomAt(innerWidth / 2, innerHeight / 2, camera.zoom * factor)
+    }
+
+    function fitToContent() {
+      const bounds = getContentBounds()
+      if (!bounds) {
+        Object.assign(camera, { x: innerWidth / 2, y: innerHeight / 2, zoom: 1 })
+        onCameraChange()
+        return
+      }
+      const margin = Math.min(90, innerWidth / 12) // hueco para la barra de herramientas y los controles
+      const width = Math.max(bounds.maxX - bounds.minX, 1)
+      const height = Math.max(bounds.maxY - bounds.minY, 1)
+      const zoom = clamp(Math.min((innerWidth - margin * 2) / width, (innerHeight - margin * 2) / height), MIN_ZOOM, 1.5)
+      camera.zoom = zoom
+      camera.x = innerWidth / 2 - ((bounds.minX + bounds.maxX) / 2) * zoom
+      camera.y = innerHeight / 2 + 10 - ((bounds.minY + bounds.maxY) / 2) * zoom
+      onCameraChange()
+    }
+
+    function exportPNG() {
+      const bounds = getContentBounds()
+      if (!bounds) return
+
+      const padding = 40
+      const width = bounds.maxX - bounds.minX + padding * 2
+      const height = bounds.maxY - bounds.minY + padding * 2
+      // Exportamos a doble resolución, sin pasarnos de un tamaño razonable
+      const scale = Math.min(2, 8000 / Math.max(width, height))
+
+      const exportCanvas = document.createElement('canvas')
+      exportCanvas.width = Math.ceil(width * scale)
+      exportCanvas.height = Math.ceil(height * scale)
+      const exportContext = exportCanvas.getContext('2d')
+      exportContext.fillStyle = '#ffffff'
+      exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
+      // Misma idea que en pantalla: una transformación que lleva el mundo al lienzo
+      exportContext.setTransform(scale, 0, 0, scale, (padding - bounds.minX) * scale, (padding - bounds.minY) * scale)
+      elements.forEach(element => drawElement(exportContext, element))
+
+      exportCanvas.toBlob(blob => {
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = 'pizarra.png'
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+      }, 'image/png')
+    }
+
+    function updateCoords() {
+      const world = screenToWorld(lastPointer.x, lastPointer.y)
+      $('#coords').innerHTML = `
+        Pantalla <b>${Math.round(lastPointer.x)}, ${Math.round(lastPointer.y)}</b><br>
+        Mundo &nbsp;&nbsp;&nbsp;<b>${Math.round(world.x)}, ${Math.round(world.y)}</b>
+      `
+    }
+
+    // ---------- Interfaz ----------
+
+    function renderPickers() {
+      $('#swatches').innerHTML = COLORS.map(value => `
+        <button class="swatch" style="--color: ${value}" data-color="${value}" aria-label="Color ${value}" aria-pressed="${value === color}"></button>
+      `).join('')
+      $('#sizes').innerHTML = SIZES.map(value => `
+        <button class="tool size" data-size="${value}" title="Grosor ${value}" aria-pressed="${value === size}">
+          <span style="--size: ${value + 3}px"></span>
+        </button>
+      `).join('')
+    }
+
+    function createDemo() {
+      const wave = Array.from({ length: 60 }, (_, i) => [-320 + i * 6, -118 + Math.sin(i / 4) * 5])
+      const smile = Array.from({ length: 24 }, (_, i) => {
+        const angle = Math.PI * 0.15 + (i / 23) * Math.PI * 0.7
+        return [250 + Math.cos(angle) * 34, 118 + Math.sin(angle) * 30]
+      })
+
+      return [
+        { type: 'text', x: -320, y: -190, text: 'Pizarra infinita ✏️', size: 52, color: '#1e1e24' },
+        { type: 'pen', points: wave, color: '#f08c00', width: 4 },
+        { type: 'rect', x1: -320, y1: -70, x2: -60, y2: 50, color: '#1971c2', width: 3 },
+        { type: 'text', x: -300, y: -40, text: 'Coordenadas\ndel mundo 🌍', size: 24, color: '#1971c2' },
+        { type: 'arrow', x1: -40, y1: -10, x2: 90, y2: -10, color: '#1e1e24', width: 3 },
+        { type: 'text', x: -38, y: -48, text: '× zoom + offset', size: 18, color: '#868e96' },
+        { type: 'ellipse', x1: 110, y1: -80, x2: 380, y2: 60, color: '#e03131', width: 3 },
+        { type: 'text', x: 170, y: -32, text: 'Pantalla 🖥️', size: 26, color: '#e03131' },
+        { type: 'text', x: -320, y: 100, text: 'Haz zoom con la rueda y arrastra\ncon la barra espaciadora pulsada', size: 22, color: '#2f9e44' },
+        { type: 'ellipse', x1: 206, y1: 76, x2: 294, y2: 160, color: '#9c36b5', width: 3 },
+        { type: 'pen', points: [[236, 104], [236, 106]], color: '#9c36b5', width: 6 },
+        { type: 'pen', points: [[264, 104], [264, 106]], color: '#9c36b5', width: 6 },
+        { type: 'pen', points: smile, color: '#9c36b5', width: 3 }
+      ]
+    }
+
+    document.querySelector('.toolbar').addEventListener('click', event => {
+      const button = event.target.closest('button')
+      if (!button) return
+      if (button.dataset.tool) setTool(button.dataset.tool)
+      if (button.dataset.color) {
+        color = button.dataset.color
+        renderPickers()
+      }
+      if (button.dataset.size) {
+        size = Number(button.dataset.size)
+        renderPickers()
+      }
+    })
+
+    // Los botones no se quedan con el foco: así la barra espaciadora no los "pulsa" al mover la pizarra
+    document.querySelectorAll('.toolbar, .zoom').forEach(panel => {
+      panel.addEventListener('pointerdown', event => event.preventDefault())
+    })
+
+    $('#undo-button').addEventListener('click', undo)
+    $('#clear-button').addEventListener('click', () => commitElements(() => { elements = [] }))
+    $('#export-button').addEventListener('click', exportPNG)
+    $('#zoom-in').addEventListener('click', () => zoomFromCenter(1.25))
+    $('#zoom-out').addEventListener('click', () => zoomFromCenter(1 / 1.25))
+    $('#zoom-reset').addEventListener('click', () => zoomAt(innerWidth / 2, innerHeight / 2, 1))
+    $('#zoom-fit').addEventListener('click', fitToContent)
+
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointermove', handlePointerMove)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerUp)
+    // passive: false para poder llamar a preventDefault y que el navegador no haga su propio zoom
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+
+    document.addEventListener('keydown', event => {
+      if (event.target.closest?.('textarea, input')) return
+
+      if (event.code === 'Space') {
+        event.preventDefault()
+        if (!event.repeat) {
+          isSpacePressed = true
+          updateCursor()
+        }
+        return
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        undo()
+        return
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      const key = event.key.toLowerCase()
+      if (SHORTCUTS[key]) setTool(SHORTCUTS[key])
+      else if (key === '+' || key === '=') zoomFromCenter(1.25)
+      else if (key === '-') zoomFromCenter(1 / 1.25)
+      else if (key === '0') zoomAt(innerWidth / 2, innerHeight / 2, 1)
+    })
+
+    document.addEventListener('keyup', event => {
+      if (event.code === 'Space') {
+        isSpacePressed = false
+        updateCursor()
+      }
+    })
+
+    window.addEventListener('resize', resizeCanvas)
+
+    const hasSavedBoard = load()
+    if (!hasSavedBoard) {
+      elements = createDemo()
+      camera.x = innerWidth / 2 - 20
+      camera.y = innerHeight / 2 + 10
+    }
+
+    renderPickers()
+    setTool(tool)
+    resizeCanvas()
+    // En pantallas estrechas la demo no cabe: ajustamos el zoom para verla entera
+    if (!hasSavedBoard && innerWidth < 820) fitToContent()
+    lastPointer = { x: innerWidth / 2, y: innerHeight / 2 }
+    onCameraChange()
+  </script>
+</body>
+
+</html>

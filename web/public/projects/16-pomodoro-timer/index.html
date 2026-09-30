@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>16 - Temporizador Pomodoro</title>
+  <style>
+    :root {
+      --bg: #0c0a12;
+      --surface: #17141f;
+      --border: #2a2536;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --accent: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: background 0.6s;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .modes {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .modes button {
+      padding: 8px 14px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .modes button[aria-pressed='true'] {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* --- Anillo de progreso --- */
+    .timer {
+      position: relative;
+      width: min(78vw, calc(100dvh - 330px), 340px);
+      min-width: 220px;
+      aspect-ratio: 1;
+    }
+
+    .timer svg {
+      width: 100%;
+      height: 100%;
+      /* Rotamos para que el progreso empiece arriba (las 12 en punto) */
+      transform: rotate(-90deg);
+      overflow: visible;
+      filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent));
+    }
+
+    .ring-track {
+      fill: none;
+      stroke: var(--surface);
+      stroke-width: 10;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.25s linear, stroke 0.6s;
+    }
+
+    .time {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+    }
+
+    .time output {
+      font-size: clamp(3rem, 12vw, 4.8rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+    }
+
+    .time span {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* --- Controles --- */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .controls button {
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .controls button:hover {
+      transform: scale(1.06);
+    }
+
+    .controls .secondary {
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
+
+    .controls .primary {
+      width: 76px;
+      height: 76px;
+      border: 0;
+      background: var(--accent);
+      color: white;
+      font-size: 1.8rem;
+      box-shadow: 0 10px 30px -8px var(--accent);
+    }
+
+    .cycle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+    }
+
+    .dots span.is-done {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    /* --- Ajustes --- */
+    details {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: min(280px, calc(100vw - 32px));
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      z-index: 2;
+    }
+
+    details:not([open]) {
+      width: auto;
+    }
+
+    summary {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+      text-align: right;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .settings {
+      display: grid;
+      gap: 10px;
+      padding: 0 14px 14px;
+    }
+
+    .settings label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .settings input[type='number'] {
+      width: 64px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+      text-align: right;
+    }
+
+    .settings input[type='checkbox'] {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+    }
+
+    .settings small {
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .settings .notify-button {
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      translate: -50% calc(-100% - 24px);
+      opacity: 0;
+      padding: 12px 20px;
+      border-radius: 12px;
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      transition: translate 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3), opacity 0.3s;
+      z-index: 3;
+    }
+
+    .toast.is-visible {
+      translate: -50% 0;
+      opacity: 1;
+    }
+
+    @media (max-width: 640px) {
+      details {
+        position: static;
+        width: 100%;
+      }
+
+      main {
+        width: 100%;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $body = document.body
+    const $time = document.querySelector('.time output')
+    const $label = document.querySelector('.time span')
+    const $ring = document.querySelector('.ring-progress')
+    const $toggle = document.querySelector('#toggle')
+    const $reset = document.querySelector('#reset')
+    const $skip = document.querySelector('#skip')
+    const $modeButtons = document.querySelectorAll('.modes button')
+    const $dots = document.querySelector('.dots')
+    const $completed = document.querySelector('#completed')
+    const $settingsForm = document.querySelector('.settings')
+    const $notifyButton = document.querySelector('.notify-button')
+    const $notifyStatus = document.querySelector('#notify-status')
+    const $toast = document.querySelector('.toast')
+
+    // CONSTANTES
+    const TICK_MS = 250
+    const RING_RADIUS = 90
+    const RING_LENGTH = 2 * Math.PI * RING_RADIUS
+    const DEFAULT_TITLE = document.title
+    const SETTINGS_KEY = 'pomodoro-settings'
+
+    const MODES = {
+      work: { label: 'Concentración', color: '#f43f5e', emoji: '🍅' },
+      short: { label: 'Descanso corto', color: '#22c55e', emoji: '☕' },
+      long: { label: 'Descanso largo', color: '#38bdf8', emoji: '🌴' }
+    }
+
+    const DEFAULT_SETTINGS = {
+      work: 25,
+      short: 5,
+      long: 15,
+      longEvery: 4,
+      autoStart: true,
+      sound: true
+    }
+
+    // ESTADO
+    const settings = loadSettings()
+    let mode = 'work'
+    let duration = settings.work * 60_000 // duración del modo actual en ms
+    let remaining = duration // tiempo restante cuando está en pausa
+    let endTime = null // marca de tiempo en la que termina; null = pausado
+    let intervalId = null
+    let completedPomodoros = 0
+    let audioContext = null
+    let toastTimeoutId = null
+
+    // ¿Por qué no hacemos `remaining -= 1000` en cada setInterval de 1s?
+    // 1. setInterval NO garantiza precisión: cada tick puede llegar tarde
+    //    (el hilo principal está ocupado, el sistema va cargado...) y esos
+    //    pequeños retrasos se van ACUMULANDO (deriva o "drift").
+    // 2. En pestañas en segundo plano los navegadores limitan los timers
+    //    (como mucho 1 vez por segundo, o incluso 1 vez por minuto), así que
+    //    contando ticks el temporizador iría muchísimo más lento.
+    // La solución: guardamos CUÁNDO debe terminar (endTime) y en cada tick
+    // calculamos lo que falta. Aunque un tick llegue tarde, el valor es exacto.
+    function getRemaining() {
+      if (endTime === null) return remaining
+      return Math.max(0, endTime - Date.now())
+    }
+
+    function isRunning() {
+      return endTime !== null
+    }
+
+    function start() {
+      if (isRunning()) return
+
+      // Ambos necesitan un gesto del usuario, por eso se piden al pulsar "Iniciar"
+      getAudioContext()
+      requestNotificationPermission()
+
+      endTime = Date.now() + remaining
+      clearInterval(intervalId)
+      intervalId = setInterval(tick, TICK_MS)
+      tick()
+    }
+
+    function pause() {
+      if (!isRunning()) return
+      remaining = getRemaining()
+      endTime = null
+      clearInterval(intervalId)
+      render()
+    }
+
+    function toggle() {
+      if (isRunning()) pause()
+      else start()
+    }
+
+    function reset() {
+      pause()
+      remaining = duration
+      render()
+    }
+
+    function tick() {
+      const left = getRemaining()
+      render(left)
+      if (left <= 0) finish()
+    }
+
+    function finish() {
+      clearInterval(intervalId)
+      endTime = null
+
+      if (mode === 'work') completedPomodoros++
+
+      const nextMode = getNextMode()
+      announce(nextMode)
+      goToMode(nextMode)
+
+      if (settings.autoStart) start()
+    }
+
+    function skip() {
+      // Saltar no cuenta como pomodoro completado
+      pause()
+      goToMode(getNextMode())
+    }
+
+    // Después de trabajar toca descanso (largo cada N pomodoros):
+    // después de cualquier descanso, vuelta al trabajo
+    function getNextMode() {
+      if (mode !== 'work') return 'work'
+      const isLongBreak = completedPomodoros > 0 && completedPomodoros % settings.longEvery === 0
+      return isLongBreak ? 'long' : 'short'
+    }
+
+    function goToMode(newMode) {
+      pause()
+      mode = newMode
+      duration = settings[mode] * 60_000
+      remaining = duration
+      render()
+    }
+
+    // RENDER
+    function formatTime(ms) {
+      // Redondeamos hacia arriba: con 24:59.4 restantes mostramos 25:00
+      const totalSeconds = Math.ceil(ms / 1000)
+      const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+      const seconds = String(totalSeconds % 60).padStart(2, '0')
+      return `${minutes}:${seconds}`
+    }
+
+    function render(left = getRemaining()) {
+      const { label, color, emoji } = MODES[mode]
+      const time = formatTime(left)
+
+      $time.textContent = time
+      $label.textContent = `${emoji} ${label}`
+
+      // stroke-dasharray = longitud total de la circunferencia.
+      // stroke-dashoffset desplaza el trazo: 0 = anillo completo,
+      // RING_LENGTH = anillo vacío. Así el anillo se "vacía" con el tiempo
+      const progress = duration > 0 ? 1 - left / duration : 1
+      $ring.style.strokeDashoffset = RING_LENGTH * progress
+
+      $body.style.setProperty('--accent', color)
+      $toggle.textContent = isRunning() ? '⏸' : '▶'
+      $toggle.setAttribute('aria-label', isRunning() ? 'Pausar' : 'Iniciar')
+
+      $modeButtons.forEach(($button) => {
+        $button.setAttribute('aria-pressed', String($button.dataset.mode === mode))
+      })
+
+      // El título de la pestaña muestra el tiempo: útil cuando estás en otra pestaña
+      const hasStarted = isRunning() || left < duration
+      document.title = hasStarted ? `${isRunning() ? '▶' : '⏸'} ${time} · ${label}` : DEFAULT_TITLE
+
+      renderCycle()
+    }
+
+    function renderCycle() {
+      const inSet = completedPomodoros % settings.longEvery
+      const filled = mode === 'long' && completedPomodoros > 0 && inSet === 0
+        ? settings.longEvery
+        : inSet
+
+      $dots.replaceChildren(...Array.from({ length: settings.longEvery }, (_, index) => {
+        const $dot = document.createElement('span')
+        if (index < filled) $dot.className = 'is-done'
+        return $dot
+      }))
+
+      $completed.textContent = completedPomodoros
+    }
+
+    // NOTIFICACIONES
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) return
+      if (Notification.permission !== 'default') return
+
+      // requestPermission devuelve una promesa con 'granted' | 'denied' | 'default'
+      Notification.requestPermission()
+        .then(renderNotificationStatus)
+        .catch(renderNotificationStatus)
+    }
+
+    function renderNotificationStatus() {
+      if (!('Notification' in window)) {
+        $notifyStatus.textContent = 'Tu navegador no soporta notificaciones.'
+        $notifyButton.hidden = true
+        return
+      }
+
+      const messages = {
+        granted: '✅ Notificaciones activadas.',
+        denied: '🚫 Notificaciones bloqueadas. Actívalas en los ajustes del navegador.',
+        default: 'Te pediremos permiso al iniciar el temporizador.'
+      }
+      $notifyStatus.textContent = messages[Notification.permission]
+      $notifyButton.hidden = Notification.permission !== 'default'
+    }
+
+    function announce(nextMode) {
+      const title = mode === 'work' ? '¡Pomodoro completado! 🍅' : '¡Se acabó el descanso! 💪'
+      const body = `Siguiente: ${MODES[nextMode].label} (${settings[nextMode]} min)`
+
+      showToast(`${title} ${body}`)
+      if (settings.sound) playChime()
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          // `tag` hace que una notificación nueva sustituya a la anterior
+          const notification = new Notification(title, { body, tag: 'pomodoro' })
+          notification.onclick = () => window.focus()
+        } catch {
+          // En algunos móviles solo se permiten notificaciones desde un Service Worker
+        }
+      }
+    }
+
+    function showToast(message) {
+      $toast.textContent = message
+      $toast.classList.add('is-visible')
+      clearTimeout(toastTimeoutId)
+      toastTimeoutId = setTimeout(() => $toast.classList.remove('is-visible'), 5000)
+    }
+
+    // SONIDO (Web Audio API)
+    function getAudioContext() {
+      // Los navegadores solo dejan reproducir audio tras una interacción del usuario,
+      // así que creamos (o reanudamos) el AudioContext al pulsar un botón
+      audioContext ??= new AudioContext()
+      if (audioContext.state === 'suspended') audioContext.resume()
+      return audioContext
+    }
+
+    function playChime() {
+      const context = getAudioContext()
+      const notes = [523.25, 659.25, 783.99] // Do, Mi, Sol
+
+      notes.forEach((frequency, index) => {
+        const start = context.currentTime + index * 0.18
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+
+        oscillator.type = 'sine'
+        oscillator.frequency.value = frequency
+
+        // Envolvente: subida muy rápida y caída exponencial suave
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.6)
+
+        oscillator.connect(gain).connect(context.destination)
+        oscillator.start(start)
+        oscillator.stop(start + 0.65)
+      })
+    }
+
+    // AJUSTES
+    function loadSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY))
+        return { ...DEFAULT_SETTINGS, ...saved }
+      } catch {
+        return { ...DEFAULT_SETTINGS }
+      }
+    }
+
+    function saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+      } catch {
+        // almacenamiento no disponible
+      }
+    }
+
+    function fillSettingsForm() {
+      for (const [key, value] of Object.entries(settings)) {
+        const $input = $settingsForm.elements[key]
+        if (!$input) continue
+        if ($input.type === 'checkbox') $input.checked = value
+        else $input.value = value
+      }
+    }
+
+    $settingsForm.addEventListener('change', (event) => {
+      const $input = event.target
+
+      if ($input.type === 'checkbox') {
+        settings[$input.name] = $input.checked
+      } else {
+        const min = Number($input.min)
+        const max = Number($input.max)
+        const value = Math.round(Number($input.value))
+        settings[$input.name] = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : DEFAULT_SETTINGS[$input.name]
+        $input.value = settings[$input.name]
+      }
+
+      saveSettings()
+
+      // Si el temporizador no ha empezado, aplicamos la nueva duración ya.
+      // Si está en marcha, se aplicará en el siguiente ciclo
+      const hasStarted = isRunning() || remaining < duration
+      if (!hasStarted) goToMode(mode)
+      else renderCycle()
+    })
+
+    $settingsForm.addEventListener('submit', (event) => event.preventDefault())
+
+    // EVENTOS
+    $toggle.addEventListener('click', toggle)
+    $reset.addEventListener('click', reset)
+    $skip.addEventListener('click', skip)
+
+    $modeButtons.forEach(($button) => {
+      $button.addEventListener('click', () => goToMode($button.dataset.mode))
+    })
+
+    $notifyButton.addEventListener('click', requestNotificationPermission)
+
+    document.addEventListener('keydown', (event) => {
+      if (event.target.matches('input, button, summary')) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        toggle()
+      }
+      if (event.code === 'KeyR') reset()
+    })
+
+    // Al volver a la pestaña refrescamos al instante (los timers pudieron ir lentos)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isRunning()) tick()
+    })
+
+    $ring.style.strokeDasharray = RING_LENGTH
+    fillSettingsForm()
+    renderNotificationStatus()
+    render()
+  </script>
+</head>
+
+<body>
+  <details>
+    <summary>⚙️ Ajustes</summary>
+    <form class="settings">
+      <label>Concentración (min) <input type="number" name="work" min="1" max="120"></label>
+      <label>Descanso corto (min) <input type="number" name="short" min="1" max="60"></label>
+      <label>Descanso largo (min) <input type="number" name="long" min="1" max="60"></label>
+      <label>Descanso largo cada <input type="number" name="longEvery" min="2" max="8"></label>
+      <label>Empezar el siguiente ciclo solo <input type="checkbox" name="autoStart"></label>
+      <label>Sonido al terminar <input type="checkbox" name="sound"></label>
+      <small id="notify-status"></small>
+      <button type="button" class="notify-button">🔔 Activar notificaciones</button>
+    </form>
+  </details>
+
+  <main>
+    <h1>Temporizador Pomodoro</h1>
+
+    <nav class="modes" aria-label="Modo">
+      <button data-mode="work" aria-pressed="true">Pomodoro</button>
+      <button data-mode="short" aria-pressed="false">Descanso corto</button>
+      <button data-mode="long" aria-pressed="false">Descanso largo</button>
+    </nav>
+
+    <div class="timer">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="ring-track" cx="100" cy="100" r="90" />
+        <circle class="ring-progress" cx="100" cy="100" r="90" />
+      </svg>
+      <div class="time">
+        <output>25:00</output>
+        <span>🍅 Concentración</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="reset" class="secondary" aria-label="Reiniciar" title="Reiniciar (R)">↺</button>
+      <button id="toggle" class="primary" aria-label="Iniciar" title="Iniciar / pausar (Espacio)">▶</button>
+      <button id="skip" class="secondary" aria-label="Saltar" title="Saltar al siguiente">⏭</button>
+    </div>
+
+    <div class="cycle">
+      <div class="dots"></div>
+      <span>· Completados: <strong id="completed">0</strong></span>
+    </div>
+  </main>
+
+  <div class="toast" role="status" aria-live="polite"></div>
+</body>
+
+</html>

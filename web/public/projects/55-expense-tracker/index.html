@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>55 - Control de gastos</title>
+  <style>
+    :root {
+      --bg: #f4f5fb;
+      --card: #ffffff;
+      --text: #1d2033;
+      --muted: #7a7f99;
+      --line: #e6e8f2;
+      --primary: #5b5bf0;
+      --income: #12a36d;
+      --expense: #e5484d;
+      --radius: 18px;
+      --shadow: 0 1px 2px rgba(20, 24, 60, .05), 0 8px 24px rgba(20, 24, 60, .06);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: radial-gradient(circle at 90% -10%, #e2e3ff 0, transparent 40%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 small {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 3px 8px;
+      border-radius: 99px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .month-nav output {
+      min-width: 170px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .icon-button {
+      border: none;
+      background: none;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .icon-button:hover {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .button {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      background: var(--text);
+      color: white;
+      font-weight: 600;
+      box-shadow: var(--shadow);
+    }
+
+    .button:hover {
+      background: #34385a;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+    }
+
+    .stat {
+      display: grid;
+      gap: 4px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stat strong {
+      font-size: 26px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.02em;
+    }
+
+    .stat.balance {
+      background: linear-gradient(135deg, #5b5bf0, #8b5cf6);
+      color: white;
+      border: none;
+    }
+
+    .stat.balance span {
+      color: rgba(255, 255, 255, .8);
+    }
+
+    .stat.income strong {
+      color: var(--income);
+    }
+
+    .stat.expense strong {
+      color: var(--expense);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+    }
+
+    /* Gráfico de dona */
+    .chart-wrap {
+      position: relative;
+      width: 176px;
+      margin: 0 auto 12px;
+    }
+
+    .chart-wrap svg {
+      display: block;
+      width: 100%;
+    }
+
+    .segment {
+      fill: none;
+      stroke-width: 6;
+      transition: stroke-dasharray .6s ease, stroke-dashoffset .6s ease, opacity .2s;
+    }
+
+    .segment.is-dimmed {
+      opacity: .2;
+    }
+
+    .chart-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .chart-center span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .chart-center strong {
+      font-size: 20px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .legend {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .legend li {
+      display: grid;
+      grid-template-columns: 12px 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .legend li:hover {
+      background: var(--bg);
+    }
+
+    .legend .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      background: var(--color);
+    }
+
+    .legend .pct {
+      color: var(--muted);
+      font-size: 12px;
+      width: 40px;
+      text-align: right;
+    }
+
+    .legend .amount {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 24px 8px;
+      font-size: 14px;
+    }
+
+    /* Formulario */
+    .right {
+      display: grid;
+      gap: 16px;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: auto 1fr 130px;
+      gap: 10px;
+    }
+
+    .type-toggle {
+      display: flex;
+      background: var(--bg);
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .type-toggle label {
+      position: relative;
+    }
+
+    .type-toggle input {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .type-toggle span {
+      display: block;
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .type-toggle input:checked+span {
+      background: var(--card);
+      color: var(--text);
+      box-shadow: var(--shadow);
+    }
+
+    .type-toggle input:focus-visible+span {
+      outline: 2px solid var(--primary);
+    }
+
+    input,
+    select {
+      font: inherit;
+      font-size: 14px;
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      color: var(--text);
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid color-mix(in srgb, var(--primary) 40%, transparent);
+      border-color: var(--primary);
+    }
+
+    form .button {
+      background: var(--primary);
+    }
+
+    form .button:hover {
+      background: #4848d8;
+    }
+
+    .list-card {
+      padding-bottom: 8px;
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .list-header span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .movements {
+      list-style: none;
+      margin: 0 -8px;
+      padding: 0;
+      max-height: calc(100dvh - 430px);
+      min-height: 180px;
+      overflow: auto;
+    }
+
+    .movement {
+      display: grid;
+      grid-template-columns: 40px 1fr auto 32px;
+      align-items: center;
+      gap: 12px;
+      padding: 8px;
+      border-radius: 12px;
+      animation: appear .3s ease;
+    }
+
+    .movement:hover {
+      background: var(--bg);
+    }
+
+    .movement .icon {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-content: center;
+      border-radius: 12px;
+      font-size: 18px;
+      background: color-mix(in srgb, var(--color) 16%, white);
+    }
+
+    .movement p {
+      margin: 0;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .movement small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .movement .amount {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--expense);
+    }
+
+    .movement.income .amount {
+      color: var(--income);
+    }
+
+    .movement .delete {
+      opacity: 0;
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+    }
+
+    .movement:hover .delete,
+    .movement .delete:focus-visible {
+      opacity: 1;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .movements {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .app {
+        padding: 16px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stat.balance {
+        grid-column: span 2;
+      }
+
+      form {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .type-toggle,
+      form .button {
+        grid-column: span 2;
+      }
+
+      .type-toggle label {
+        flex: 1;
+        text-align: center;
+      }
+
+      .month-nav output {
+        min-width: 140px;
+      }
+
+      .movement .delete {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header>
+      <h1>💰 Control de gastos <small>IndexedDB</small></h1>
+      <div class="toolbar">
+        <div class="month-nav">
+          <button class="icon-button" id="prev-month" aria-label="Mes anterior">‹</button>
+          <output id="month-label"></output>
+          <button class="icon-button" id="next-month" aria-label="Mes siguiente">›</button>
+        </div>
+        <button class="button" id="export">⬇ CSV</button>
+      </div>
+    </header>
+
+    <section class="summary">
+      <article class="card stat balance">
+        <span>Balance del mes</span>
+        <strong id="balance">—</strong>
+      </article>
+      <article class="card stat income">
+        <span>Ingresos</span>
+        <strong id="total-income">—</strong>
+      </article>
+      <article class="card stat expense">
+        <span>Gastos</span>
+        <strong id="total-expense">—</strong>
+      </article>
+    </section>
+
+    <section class="layout">
+      <article class="card">
+        <h2>Gastos por categoría</h2>
+        <div class="chart-wrap">
+          <svg viewBox="0 0 42 42" role="img" aria-label="Gráfico de gastos por categoría">
+            <circle cx="21" cy="21" r="15.9155" fill="none" stroke="#eef0f7" stroke-width="6"></circle>
+            <g id="segments"></g>
+          </svg>
+          <div class="chart-center">
+            <span>Total gastado</span>
+            <strong id="chart-total">—</strong>
+          </div>
+        </div>
+        <ul class="legend" id="legend"></ul>
+      </article>
+
+      <div class="right">
+        <article class="card">
+          <h2>Nuevo movimiento</h2>
+          <form id="form" autocomplete="off">
+            <div class="type-toggle" role="radiogroup" aria-label="Tipo">
+              <label><input type="radio" name="type" value="expense" checked><span>Gasto</span></label>
+              <label><input type="radio" name="type" value="income"><span>Ingreso</span></label>
+            </div>
+            <input name="description" placeholder="Descripción (p. ej. Supermercado)" required maxlength="60">
+            <input name="amount" type="number" min="0.01" step="0.01" placeholder="Importe €" required>
+            <select name="category" aria-label="Categoría"></select>
+            <input name="date" type="date" required aria-label="Fecha">
+            <button class="button">Añadir</button>
+          </form>
+        </article>
+
+        <article class="card list-card">
+          <div class="list-header">
+            <h2>Movimientos</h2>
+            <span id="count"></span>
+          </div>
+          <ul class="movements" id="movements"></ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const DB_NAME = 'control-de-gastos'
+    const DB_VERSION = 1
+    const STORE = 'movimientos'
+
+    const CATEGORIES = {
+      expense: {
+        vivienda: { label: 'Vivienda', emoji: '🏠', color: '#5b5bf0' },
+        comida: { label: 'Comida', emoji: '🛒', color: '#f59e0b' },
+        transporte: { label: 'Transporte', emoji: '🚗', color: '#06b6d4' },
+        facturas: { label: 'Facturas', emoji: '💡', color: '#8b5cf6' },
+        ocio: { label: 'Ocio', emoji: '🎬', color: '#ec4899' },
+        compras: { label: 'Compras', emoji: '🛍️', color: '#f97316' },
+        salud: { label: 'Salud', emoji: '💊', color: '#10b981' },
+        otros: { label: 'Otros', emoji: '📦', color: '#94a3b8' }
+      },
+      income: {
+        nomina: { label: 'Nómina', emoji: '💼', color: '#12a36d' },
+        freelance: { label: 'Freelance', emoji: '💻', color: '#0ea5e9' },
+        regalos: { label: 'Regalos', emoji: '🎁', color: '#e879f9' },
+        otros: { label: 'Otros ingresos', emoji: '💶', color: '#64748b' }
+      }
+    }
+
+    // Intl formatea números y fechas según el idioma sin librerías externas
+    const currency = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
+    const percent = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 0 })
+    const monthFormat = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
+    const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+
+    const $ = selector => document.querySelector(selector)
+    const form = $('#form')
+
+    let db
+    let currentMonth = toMonthKey(new Date())
+    let movements = []
+
+    // ---------- Utilidades de fechas ----------
+    // Guardamos las fechas como texto 'AAAA-MM-DD': se ordenan alfabéticamente
+    // igual que cronológicamente, perfecto para el índice de IndexedDB
+    function pad(number) {
+      return String(number).padStart(2, '0')
+    }
+
+    function toMonthKey(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
+    }
+
+    function toDateKey(date) {
+      return `${toMonthKey(date)}-${pad(date.getDate())}`
+    }
+
+    // new Date('2026-09-05') se interpreta en UTC y puede cambiar de día;
+    // construyendo la fecha por partes usamos la hora local
+    function parseDateKey(key) {
+      const [year, month, day = 1] = key.split('-').map(Number)
+      return new Date(year, month - 1, day)
+    }
+
+    function shiftMonth(monthKey, delta) {
+      const date = parseDateKey(monthKey)
+      date.setMonth(date.getMonth() + delta)
+      return toMonthKey(date)
+    }
+
+    // ---------- Datos de ejemplo ----------
+    function createSeed() {
+      const today = new Date()
+      const thisMonth = toMonthKey(today)
+      const lastMonth = shiftMonth(thisMonth, -1)
+      // En el mes actual no creamos movimientos en el futuro
+      const day = (month, number) => month === thisMonth
+        ? `${month}-${pad(Math.min(number, today.getDate()))}`
+        : `${month}-${pad(number)}`
+
+      const sample = (month, type, category, description, amount, dayNumber) => ({
+        type, category, description, amount, date: day(month, dayNumber), createdAt: Date.now()
+      })
+
+      return [
+        sample(lastMonth, 'income', 'nomina', 'Nómina', 2450, 1),
+        sample(lastMonth, 'expense', 'vivienda', 'Alquiler', 850, 2),
+        sample(lastMonth, 'expense', 'comida', 'Supermercado', 231.4, 10),
+        sample(lastMonth, 'expense', 'ocio', 'Vacaciones', 420, 14),
+        sample(lastMonth, 'expense', 'facturas', 'Luz e internet', 98.75, 8),
+        sample(lastMonth, 'expense', 'transporte', 'Tren', 64.2, 20),
+        sample(thisMonth, 'income', 'nomina', 'Nómina', 2450, 1),
+        sample(thisMonth, 'income', 'freelance', 'Proyecto web', 380, 12),
+        sample(thisMonth, 'expense', 'vivienda', 'Alquiler', 850, 2),
+        sample(thisMonth, 'expense', 'transporte', 'Abono transporte', 54.6, 3),
+        sample(thisMonth, 'expense', 'comida', 'Supermercado', 142.35, 5),
+        sample(thisMonth, 'expense', 'facturas', 'Luz e internet', 112.4, 8),
+        sample(thisMonth, 'expense', 'salud', 'Farmacia', 18.9, 9),
+        sample(thisMonth, 'expense', 'ocio', 'Cine y cena', 48.5, 13),
+        sample(thisMonth, 'expense', 'compras', 'Zapatillas', 89.99, 15),
+        sample(thisMonth, 'expense', 'comida', 'Mercado', 96.8, 19),
+        sample(thisMonth, 'expense', 'transporte', 'Gasolina', 60, 21),
+        sample(thisMonth, 'expense', 'ocio', 'Concierto', 65, 26)
+      ]
+    }
+
+    // ---------- IndexedDB ----------
+    // La API de IndexedDB es antigua y funciona con eventos (onsuccess/onerror).
+    // Este pequeño helper envuelve cualquier petición en una promesa para
+    // poder usar async/await en el resto del código
+    function promisify(request) {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+    }
+
+    function openDatabase() {
+      const request = indexedDB.open(DB_NAME, DB_VERSION)
+
+      // Solo se ejecuta al crear la base de datos (o al subir DB_VERSION).
+      // Aquí definimos el "esquema": el almacén de objetos y sus índices
+      request.onupgradeneeded = () => {
+        const database = request.result
+        const store = database.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true })
+        // El índice por fecha nos permite consultar un rango (un mes) sin
+        // tener que leer todos los movimientos
+        store.createIndex('fecha', 'date')
+
+        // Como solo ocurre una vez, es el sitio ideal para los datos de ejemplo
+        createSeed().forEach(movement => store.add(movement))
+      }
+
+      return promisify(request)
+    }
+
+    function getStore(mode = 'readonly') {
+      return db.transaction(STORE, mode).objectStore(STORE)
+    }
+
+    function addMovement(movement) {
+      return promisify(getStore('readwrite').add(movement))
+    }
+
+    function deleteMovement(id) {
+      return promisify(getStore('readwrite').delete(id))
+    }
+
+    function getMovementsByMonth(monthKey) {
+      // Como las fechas son texto, '2026-09-01' <= fecha <= '2026-09-31'
+      // abarca todo el mes (aunque el día 31 no exista)
+      const range = IDBKeyRange.bound(`${monthKey}-01`, `${monthKey}-31`)
+      return promisify(getStore().index('fecha').getAll(range))
+    }
+
+    // ---------- Cálculos ----------
+    function sumBy(list, type) {
+      return list
+        .filter(movement => movement.type === type)
+        .reduce((total, movement) => total + movement.amount, 0)
+    }
+
+    function expensesByCategory(list) {
+      const totals = {}
+      for (const { type, category, amount } of list) {
+        if (type !== 'expense') continue
+        totals[category] = (totals[category] ?? 0) + amount
+      }
+      return Object.entries(totals)
+        .map(([category, amount]) => ({ category, amount, ...CATEGORIES.expense[category] }))
+        .sort((a, b) => b.amount - a.amount)
+    }
+
+    // ---------- Renderizado ----------
+    function renderSummary() {
+      const income = sumBy(movements, 'income')
+      const expense = sumBy(movements, 'expense')
+
+      $('#balance').textContent = currency.format(income - expense)
+      $('#total-income').textContent = currency.format(income)
+      $('#total-expense').textContent = currency.format(expense)
+    }
+
+    // Cada categoría es un <circle> con el mismo radio. Con r = 15.9155 la
+    // circunferencia mide exactamente 100 (2·π·r), así que podemos usar
+    // porcentajes directamente en stroke-dasharray: "30 70" pinta un trazo
+    // del 30 % y deja un hueco del 70 %. Con stroke-dashoffset desplazamos
+    // cada segmento para que empiece donde terminó el anterior
+    function renderChart() {
+      const groups = expensesByCategory(movements)
+      const total = groups.reduce((sum, group) => sum + group.amount, 0)
+      const segments = $('#segments')
+      const legend = $('#legend')
+
+      $('#chart-total').textContent = currency.format(total)
+
+      let accumulated = 0
+      segments.innerHTML = groups.map(({ category, color, amount }) => {
+        const percentage = (amount / total) * 100
+        // El trazo de un círculo empieza a las 3 en punto; un offset de 25
+        // lo lleva a las 12. Restamos lo acumulado para encadenar segmentos
+        const offset = 25 - accumulated
+        accumulated += percentage
+        // Dejamos un pequeño hueco entre segmentos para que se distingan
+        const visible = Math.max(percentage - 0.6, 0.1)
+        return `<circle class="segment" data-category="${category}" cx="21" cy="21" r="15.9155"
+          stroke="${color}" stroke-dasharray="${visible} ${100 - visible}" stroke-dashoffset="${offset}"></circle>`
+      }).join('')
+
+      if (groups.length === 0) {
+        legend.innerHTML = '<li class="empty">Sin gastos este mes 🎉</li>'
+        return
+      }
+
+      legend.innerHTML = groups.map(({ category, label, emoji, color, amount }) => `
+        <li data-category="${category}" style="--color: ${color}">
+          <span class="dot"></span>
+          <span>${emoji} ${label}</span>
+          <span class="pct">${percent.format(amount / total)}</span>
+          <span class="amount">${currency.format(amount)}</span>
+        </li>
+      `).join('')
+    }
+
+    function escapeHTML(text) {
+      const div = document.createElement('div')
+      div.textContent = text
+      return div.innerHTML
+    }
+
+    function renderList() {
+      const list = $('#movements')
+      const sorted = movements.toSorted((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+
+      $('#count').textContent = `${movements.length} ${movements.length === 1 ? 'movimiento' : 'movimientos'}`
+
+      if (sorted.length === 0) {
+        list.innerHTML = '<li class="empty">No hay movimientos en este mes. ¡Añade el primero!</li>'
+        return
+      }
+
+      list.innerHTML = sorted.map(movement => {
+        const { id, type, category, description, amount, date } = movement
+        const { emoji, label, color } = CATEGORIES[type][category] ?? CATEGORIES[type].otros
+        const sign = type === 'income' ? '+' : '−'
+        return `
+          <li class="movement ${type}" style="--color: ${color}">
+            <span class="icon">${emoji}</span>
+            <div>
+              <p>${escapeHTML(description)}</p>
+              <small>${label} · ${dayFormat.format(parseDateKey(date))}</small>
+            </div>
+            <span class="amount">${sign}${currency.format(amount)}</span>
+            <button class="icon-button delete" data-id="${id}" aria-label="Borrar ${escapeHTML(description)}">✕</button>
+          </li>
+        `
+      }).join('')
+    }
+
+    function renderMonthLabel() {
+      const label = monthFormat.format(parseDateKey(currentMonth))
+      $('#month-label').textContent = label[0].toUpperCase() + label.slice(1)
+    }
+
+    async function refresh() {
+      movements = await getMovementsByMonth(currentMonth)
+      renderMonthLabel()
+      renderSummary()
+      renderChart()
+      renderList()
+    }
+
+    // ---------- Formulario ----------
+    function fillCategories(type) {
+      const select = form.elements.category
+      select.innerHTML = Object.entries(CATEGORIES[type])
+        .map(([value, { label, emoji }]) => `<option value="${value}">${emoji} ${label}</option>`)
+        .join('')
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault()
+      const data = new FormData(form)
+      const amount = Number(data.get('amount'))
+      if (!Number.isFinite(amount) || amount <= 0) return
+
+      const movement = {
+        type: data.get('type'),
+        category: data.get('category'),
+        description: data.get('description').trim(),
+        amount: Math.round(amount * 100) / 100,
+        date: data.get('date'),
+        createdAt: Date.now()
+      }
+
+      await addMovement(movement)
+
+      // Si el movimiento es de otro mes, navegamos a ese mes para verlo
+      currentMonth = movement.date.slice(0, 7)
+      form.elements.description.value = ''
+      form.elements.amount.value = ''
+      form.elements.description.focus()
+      await refresh()
+    }
+
+    async function handleDelete(event) {
+      const button = event.target.closest('.delete')
+      if (!button) return
+      await deleteMovement(Number(button.dataset.id))
+      await refresh()
+    }
+
+    // ---------- Exportar a CSV ----------
+    // Usamos ';' como separador y coma decimal para que Excel en español
+    // lo abra correctamente. El BOM (﻿) le indica que el texto es UTF-8
+    function toCSV(list) {
+      const escape = value => `"${String(value).replaceAll('"', '""')}"`
+      const header = ['Fecha', 'Tipo', 'Categoría', 'Descripción', 'Importe']
+      const rows = list
+        .toSorted((a, b) => a.date.localeCompare(b.date))
+        .map(({ date, type, category, description, amount }) => [
+          date,
+          type === 'income' ? 'Ingreso' : 'Gasto',
+          CATEGORIES[type][category]?.label ?? category,
+          description,
+          (type === 'income' ? amount : -amount).toFixed(2).replace('.', ',')
+        ])
+
+      return '﻿' + [header, ...rows].map(row => row.map(escape).join(';')).join('\r\n')
+    }
+
+    function exportCSV() {
+      const blob = new Blob([toCSV(movements)], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `gastos-${currentMonth}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+
+    // ---------- Resaltar categoría al pasar por la leyenda ----------
+    function highlightCategory(category) {
+      document.querySelectorAll('.segment').forEach(segment => {
+        segment.classList.toggle('is-dimmed', Boolean(category) && segment.dataset.category !== category)
+      })
+    }
+
+    // ---------- Eventos ----------
+    form.addEventListener('submit', handleSubmit)
+    form.addEventListener('change', event => {
+      if (event.target.name === 'type') fillCategories(event.target.value)
+    })
+
+    $('#movements').addEventListener('click', handleDelete)
+    $('#export').addEventListener('click', exportCSV)
+
+    $('#prev-month').addEventListener('click', () => {
+      currentMonth = shiftMonth(currentMonth, -1)
+      refresh()
+    })
+
+    $('#next-month').addEventListener('click', () => {
+      currentMonth = shiftMonth(currentMonth, 1)
+      refresh()
+    })
+
+    $('#legend').addEventListener('mouseover', event => {
+      highlightCategory(event.target.closest('li')?.dataset.category)
+    })
+    $('#legend').addEventListener('mouseleave', () => highlightCategory(null))
+
+    // ---------- Inicio ----------
+    async function init() {
+      fillCategories('expense')
+      form.elements.date.value = toDateKey(new Date())
+
+      try {
+        db = await openDatabase()
+        await refresh()
+      } catch (error) {
+        console.error(error)
+        $('#movements').innerHTML = '<li class="empty">No se pudo abrir IndexedDB en este navegador 😢</li>'
+      }
+    }
+
+    init()
+  </script>
+</body>
+
+</html>

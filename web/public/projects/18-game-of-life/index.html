@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>18 - Juego de la vida</title>
+  <style>
+    :root {
+      --bg: #05070d;
+      --surface: #0d121d;
+      --border: #1c2433;
+      --text: #e5e9f0;
+      --muted: #8a94a8;
+      --accent: #2dd4bf;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 14px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    h1 {
+      margin: 0 8px 0 0;
+      font-size: 1.1rem;
+      white-space: nowrap;
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button,
+    select {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+
+    button:hover,
+    select:hover {
+      border-color: var(--accent);
+    }
+
+    #play {
+      min-width: 104px;
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #042f2e;
+      font-weight: 700;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    input[type='range'] {
+      width: 110px;
+      accent-color: var(--accent);
+    }
+
+    .stats {
+      margin-left: auto;
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stats strong {
+      color: var(--text);
+    }
+
+    .world {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    canvas {
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .hint {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      margin: 0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(13, 18, 29, 0.85);
+      font-size: 0.78rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+  </style>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const context = canvas.getContext('2d')
+    const $world = document.querySelector('.world')
+    const $play = document.querySelector('#play')
+    const $step = document.querySelector('#step')
+    const $random = document.querySelector('#random')
+    const $clear = document.querySelector('#clear')
+    const $speed = document.querySelector('#speed')
+    const $pattern = document.querySelector('#pattern')
+    const $generation = document.querySelector('#generation')
+    const $population = document.querySelector('#population')
+
+    // CONSTANTES
+    const CELL_SIZE = window.innerWidth < 640 ? 9 : 12 // píxeles CSS por celda
+    const RANDOM_DENSITY = 0.28
+
+    // Patrones en formato "texto plano": O = viva, . = muerta
+    const PATTERNS = {
+      glider: ['.O.', '..O', 'OOO'],
+      lwss: ['.O..O', 'O....', 'O...O', 'OOOO.'],
+      pulsar: [
+        '..OOO...OOO..',
+        '.............',
+        'O....O.O....O',
+        'O....O.O....O',
+        'O....O.O....O',
+        '..OOO...OOO..',
+        '.............',
+        '..OOO...OOO..',
+        'O....O.O....O',
+        'O....O.O....O',
+        'O....O.O....O',
+        '.............',
+        '..OOO...OOO..'
+      ],
+      pentadecathlon: ['..O....O..', 'OO.OOOO.OO', '..O....O..'],
+      gosper: [
+        '........................O...........',
+        '......................O.O...........',
+        '............OO......OO............OO',
+        '...........O...O....OO............OO',
+        'OO........O.....O...OO..............',
+        'OO........O...O.OO....O.O...........',
+        '..........O.....O.......O...........',
+        '...........O...O....................',
+        '............OO......................'
+      ],
+      rPentomino: ['.OO', 'OO.', '.O.'],
+      acorn: ['.O.....', '...O...', 'OO..OOO']
+    }
+
+    // ESTADO
+    let cols = 0
+    let rows = 0
+    // Doble buffer: `cells` es la generación actual y `next` la siguiente.
+    // Uint8Array es un array tipado: memoria contigua, 1 byte por celda
+    // y mucho más rápido que un array de arrays de booleanos
+    let cells = new Uint8Array(0)
+    let next = new Uint8Array(0)
+    let generation = 0
+    let isPlaying = true
+    let lastFrameTime = 0
+    let accumulator = 0
+
+    // La matriz 2D se guarda "aplanada" en un array 1D:
+    // la celda (x, y) está en la posición y * cols + x
+    function index(x, y) {
+      return y * cols + x
+    }
+
+    function countNeighbours(x, y) {
+      // Bordes toroidales: lo que sale por la derecha entra por la izquierda
+      // (y lo mismo arriba/abajo). El módulo hace el "wrap"; sumamos cols/rows
+      // antes para que -1 no dé un resultado negativo
+      const left = (x - 1 + cols) % cols
+      const right = (x + 1) % cols
+      const up = ((y - 1 + rows) % rows) * cols
+      const row = y * cols
+      const down = ((y + 1) % rows) * cols
+
+      return cells[up + left] + cells[up + x] + cells[up + right] +
+        cells[row + left] + cells[row + right] +
+        cells[down + left] + cells[down + x] + cells[down + right]
+    }
+
+    function step() {
+      // ¿Por qué no modificar `cells` directamente? Porque al calcular una
+      // celda necesitamos a sus vecinas TAL Y COMO ESTABAN en la generación
+      // actual. Si las fuéramos cambiando sobre la marcha, las celdas de más
+      // abajo verían una mezcla de la generación actual y la siguiente
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const neighbours = countNeighbours(x, y)
+          const isAlive = cells[index(x, y)] === 1
+
+          // Reglas de Conway (B3/S23):
+          // - Una célula viva con 2 o 3 vecinas sobrevive
+          // - Una célula muerta con exactamente 3 vecinas nace
+          // - En cualquier otro caso muere (soledad o superpoblación)
+          next[index(x, y)] = neighbours === 3 || (isAlive && neighbours === 2) ? 1 : 0
+        }
+      }
+
+      // Intercambiamos los buffers: la siguiente pasa a ser la actual.
+      // Así no creamos un array nuevo en cada generación
+      const temp = cells
+      cells = next
+      next = temp
+
+      generation++
+      updateStats()
+    }
+
+    // TAMAÑO DEL MUNDO
+    function resizeWorld() {
+      const { width, height } = $world.getBoundingClientRect()
+      const newCols = Math.max(10, Math.floor(width / CELL_SIZE))
+      const newRows = Math.max(10, Math.floor(height / CELL_SIZE))
+
+      if (newCols !== cols || newRows !== rows) {
+        // Copiamos el contenido anterior centrado en el nuevo tamaño
+        const newCells = new Uint8Array(newCols * newRows)
+        const offsetX = Math.floor((newCols - cols) / 2)
+        const offsetY = Math.floor((newRows - rows) / 2)
+
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            const nx = x + offsetX
+            const ny = y + offsetY
+            if (nx >= 0 && ny >= 0 && nx < newCols && ny < newRows) {
+              newCells[ny * newCols + nx] = cells[index(x, y)]
+            }
+          }
+        }
+
+        cols = newCols
+        rows = newRows
+        cells = newCells
+        next = new Uint8Array(cols * rows)
+      }
+
+      const ratio = window.devicePixelRatio || 1
+      canvas.style.width = `${cols * CELL_SIZE}px`
+      canvas.style.height = `${rows * CELL_SIZE}px`
+      canvas.width = cols * CELL_SIZE * ratio
+      canvas.height = rows * CELL_SIZE * ratio
+      context.setTransform(ratio, 0, 0, ratio, 0, 0)
+
+      updateStats()
+      draw()
+    }
+
+    // DIBUJO
+    function draw() {
+      const width = cols * CELL_SIZE
+      const height = rows * CELL_SIZE
+
+      context.fillStyle = '#05070d'
+      context.fillRect(0, 0, width, height)
+      drawGridLines(width, height)
+
+      // Un único degradado para todas las celdas: más barato que
+      // cambiar fillStyle en cada una
+      const gradient = context.createLinearGradient(0, 0, width, height)
+      gradient.addColorStop(0, '#2dd4bf')
+      gradient.addColorStop(0.5, '#60a5fa')
+      gradient.addColorStop(1, '#c084fc')
+      context.fillStyle = gradient
+
+      const gap = CELL_SIZE > 6 ? 1 : 0
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (cells[index(x, y)] === 1) {
+            context.fillRect(x * CELL_SIZE + gap, y * CELL_SIZE + gap, CELL_SIZE - gap * 2, CELL_SIZE - gap * 2)
+          }
+        }
+      }
+    }
+
+    function drawGridLines(width, height) {
+      context.strokeStyle = 'rgba(255, 255, 255, 0.035)'
+      context.lineWidth = 1
+      context.beginPath()
+
+      for (let x = 0; x <= cols; x++) {
+        context.moveTo(x * CELL_SIZE + 0.5, 0)
+        context.lineTo(x * CELL_SIZE + 0.5, height)
+      }
+      for (let y = 0; y <= rows; y++) {
+        context.moveTo(0, y * CELL_SIZE + 0.5)
+        context.lineTo(width, y * CELL_SIZE + 0.5)
+      }
+
+      context.stroke()
+    }
+
+    function updateStats() {
+      let population = 0
+      for (const cell of cells) population += cell
+
+      $generation.textContent = generation.toLocaleString('es')
+      $population.textContent = population.toLocaleString('es')
+    }
+
+    // BUCLE PRINCIPAL
+    function loop(now) {
+      const delta = Math.min(now - lastFrameTime, 250)
+      lastFrameTime = now
+
+      if (isPlaying) {
+        // La velocidad está en generaciones por segundo
+        const msPerGeneration = 1000 / Number($speed.value)
+        accumulator += delta
+
+        let hasChanged = false
+        while (accumulator >= msPerGeneration) {
+          accumulator -= msPerGeneration
+          step()
+          hasChanged = true
+        }
+
+        if (hasChanged) draw()
+      }
+
+      window.requestAnimationFrame(loop)
+    }
+
+    // ACCIONES
+    function setPlaying(value) {
+      isPlaying = value
+      accumulator = 0
+      $play.textContent = isPlaying ? '⏸ Pausa' : '▶ Play'
+    }
+
+    function randomize() {
+      for (let i = 0; i < cells.length; i++) {
+        cells[i] = Math.random() < RANDOM_DENSITY ? 1 : 0
+      }
+      generation = 0
+      updateStats()
+      draw()
+    }
+
+    function clearWorld() {
+      cells.fill(0)
+      generation = 0
+      setPlaying(false)
+      updateStats()
+      draw()
+    }
+
+    function placePattern(name) {
+      const pattern = PATTERNS[name]
+      if (!pattern) return
+
+      const height = pattern.length
+      const width = pattern[0].length
+      const startX = Math.floor((cols - width) / 2)
+      const startY = Math.floor((rows - height) / 2)
+
+      cells.fill(0)
+      for (let dy = 0; dy < height; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          // Usamos el módulo también aquí por si el patrón es más grande que el mundo
+          const x = (startX + dx + cols) % cols
+          const y = (startY + dy + rows) % rows
+          if (pattern[dy][dx] === 'O') cells[index(x, y)] = 1
+        }
+      }
+
+      generation = 0
+      updateStats()
+      draw()
+    }
+
+    // DIBUJAR CON EL RATÓN
+    let drawValue = null
+    let lastCell = null
+
+    function getCellFromEvent(event) {
+      const rect = canvas.getBoundingClientRect()
+      const x = Math.floor((event.clientX - rect.left) / CELL_SIZE)
+      const y = Math.floor((event.clientY - rect.top) / CELL_SIZE)
+      return {
+        x: Math.min(cols - 1, Math.max(0, x)),
+        y: Math.min(rows - 1, Math.max(0, y))
+      }
+    }
+
+    // Si el ratón se mueve rápido, entre dos eventos puede saltarse celdas.
+    // Rellenamos el hueco recorriendo la línea entre ambos puntos
+    function paintLine(from, to) {
+      const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y), 1)
+      for (let i = 0; i <= steps; i++) {
+        const x = Math.round(from.x + ((to.x - from.x) * i) / steps)
+        const y = Math.round(from.y + ((to.y - from.y) * i) / steps)
+        cells[index(x, y)] = drawValue
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      canvas.setPointerCapture(event.pointerId)
+      const cell = getCellFromEvent(event)
+
+      // Si empiezas sobre una célula viva, borras; si no, dibujas
+      drawValue = cells[index(cell.x, cell.y)] === 1 ? 0 : 1
+      lastCell = cell
+      paintLine(cell, cell)
+      updateStats()
+      draw()
+    })
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (drawValue === null) return
+      const cell = getCellFromEvent(event)
+      paintLine(lastCell, cell)
+      lastCell = cell
+      updateStats()
+      draw()
+    })
+
+    function stopDrawing() {
+      drawValue = null
+      lastCell = null
+    }
+
+    canvas.addEventListener('pointerup', stopDrawing)
+    canvas.addEventListener('pointercancel', stopDrawing)
+
+    // EVENTOS
+    $play.addEventListener('click', () => setPlaying(!isPlaying))
+
+    $step.addEventListener('click', () => {
+      setPlaying(false)
+      step()
+      draw()
+    })
+
+    $random.addEventListener('click', randomize)
+    $clear.addEventListener('click', clearWorld)
+
+    $pattern.addEventListener('change', () => {
+      placePattern($pattern.value)
+      $pattern.value = ''
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.target.matches('select, input')) return
+
+      const actions = {
+        Space: () => setPlaying(!isPlaying),
+        KeyN: () => $step.click(),
+        ArrowRight: () => $step.click(),
+        KeyR: randomize,
+        KeyC: clearWorld
+      }
+
+      const action = actions[event.code]
+      if (!action) return
+      event.preventDefault()
+      action()
+    })
+
+    new ResizeObserver(resizeWorld).observe($world)
+
+    resizeWorld()
+    randomize()
+    setPlaying(true)
+    window.requestAnimationFrame((now) => {
+      lastFrameTime = now
+      loop(now)
+    })
+  </script>
+</head>
+
+<body>
+  <header>
+    <h1>🧬 Juego de la vida</h1>
+
+    <div class="group">
+      <button id="play">⏸ Pausa</button>
+      <button id="step" title="Siguiente generación (N)">⏭ Paso</button>
+    </div>
+
+    <label>Velocidad <input id="speed" type="range" min="1" max="60" value="15"></label>
+
+    <div class="group">
+      <button id="random" title="Rellenar al azar (R)">🎲 Aleatorio</button>
+      <button id="clear" title="Vaciar (C)">🧹 Limpiar</button>
+      <select id="pattern" aria-label="Insertar patrón">
+        <option value="">✨ Patrones…</option>
+        <option value="glider">Planeador (glider)</option>
+        <option value="lwss">Nave ligera (LWSS)</option>
+        <option value="pulsar">Púlsar</option>
+        <option value="pentadecathlon">Pentadecatlón</option>
+        <option value="gosper">Cañón de Gosper</option>
+        <option value="rPentomino">R-pentominó</option>
+        <option value="acorn">Bellota (acorn)</option>
+      </select>
+    </div>
+
+    <div class="stats">
+      <span>Generación <strong id="generation">0</strong></span>
+      <span>Población <strong id="population">0</strong></span>
+    </div>
+  </header>
+
+  <main class="world">
+    <canvas aria-label="Rejilla del juego de la vida"></canvas>
+    <p class="hint">Haz clic y arrastra para dibujar o borrar células</p>
+  </main>
+</body>
+
+</html>

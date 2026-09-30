@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>56 - Efectos de texto</title>
+  <style>
+    :root {
+      --bg: #0b0b12;
+      --card: #14141f;
+      --line: #262636;
+      --text: #ecebf5;
+      --muted: #8d8ca6;
+      --accent: #a78bfa;
+      --accent-2: #22d3ee;
+      --green: #4ade80;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(167, 139, 250, .14), transparent 35%),
+        radial-gradient(circle at 90% 90%, rgba(34, 211, 238, .1), transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 8px 4px 150px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1;
+      letter-spacing: -.03em;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    aside p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .graphemes {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .graphemes h2 {
+      margin: 0;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+    }
+
+    .graphemes dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      font-size: 13px;
+    }
+
+    .graphemes dt {
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+    }
+
+    .graphemes dd {
+      margin: 0;
+      font-weight: 700;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .graphemes dd.good {
+      color: var(--green);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .chips span {
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: #1e1e2d;
+      border: 1px solid var(--line);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-rows: minmax(250px, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background: linear-gradient(180deg, #171724, var(--card));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      min-width: 0;
+    }
+
+    .card header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 15px;
+      flex: 1;
+    }
+
+    .card h3 small {
+      color: var(--muted);
+      font-weight: 500;
+      margin-right: 6px;
+    }
+
+    .tag {
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      padding: 3px 8px;
+      border-radius: 99px;
+      color: var(--accent-2);
+      background: rgba(34, 211, 238, .1);
+    }
+
+    .stage {
+      flex: 1;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      font-size: clamp(22px, 2.6vw, 32px);
+      font-weight: 700;
+      line-height: 1.3;
+      padding: 12px;
+      border-radius: 12px;
+      background: #0e0e17;
+      border: 1px solid #1e1e2c;
+      overflow-wrap: anywhere;
+      min-height: 120px;
+    }
+
+    form {
+      display: flex;
+      gap: 8px;
+    }
+
+    input,
+    select {
+      flex: 1;
+      min-width: 0;
+      font: inherit;
+      font-size: 14px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0e0e17;
+      color: var(--text);
+    }
+
+    select {
+      flex: 0 0 auto;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    button {
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: var(--accent);
+      color: #140f24;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      filter: brightness(1.1);
+    }
+
+    button.ghost {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--text);
+      padding: 6px 10px;
+    }
+
+    /* Máquina de escribir */
+    .typewriter {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-weight: 600;
+    }
+
+    .typewriter .prompt {
+      color: var(--green);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: .55em;
+      height: 1.1em;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      background: var(--accent);
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    /* Scramble */
+    .scramble {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      letter-spacing: .02em;
+    }
+
+    .scramble .glitch {
+      color: var(--green);
+      opacity: .75;
+    }
+
+    /* Contador */
+    .counter {
+      gap: 14px;
+    }
+
+    .counter .big {
+      font-size: clamp(36px, 4.4vw, 58px);
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(90deg, #fff, var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .counter .stats {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .counter .stats strong {
+      display: block;
+      font-size: 20px;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Palabra a palabra */
+    .words {
+      font-weight: 650;
+      text-wrap: balance;
+    }
+
+    .word {
+      display: inline-block;
+      opacity: 0;
+      filter: blur(10px);
+      transform: translateY(14px);
+      animation: word-in .6s cubic-bezier(.2, .8, .2, 1) forwards;
+      animation-delay: calc(var(--i) * 110ms);
+    }
+
+    @keyframes word-in {
+      to {
+        opacity: 1;
+        filter: blur(0);
+        transform: none;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        padding-bottom: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 16px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tag {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <aside>
+      <h1>Efectos de texto</h1>
+      <p>Cuatro efectos reutilizables hechos con <strong>async/await</strong>, <strong>requestAnimationFrame</strong> e
+        <strong>Intl.Segmenter</strong>. Escribe tu propio texto en cada tarjeta, ¡emojis incluidos!</p>
+
+      <section class="graphemes">
+        <h2>¿Cuántos caracteres tiene?</h2>
+        <input id="grapheme-input" value="Hola 👋🏽 👩‍💻 🇪🇸" aria-label="Texto para contar caracteres">
+        <dl>
+          <dt>texto.length</dt>
+          <dd id="count-length"></dd>
+          <dt>[...texto].length</dt>
+          <dd id="count-spread"></dd>
+          <dt>Intl.Segmenter</dt>
+          <dd id="count-graphemes" class="good"></dd>
+        </dl>
+        <div class="chips" id="grapheme-chips"></div>
+      </section>
+    </aside>
+
+    <section class="grid">
+      <article class="card" data-effect="typewriter">
+        <header>
+          <h3><small>01</small>Máquina de escribir</h3>
+          <span class="tag">async/await</span>
+          <button class="ghost" data-action="replay" aria-label="Repetir">↻</button>
+        </header>
+        <div class="stage typewriter">
+          <div><span class="prompt">&gt; </span><span class="output"></span><span class="cursor"></span></div>
+        </div>
+        <form>
+          <input name="text" placeholder="Frases separadas por |" value="Hola, soy una máquina de escribir ⌨️|Escribo y borro en bucle|Y no rompo emojis: 👩‍💻🇪🇸👍🏽">
+          <button>Probar</button>
+        </form>
+      </article>
+
+      <article class="card" data-effect="scramble">
+        <header>
+          <h3><small>02</small>Scramble / decode</h3>
+          <span class="tag">requestAnimationFrame</span>
+          <button class="ghost" data-action="replay" aria-label="Repetir">↻</button>
+        </header>
+        <div class="stage scramble"><span class="output"></span></div>
+        <form>
+          <input name="text" placeholder="Texto a descifrar" value="ACCESO CONCEDIDO 🔓">
+          <button>Probar</button>
+        </form>
+      </article>
+
+      <article class="card" data-effect="counter">
+        <header>
+          <h3><small>03</small>Contador animado</h3>
+          <span class="tag">easing</span>
+          <button class="ghost" data-action="replay" aria-label="Repetir">↻</button>
+        </header>
+        <div class="stage counter">
+          <span class="big output">0</span>
+          <div class="stats">
+            <span><strong data-stat="compact">0</strong>visitas</span>
+            <span><strong data-stat="percent">0</strong>satisfacción</span>
+            <span><strong data-stat="money">0</strong>ahorrado</span>
+          </div>
+        </div>
+        <form>
+          <input name="text" type="number" placeholder="Número final" value="1234567" step="any">
+          <select name="easing" aria-label="Curva de animación">
+            <option value="easeOutExpo">easeOutExpo</option>
+            <option value="easeOutCubic">easeOutCubic</option>
+            <option value="easeInOutQuad">easeInOutQuad</option>
+            <option value="easeOutBack">easeOutBack</option>
+            <option value="linear">linear</option>
+          </select>
+          <button>Probar</button>
+        </form>
+      </article>
+
+      <article class="card" data-effect="words">
+        <header>
+          <h3><small>04</small>Palabra a palabra</h3>
+          <span class="tag">Intl.Segmenter</span>
+          <button class="ghost" data-action="replay" aria-label="Repetir">↻</button>
+        </header>
+        <div class="stage words"><span class="output"></span></div>
+        <form>
+          <input name="text" placeholder="Una frase" value="¡El código más bonito es el que se entiende a la primera! ✨">
+          <button>Probar</button>
+        </form>
+      </article>
+    </section>
+  </main>
+
+  <script type="module">
+    const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@*+=<>/\\{}[]'
+    const TYPE_DELAY = 55
+    const DELETE_DELAY = 28
+    const PAUSE_AFTER_TYPING = 1400
+    const COUNTER_DURATION = 2200
+
+    // ---------- Intl.Segmenter ----------
+    // En JavaScript los strings son UTF-16: un emoji como 👩‍💻 son en realidad
+    // 3 puntos de código (👩 + unión invisible + 💻) y 5 unidades de .length.
+    // Si recortamos el texto con .slice() o [...texto] podemos dejar medio
+    // emoji a la vista. Intl.Segmenter separa por "grafemas", que es lo que
+    // una persona percibe como un único carácter
+    const graphemeSegmenter = new Intl.Segmenter('es', { granularity: 'grapheme' })
+    const wordSegmenter = new Intl.Segmenter('es', { granularity: 'word' })
+
+    function splitGraphemes(text) {
+      return Array.from(graphemeSegmenter.segment(text), ({ segment }) => segment)
+    }
+
+    function escapeHTML(text) {
+      return text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    // ---------- Utilidades con promesas ----------
+    // Un sleep que se puede cancelar con un AbortSignal: así podemos repetir
+    // un efecto sin que el anterior siga escribiendo en el mismo elemento
+    function sleep(ms, signal) {
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) return reject(signal.reason)
+        const timeout = setTimeout(resolve, ms)
+        signal.addEventListener('abort', () => {
+          clearTimeout(timeout)
+          reject(signal.reason)
+        }, { once: true })
+      })
+    }
+
+    // Envuelve un bucle de requestAnimationFrame en una promesa.
+    // `update` recibe el tiempo transcurrido y devuelve true cuando termina
+    function animate(update, signal) {
+      return new Promise((resolve, reject) => {
+        const start = performance.now()
+        function frame(now) {
+          if (signal.aborted) return reject(signal.reason)
+          const finished = update(now - start)
+          if (finished) resolve()
+          else window.requestAnimationFrame(frame)
+        }
+        window.requestAnimationFrame(frame)
+      })
+    }
+
+    // ---------- Efecto 1: máquina de escribir ----------
+    // Gracias a async/await el efecto se lee como una receta secuencial:
+    // escribe letra a letra, espera, borra y pasa a la siguiente frase
+    async function typewriter(element, phrases, signal) {
+      while (true) {
+        for (const phrase of phrases) {
+          const graphemes = splitGraphemes(phrase)
+
+          for (let i = 1; i <= graphemes.length; i++) {
+            element.textContent = graphemes.slice(0, i).join('')
+            // Un poco de aleatoriedad hace que parezca escrito por una persona
+            await sleep(TYPE_DELAY + Math.random() * 70, signal)
+          }
+
+          await sleep(PAUSE_AFTER_TYPING, signal)
+
+          for (let i = graphemes.length - 1; i >= 0; i--) {
+            element.textContent = graphemes.slice(0, i).join('')
+            await sleep(DELETE_DELAY, signal)
+          }
+
+          await sleep(350, signal)
+        }
+      }
+    }
+
+    // ---------- Efecto 2: scramble / decode ----------
+    // Cada grafema tiene un momento en el que se "descifra". Hasta entonces
+    // mostramos símbolos aleatorios que cambian en cada frame de rAF
+    function randomGlyph() {
+      return GLYPHS[Math.floor(Math.random() * GLYPHS.length)]
+    }
+
+    function scramble(element, text, signal) {
+      const queue = splitGraphemes(text).map((char, index) => ({
+        char,
+        revealAt: 300 + index * 45 + Math.random() * 500,
+        glyph: randomGlyph()
+      }))
+
+      return animate(elapsed => {
+        let revealed = 0
+
+        element.innerHTML = queue.map(item => {
+          // Los espacios no se cifran para mantener la forma de las palabras
+          if (item.char.trim() === '' || elapsed >= item.revealAt) {
+            revealed++
+            return escapeHTML(item.char)
+          }
+          // Cambiamos el símbolo solo a veces para que no sea un parpadeo loco
+          if (Math.random() < 0.35) item.glyph = randomGlyph()
+          return `<span class="glitch">${escapeHTML(item.glyph)}</span>`
+        }).join('')
+
+        return revealed === queue.length
+      }, signal)
+    }
+
+    // ---------- Efecto 3: contador animado ----------
+    // Una función de easing transforma el progreso lineal (0 → 1) en una curva:
+    // así el número arranca rápido y frena suavemente al llegar al final
+    const EASINGS = {
+      linear: t => t,
+      easeOutCubic: t => 1 - (1 - t) ** 3,
+      easeOutExpo: t => t === 1 ? 1 : 1 - 2 ** (-10 * t),
+      easeInOutQuad: t => t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2,
+      easeOutBack: t => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2
+    }
+
+    const FORMATS = {
+      number: new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }),
+      decimal: new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }),
+      compact: new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 }),
+      percent: new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 1 }),
+      money: new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', notation: 'compact' })
+    }
+
+    function countTo(elements, target, easingName, signal) {
+      const ease = EASINGS[easingName] ?? EASINGS.easeOutExpo
+      const hasDecimals = !Number.isInteger(target)
+      const mainFormat = hasDecimals ? FORMATS.decimal : FORMATS.number
+
+      return animate(elapsed => {
+        const progress = Math.min(elapsed / COUNTER_DURATION, 1)
+        const eased = ease(progress)
+
+        elements.main.textContent = mainFormat.format(target * eased)
+        elements.compact.textContent = FORMATS.compact.format(target * 3.7 * eased)
+        elements.percent.textContent = FORMATS.percent.format(0.987 * eased)
+        elements.money.textContent = FORMATS.money.format(target * 0.042 * eased)
+
+        return progress === 1
+      }, signal)
+    }
+
+    // ---------- Efecto 4: palabra a palabra ----------
+    // Con granularity 'word' el segmentador encuentra las palabras incluso en
+    // idiomas sin espacios (prueba con 吾輩は猫である). Los signos de
+    // puntuación se pegan a su palabra para que no aparezcan sueltos
+    function toWordTokens(text) {
+      const tokens = []
+      let prefix = ''
+
+      for (const { segment, isWordLike } of wordSegmenter.segment(text)) {
+        const last = tokens.at(-1)
+
+        if (/^\s+$/.test(segment)) {
+          if (prefix) tokens.push({ word: prefix })
+          prefix = ''
+          tokens.push({ space: segment })
+        } else if (isWordLike) {
+          tokens.push({ word: prefix + segment })
+          prefix = ''
+        } else if (last?.word && !prefix) {
+          last.word += segment // signo de cierre: "Hola," o "mundo!"
+        } else {
+          prefix += segment // signo de apertura o emoji suelto: "¡Hola"
+        }
+      }
+
+      if (prefix) tokens.push({ word: prefix })
+      return tokens
+    }
+
+    function revealWords(element, text) {
+      let index = 0
+      element.innerHTML = toWordTokens(text).map(token => token.space !== undefined
+        ? token.space
+        : `<span class="word" style="--i: ${index++}">${escapeHTML(token.word)}</span>`
+      ).join('')
+
+      // Las animaciones CSS también exponen promesas: esperamos a que acaben todas
+      return Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished))
+    }
+
+    // ---------- Conexión con las tarjetas ----------
+    const EFFECTS = {
+      typewriter: (card, text, signal) => {
+        const phrases = text.split('|').map(phrase => phrase.trim()).filter(Boolean)
+        return typewriter(card.querySelector('.output'), phrases.length ? phrases : ['…'], signal)
+      },
+      scramble: (card, text, signal) => scramble(card.querySelector('.output'), text || '???', signal),
+      counter: (card, text, signal) => {
+        const target = Number.parseFloat(text)
+        const elements = {
+          main: card.querySelector('.output'),
+          compact: card.querySelector('[data-stat="compact"]'),
+          percent: card.querySelector('[data-stat="percent"]'),
+          money: card.querySelector('[data-stat="money"]')
+        }
+        const easing = card.querySelector('[name="easing"]').value
+        return countTo(elements, Number.isFinite(target) ? target : 0, easing, signal)
+      },
+      words: (card, text) => revealWords(card.querySelector('.output'), text)
+    }
+
+    const controllers = new WeakMap()
+
+    function runEffect(card) {
+      // Cancelamos la ejecución anterior de esta tarjeta antes de empezar otra
+      controllers.get(card)?.abort()
+      const controller = new AbortController()
+      controllers.set(card, controller)
+
+      const text = card.querySelector('[name="text"]').value.trim()
+      EFFECTS[card.dataset.effect](card, text, controller.signal)
+        .catch(error => {
+          if (error?.name !== 'AbortError') console.error(error)
+        })
+    }
+
+    document.querySelectorAll('.card').forEach(card => {
+      card.querySelector('form').addEventListener('submit', event => {
+        event.preventDefault()
+        runEffect(card)
+      })
+      card.querySelector('[data-action="replay"]').addEventListener('click', () => runEffect(card))
+      card.querySelector('select')?.addEventListener('change', () => runEffect(card))
+    })
+
+    // ---------- Contador de grafemas ----------
+    function updateGraphemeCounter() {
+      const text = document.querySelector('#grapheme-input').value
+      const graphemes = splitGraphemes(text)
+
+      document.querySelector('#count-length').textContent = text.length
+      document.querySelector('#count-spread').textContent = [...text].length
+      document.querySelector('#count-graphemes').textContent = graphemes.length
+      document.querySelector('#grapheme-chips').innerHTML = graphemes
+        .map(grapheme => `<span>${grapheme === ' ' ? '␣' : escapeHTML(grapheme)}</span>`)
+        .join('')
+    }
+
+    document.querySelector('#grapheme-input').addEventListener('input', updateGraphemeCounter)
+
+    updateGraphemeCounter()
+    document.querySelectorAll('.card').forEach(runEffect)
+  </script>
+</body>
+
+</html>

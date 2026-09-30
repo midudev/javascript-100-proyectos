@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>58 - Explorador de países</title>
+  <style>
+    :root {
+      --bg: #0a0f1c;
+      --panel: #111829;
+      --card: #141c30;
+      --line: #223052;
+      --text: #e8edf9;
+      --muted: #8a97b8;
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: radial-gradient(circle at 80% -20%, rgba(56, 189, 248, .15), transparent 45%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 16px 24px 12px;
+      display: grid;
+      gap: 12px;
+      background: rgba(10, 15, 28, .85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      white-space: nowrap;
+    }
+
+    .search {
+      flex: 1;
+      min-width: 220px;
+      position: relative;
+    }
+
+    .search input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      font: inherit;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: none;
+    }
+
+    .search input:focus {
+      border-color: var(--accent);
+    }
+
+    .search::before {
+      content: '🔍';
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      opacity: .7;
+    }
+
+    .sort {
+      display: flex;
+      gap: 6px;
+    }
+
+    select,
+    .icon-button {
+      font: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 9px 12px;
+      cursor: pointer;
+    }
+
+    .icon-button {
+      width: 42px;
+      padding: 9px 0;
+    }
+
+    .regions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .regions button {
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .regions button small {
+      opacity: .6;
+      margin-left: 4px;
+    }
+
+    .regions button[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #03121d;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 24px 0;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-width: 0;
+    }
+
+    .stat span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      padding: 14px 24px 32px;
+    }
+
+    .country {
+      position: relative;
+      display: grid;
+      align-content: start;
+      text-align: left;
+      padding: 0;
+      font: inherit;
+      color: inherit;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .2s, border-color .2s, box-shadow .2s;
+    }
+
+    .country:hover,
+    .country:focus-visible {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 10px 30px rgba(56, 189, 248, .15);
+      outline: none;
+    }
+
+    .country img {
+      width: 100%;
+      aspect-ratio: 2 / 1;
+      object-fit: cover;
+      background: #1b2440;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .country .info {
+      padding: 10px 12px 12px;
+      display: grid;
+      gap: 2px;
+    }
+
+    .country h2 {
+      margin: 0;
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .country p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .country .figure {
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .country .figure strong {
+      color: var(--accent);
+    }
+
+    .rank {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: rgba(5, 10, 22, .75);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      backdrop-filter: blur(4px);
+    }
+
+    .message {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--muted);
+    }
+
+    .message button {
+      margin-top: 12px;
+      font: inherit;
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #03121d;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .skeleton {
+      height: 190px;
+      border-radius: 16px;
+      background: linear-gradient(90deg, var(--card) 30%, #1c2742 50%, var(--card) 70%) 0 0 / 300% 100%;
+      animation: shimmer 1.2s linear infinite;
+    }
+
+    @keyframes shimmer {
+      to {
+        background-position: -150% 0;
+      }
+    }
+
+    /* Detalle */
+    dialog {
+      width: min(560px, calc(100vw - 32px));
+      max-height: calc(100dvh - 32px);
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      color: var(--text);
+      overflow: auto;
+    }
+
+    dialog::backdrop {
+      background: rgba(3, 6, 14, .7);
+      backdrop-filter: blur(4px);
+    }
+
+    dialog[open] {
+      animation: pop .25s ease;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: scale(.96) translateY(8px);
+      }
+    }
+
+    .detail-flag {
+      width: 100%;
+      height: 220px;
+      padding: 24px;
+      object-fit: contain;
+      display: block;
+      background: radial-gradient(circle, #1f2a48, #0b1120);
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .4));
+    }
+
+    .detail-body {
+      padding: 18px 22px 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .detail-body h2 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    .detail-body .official {
+      margin: -10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 0;
+    }
+
+    .facts div {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 12px;
+    }
+
+    .facts dt {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .facts dd {
+      margin: 2px 0 0;
+      font-weight: 600;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tags h3 {
+      width: 100%;
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .tags span,
+    .tags button {
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: rgba(167, 139, 250, .14);
+      border: 1px solid transparent;
+      color: #d7cbff;
+    }
+
+    .tags button {
+      cursor: pointer;
+      background: rgba(56, 189, 248, .12);
+      color: #bfe9ff;
+    }
+
+    .tags button:hover {
+      border-color: var(--accent);
+    }
+
+    .close {
+      position: absolute;
+      z-index: 1;
+      top: 12px;
+      right: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, .55);
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stat:last-child {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 12px 16px;
+        position: static;
+      }
+
+      .stats,
+      .grid {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .regions {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+      }
+
+      .regions button {
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="top">
+      <h1>🌍 Explorador de países</h1>
+      <label class="search">
+        <input id="search" type="search" placeholder="Busca por país, capital o código…" autocomplete="off" aria-label="Buscar país">
+      </label>
+      <div class="sort">
+        <select id="sort" aria-label="Ordenar por">
+          <option value="population">Población</option>
+          <option value="area">Superficie</option>
+          <option value="density">Densidad</option>
+          <option value="name">Nombre</option>
+        </select>
+        <button class="icon-button" id="direction" aria-label="Cambiar orden" title="Cambiar orden">↓</button>
+      </div>
+    </div>
+    <nav class="regions" id="regions" aria-label="Filtrar por región"></nav>
+  </header>
+
+  <section class="stats" id="stats" aria-live="polite"></section>
+
+  <main class="grid" id="grid"></main>
+
+  <dialog id="detail"></dialog>
+
+  <script type="module">
+    // La API pública v3.1 de REST Countries ahora exige una API key. Usamos el
+    // mismo JSON que servía esa API (el repositorio es open source) a través de
+    // la CDN de jsDelivr, con GitHub como alternativa si falla
+    const DATA_URLS = [
+      'https://cdn.jsdelivr.net/gh/restcountries/restcountries@master/src/main/resources/countriesV3.1.json',
+      'https://raw.githubusercontent.com/restcountries/restcountries/master/src/main/resources/countriesV3.1.json'
+    ]
+
+    const REGIONS = {
+      Africa: 'África',
+      Americas: 'América',
+      Asia: 'Asia',
+      Europe: 'Europa',
+      Oceania: 'Oceanía',
+      Antarctic: 'Antártida'
+    }
+
+    // Algunos códigos de idioma del JSON no son estándar: los corregimos
+    const LANGUAGE_ALIASES = { glc: 'gl' }
+
+    const SUBREGIONS = {
+      'Caribbean': 'Caribe',
+      'Central America': 'Centroamérica',
+      'North America': 'Norteamérica',
+      'South America': 'Sudamérica',
+      'Eastern Africa': 'África oriental',
+      'Middle Africa': 'África central',
+      'Northern Africa': 'Norte de África',
+      'Southern Africa': 'África austral',
+      'Western Africa': 'África occidental',
+      'Central Asia': 'Asia central',
+      'Eastern Asia': 'Asia oriental',
+      'South-Eastern Asia': 'Sudeste asiático',
+      'Southern Asia': 'Asia meridional',
+      'Western Asia': 'Asia occidental',
+      'Central Europe': 'Europa central',
+      'Eastern Europe': 'Europa oriental',
+      'Northern Europe': 'Europa del norte',
+      'Southeast Europe': 'Europa del sudeste',
+      'Southern Europe': 'Europa del sur',
+      'Western Europe': 'Europa occidental',
+      'Australia and New Zealand': 'Australia y Nueva Zelanda',
+      'Melanesia': 'Melanesia',
+      'Micronesia': 'Micronesia',
+      'Polynesia': 'Polinesia'
+    }
+
+    // ---------- Intl: formateo y traducciones sin librerías ----------
+    const compact = new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 })
+    const full = new Intl.NumberFormat('es-ES')
+    const decimal = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 })
+    // Intl.DisplayNames traduce códigos estándar (idiomas, monedas, regiones)
+    // al idioma que queramos usando los datos que ya trae el navegador
+    const languageNames = new Intl.DisplayNames(['es'], { type: 'language', fallback: 'none' })
+    const currencyNames = new Intl.DisplayNames(['es'], { type: 'currency', fallback: 'none' })
+    const regionNames = new Intl.DisplayNames(['es'], { type: 'region', fallback: 'none' })
+    // Intl.Collator es la versión reutilizable de localeCompare: más rápido al
+    // ordenar muchos elementos y respeta la ñ y los acentos del español
+    const collator = new Intl.Collator('es')
+
+    const $ = selector => document.querySelector(selector)
+    const grid = $('#grid')
+    const dialog = $('#detail')
+
+    const state = {
+      countries: [],
+      query: '',
+      region: 'all',
+      sort: 'population',
+      descending: true
+    }
+
+    // ---------- Datos ----------
+    async function fetchCountries() {
+      for (const url of DATA_URLS) {
+        try {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          return await response.json()
+        } catch (error) {
+          console.warn(`No se pudo cargar ${url}`, error)
+        }
+      }
+      throw new Error('No se pudieron cargar los países')
+    }
+
+    function capitalize(text) {
+      return text ? text[0].toUpperCase() + text.slice(1) : text
+    }
+
+    // Quita tildes y pasa a minúsculas: "Perú" y "peru" deben coincidir
+    function normalize(text) {
+      return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    }
+
+    // Transformamos la respuesta a un objeto más cómodo para la interfaz
+    function mapCountry(raw) {
+      const name = raw.translations?.spa?.common ?? regionNames.of(raw.cca2) ?? raw.name.common
+      const area = raw.area > 0 ? raw.area : 0
+
+      return {
+        code: raw.cca3,
+        name,
+        officialName: raw.translations?.spa?.official ?? raw.name.official,
+        englishName: raw.name.common,
+        flag: raw.flags?.png ?? raw.flags?.svg,
+        flagAlt: raw.flags?.alt ?? `Bandera de ${name}`,
+        population: raw.population ?? 0,
+        area,
+        density: area > 0 ? raw.population / area : 0,
+        region: raw.region,
+        subregion: raw.subregion,
+        capital: raw.capital?.join(', ') || '—',
+        languages: Object.entries(raw.languages ?? {}).map(([code, english]) => capitalize(languageNames.of(LANGUAGE_ALIASES[code] ?? code) ?? english)),
+        currencies: Object.entries(raw.currencies ?? {}).map(([code, { symbol }]) => {
+          const label = capitalize(currencyNames.of(code) ?? code)
+          return symbol ? `${label} (${symbol})` : label
+        }),
+        borders: raw.borders ?? [],
+        maps: raw.maps?.googleMaps,
+        searchText: normalize([name, raw.name.common, raw.capital?.join(' '), raw.cca3].join(' '))
+      }
+    }
+
+    // ---------- filter + sort ----------
+    const SORTERS = {
+      name: (a, b) => collator.compare(a.name, b.name),
+      population: (a, b) => a.population - b.population,
+      area: (a, b) => a.area - b.area,
+      density: (a, b) => a.density - b.density
+    }
+
+    function getVisibleCountries() {
+      const query = normalize(state.query.trim())
+      const compare = SORTERS[state.sort]
+
+      return state.countries
+        .filter(country => state.region === 'all' || country.region === state.region)
+        .filter(country => country.searchText.includes(query))
+        // toSorted devuelve una copia ordenada sin mutar el array original
+        .toSorted((a, b) => state.descending ? compare(b, a) : compare(a, b))
+    }
+
+    // ---------- reduce: estadísticas de la selección ----------
+    function getStats(countries) {
+      return countries.reduce((stats, country) => {
+        stats.population += country.population
+        stats.area += country.area
+        if (!stats.largest || country.area > stats.largest.area) stats.largest = country
+        if (!stats.mostPopulated || country.population > stats.mostPopulated.population) stats.mostPopulated = country
+        return stats
+      }, { population: 0, area: 0, largest: null, mostPopulated: null })
+    }
+
+    function countByRegion(countries) {
+      return countries.reduce((counts, { region }) => {
+        counts[region] = (counts[region] ?? 0) + 1
+        return counts
+      }, {})
+    }
+
+    // ---------- Renderizado ----------
+    function escapeHTML(text) {
+      return String(text).replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    function renderRegions() {
+      const counts = countByRegion(state.countries)
+      const buttons = [['all', 'Todas', state.countries.length], ...Object.entries(REGIONS).map(([key, label]) => [key, label, counts[key] ?? 0])]
+
+      $('#regions').innerHTML = buttons.map(([key, label, count]) => `
+        <button data-region="${key}" aria-pressed="${state.region === key}">${label}<small>${count}</small></button>
+      `).join('')
+    }
+
+    function renderStats(countries) {
+      const { population, area, largest, mostPopulated } = getStats(countries)
+      const items = [
+        ['Países', full.format(countries.length)],
+        ['Población total', compact.format(population)],
+        ['Superficie total', `${compact.format(area)} km²`],
+        ['El más grande', largest ? largest.name : '—'],
+        ['El más poblado', mostPopulated ? mostPopulated.name : '—']
+      ]
+
+      $('#stats').innerHTML = items.map(([label, value]) => `
+        <div class="stat"><span>${label}</span><strong title="${escapeHTML(value)}">${escapeHTML(value)}</strong></div>
+      `).join('')
+    }
+
+    function figureFor(country) {
+      if (state.sort === 'area') return ['Superficie', `${compact.format(country.area)} km²`]
+      if (state.sort === 'density') return ['Densidad', `${decimal.format(country.density)} hab/km²`]
+      return ['Población', compact.format(country.population)]
+    }
+
+    function renderGrid(countries) {
+      if (countries.length === 0) {
+        grid.innerHTML = '<p class="message">No hay países que coincidan con tu búsqueda 🧭</p>'
+        return
+      }
+
+      grid.innerHTML = countries.map((country, index) => {
+        const [label, value] = figureFor(country)
+        return `
+          <button class="country" data-code="${country.code}">
+            <img src="${country.flag}" alt="${escapeHTML(country.flagAlt)}" loading="lazy" decoding="async">
+            <div class="info">
+              <h2>${escapeHTML(country.name)}</h2>
+              <p>🏛️ ${escapeHTML(country.capital)} · ${REGIONS[country.region] ?? country.region}</p>
+              <div class="figure"><span>${label}</span><strong>${value}</strong></div>
+            </div>
+            <span class="rank">#${index + 1}</span>
+          </button>
+        `
+      }).join('')
+    }
+
+    function render() {
+      const countries = getVisibleCountries()
+      renderStats(countries)
+      renderGrid(countries)
+      $('#direction').textContent = state.descending ? '↓' : '↑'
+    }
+
+    // ---------- Detalle ----------
+    function openDetail(code) {
+      const country = state.countries.find(item => item.code === code)
+      if (!country) return
+
+      const facts = [
+        ['Capital', country.capital],
+        ['Región', [REGIONS[country.region], SUBREGIONS[country.subregion] ?? country.subregion].filter(Boolean).join(' · ')],
+        ['Población', `${full.format(country.population)} hab.`],
+        ['Superficie', `${full.format(country.area)} km²`],
+        ['Densidad', `${decimal.format(country.density)} hab/km²`],
+        ['Código', country.code]
+      ]
+
+      const borders = country.borders
+        .map(border => state.countries.find(item => item.code === border))
+        .filter(Boolean)
+        .toSorted((a, b) => collator.compare(a.name, b.name))
+
+      const tagList = (title, items) => items.length === 0 ? '' : `
+        <div class="tags"><h3>${title}</h3>${items.map(item => `<span>${escapeHTML(item)}</span>`).join('')}</div>
+      `
+
+      dialog.innerHTML = `
+        <button class="close" aria-label="Cerrar" data-close>✕</button>
+        <img class="detail-flag" src="${country.flag}" alt="${escapeHTML(country.flagAlt)}">
+        <div class="detail-body">
+          <h2>${escapeHTML(country.name)}</h2>
+          <p class="official">${escapeHTML(country.officialName)}</p>
+          <dl class="facts">
+            ${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}
+          </dl>
+          ${tagList('Idiomas', country.languages)}
+          ${tagList('Monedas', country.currencies)}
+          ${borders.length === 0 ? '' : `
+            <div class="tags"><h3>Fronteras</h3>
+              ${borders.map(border => `<button data-code="${border.code}">${escapeHTML(border.name)}</button>`).join('')}
+            </div>`}
+        </div>
+      `
+
+      if (!dialog.open) dialog.showModal()
+      dialog.scrollTop = 0
+    }
+
+    // ---------- Eventos ----------
+    $('#search').addEventListener('input', event => {
+      state.query = event.target.value
+      render()
+    })
+
+    $('#sort').addEventListener('change', event => {
+      state.sort = event.target.value
+      // Por nombre tiene más sentido A→Z; por números, de mayor a menor
+      state.descending = state.sort !== 'name'
+      render()
+    })
+
+    $('#direction').addEventListener('click', () => {
+      state.descending = !state.descending
+      render()
+    })
+
+    $('#regions').addEventListener('click', event => {
+      const button = event.target.closest('[data-region]')
+      if (!button) return
+      state.region = button.dataset.region
+      renderRegions()
+      render()
+    })
+
+    grid.addEventListener('click', event => {
+      const card = event.target.closest('.country')
+      if (card) openDetail(card.dataset.code)
+    })
+
+    dialog.addEventListener('click', event => {
+      // Click en el fondo (fuera del contenido) o en la X: cerramos
+      if (event.target === dialog || event.target.closest('[data-close]')) {
+        dialog.close()
+        return
+      }
+      const border = event.target.closest('[data-code]')
+      if (border) openDetail(border.dataset.code)
+    })
+
+    // ---------- Inicio ----------
+    async function init() {
+      grid.innerHTML = Array.from({ length: 12 }, () => '<div class="skeleton"></div>').join('')
+
+      try {
+        const data = await fetchCountries()
+        state.countries = data.map(mapCountry)
+        renderRegions()
+        render()
+      } catch (error) {
+        console.error(error)
+        $('#stats').innerHTML = ''
+        grid.innerHTML = `
+          <div class="message">
+            <p>😵 No se pudieron cargar los países. Revisa tu conexión.</p>
+            <button id="retry">Reintentar</button>
+          </div>`
+        $('#retry').addEventListener('click', init)
+      }
+    }
+
+    init()
+  </script>
+</body>
+
+</html>

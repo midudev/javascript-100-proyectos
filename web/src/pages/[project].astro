@@ -18,6 +18,14 @@ const index = PROJECTS.findIndex((p) => p.slug === project)
 const info = PROJECTS[index]
 const number = `${index + 1}`.padStart(2, "0")
 
+const neighbor = (i: number) => {
+  const p = PROJECTS[i]
+  if (!p || p.hidden) return undefined
+  return { slug: p.slug, title: p.title, number: `${i + 1}`.padStart(2, "0") }
+}
+const prev = neighbor(index - 1)
+const next = neighbor(index + 1)
+
 const pageURL = new URL(`/${info.slug}`, Astro.site).href
 const learnings = new Intl.ListFormat("es", { type: "conjunction" }).format(
   info.learnings
@@ -87,6 +95,8 @@ const jsonLd = {
     title={`Demo del proyecto ${info.title}`}
     class="w-screen h-dvh"
     src={`/projects/${project}/index.html`}
+    allow="camera; microphone; display-capture; geolocation; clipboard-read; clipboard-write; fullscreen; picture-in-picture; gamepad; autoplay"
+    allowfullscreen
   ></iframe>
-  <InfoProject info={{ ...info, number }} />
+  <InfoProject info={{ ...info, number }} prev={prev} next={next} />
 </Layout>

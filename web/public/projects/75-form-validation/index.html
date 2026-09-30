@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>75 - Validación de formularios</title>
+  <style>
+    :root {
+      --bg: #f3f5fb;
+      --surface: #ffffff;
+      --border: #dfe3ee;
+      --text: #1b2033;
+      --muted: #69708a;
+      --accent: #4f46e5;
+      --accent-soft: #eef0ff;
+      --error: #d92d20;
+      --error-soft: #fff1f0;
+      --ok: #12a150;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: radial-gradient(circle at 0 0, #e4e8ff 0, transparent 40%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.45;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 28px;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+      align-items: start;
+    }
+
+    /* --- Panel lateral con la tarjeta --- */
+    aside {
+      position: sticky;
+      top: 28px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -.02em;
+    }
+
+    .brand-title+p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    .card-scene {
+      perspective: 900px;
+    }
+
+    .credit-card {
+      position: relative;
+      aspect-ratio: 1.586;
+      transform-style: preserve-3d;
+      transition: transform .6s cubic-bezier(.3, .7, .3, 1);
+    }
+
+    .credit-card.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      padding: 20px 22px;
+      border-radius: 18px;
+      color: #fff;
+      backface-visibility: hidden;
+      background: linear-gradient(135deg, var(--card-from, #334155), var(--card-to, #0f172a));
+      box-shadow: 0 20px 40px -18px #1e1b4b99;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background .4s;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+      padding: 22px 0;
+      justify-content: flex-start;
+      gap: 18px;
+    }
+
+    .card-back .stripe {
+      height: 40px;
+      background: #0b0b12;
+    }
+
+    .card-back .signature {
+      margin: 0 22px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 6px;
+      color: #1b2033;
+      font-family: ui-monospace, Menlo, monospace;
+      background: repeating-linear-gradient(45deg, #fff, #fff 6px, #f1f1f1 6px, #f1f1f1 12px);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chip {
+      width: 40px;
+      height: 30px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #f7d774, #c9a13b);
+    }
+
+    .card-brand {
+      font-weight: 800;
+      font-style: italic;
+      letter-spacing: .02em;
+    }
+
+    .card-number {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 1.28rem;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+
+    .card-bottom {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: .8rem;
+      text-transform: uppercase;
+    }
+
+    .card-bottom small {
+      display: block;
+      opacity: .65;
+      font-size: .62rem;
+    }
+
+    .tips {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    .tips h2 {
+      margin: 0 0 6px;
+      font-size: .9rem;
+      color: var(--text);
+    }
+
+    .tips ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .tips code {
+      color: var(--accent);
+      font-size: .8rem;
+    }
+
+    /* --- Formulario --- */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 50px -30px #1e1b4b55;
+    }
+
+    .form-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .form-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .demo-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ghost {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: .82rem;
+      cursor: pointer;
+    }
+
+    .ghost:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    fieldset {
+      border: 0;
+      padding: 0;
+      margin: 0 0 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+    }
+
+    legend {
+      padding: 0;
+      margin-bottom: 10px;
+      font-weight: 700;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent);
+    }
+
+    .field {
+      display: grid;
+      gap: 4px;
+      align-content: start;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-weight: 600;
+      font-size: .88rem;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input:not([type="checkbox"]) {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      color: inherit;
+      background: #fbfcff;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    input:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    /* :user-invalid solo se aplica cuando el usuario ya ha interactuado con el campo
+       (a diferencia de :invalid, que marcaría en rojo el formulario vacío al cargar) */
+    input:user-invalid,
+    input[aria-invalid="true"] {
+      border-color: var(--error);
+      background: var(--error-soft);
+    }
+
+    input:user-invalid:focus-visible,
+    input[aria-invalid="true"]:focus-visible {
+      box-shadow: 0 0 0 4px #d92d2022;
+    }
+
+    input:user-valid:not([aria-invalid="true"]),
+    input[aria-invalid="false"] {
+      border-color: var(--ok);
+    }
+
+    .badge {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      translate: 0 -50%;
+      font-size: .7rem;
+      font-weight: 800;
+      padding: 3px 7px;
+      border-radius: 6px;
+      color: #fff;
+      background: var(--badge, #94a3b8);
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+
+    .badge.is-visible {
+      opacity: 1;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      translate: 0 -50%;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 4px 6px;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: .76rem;
+      color: var(--muted);
+    }
+
+    .error {
+      margin: 0;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--error);
+    }
+
+    .error:empty {
+      display: none;
+    }
+
+    .error::before {
+      content: '⚠ ';
+    }
+
+    .strength {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      height: 4px;
+    }
+
+    .strength span {
+      border-radius: 4px;
+      background: var(--border);
+      transition: background .2s;
+    }
+
+    .checkbox {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-weight: 500;
+    }
+
+    .checkbox input {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--accent);
+    }
+
+    .summary {
+      border: 1.5px solid var(--error);
+      background: var(--error-soft);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 18px;
+    }
+
+    .summary:focus {
+      outline: 3px solid #d92d2033;
+    }
+
+    .summary h3 {
+      margin: 0 0 6px;
+      font-size: .95rem;
+      color: var(--error);
+    }
+
+    .summary ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: .86rem;
+    }
+
+    .summary a {
+      color: var(--text);
+    }
+
+    .submit {
+      width: 100%;
+      margin-top: 8px;
+      padding: 13px;
+      border: 0;
+      border-radius: 12px;
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #6366f1, var(--accent));
+      cursor: pointer;
+      box-shadow: 0 12px 24px -12px var(--accent);
+    }
+
+    dialog {
+      border: 0;
+      border-radius: 20px;
+      padding: 28px;
+      width: min(420px, calc(100% - 32px));
+      text-align: center;
+      box-shadow: 0 30px 80px -20px #1e1b4b88;
+    }
+
+    dialog::backdrop {
+      background: #1b203366;
+      backdrop-filter: blur(3px);
+    }
+
+    dialog dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 12px;
+      text-align: left;
+      font-size: .9rem;
+    }
+
+    dialog dt {
+      color: var(--muted);
+    }
+
+    dialog dd {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+        max-width: 420px;
+      }
+
+      .concepts {
+        display: none;
+      }
+    }
+
+    @media (max-width: 520px) {
+      fieldset {
+        grid-template-columns: 1fr;
+      }
+
+      .form-card {
+        padding: 18px;
+      }
+    }
+
+    /* Espacio extra abajo para que el logo de la web no tape el final del formulario */
+    @media (min-width: 640px) {
+      .layout {
+        padding-bottom: 160px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside>
+      <div>
+        <h1 class="brand-title">Validación de formularios</h1>
+        <p>Constraint Validation API + mensajes a medida</p>
+      </div>
+
+      <div class="card-scene" aria-hidden="true">
+        <div class="credit-card" id="card-preview">
+          <div class="card-face">
+            <div class="card-top">
+              <div class="chip"></div>
+              <span class="card-brand" id="preview-brand">TARJETA</span>
+            </div>
+            <div class="card-number" id="preview-number">•••• •••• •••• ••••</div>
+            <div class="card-bottom">
+              <div><small>Titular</small><span id="preview-name">Tu nombre</span></div>
+              <div><small>Caduca</small><span id="preview-expiry">MM/AA</span></div>
+            </div>
+          </div>
+          <div class="card-face card-back">
+            <div class="stripe"></div>
+            <div class="signature" id="preview-cvc">•••</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tips">
+        <h2>Tarjetas de prueba (pasan Luhn)</h2>
+        <ul>
+          <li>Visa <code>4242 4242 4242 4242</code></li>
+          <li>Mastercard <code>5555 5555 5555 4444</code></li>
+          <li>Amex <code>3782 822463 10005</code></li>
+        </ul>
+      </div>
+
+      <div class="tips concepts">
+        <h2>Cómo funciona</h2>
+        <ul>
+          <li>Atributos nativos: <code>required</code>, <code>pattern</code>, <code>minlength</code>, <code>type</code></li>
+          <li>Reglas propias con <code>setCustomValidity()</code></li>
+          <li>Mensajes traducidos desde <code>input.validity</code></li>
+          <li>Estilos con <code>:user-invalid</code> y errores al salir del campo</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="form-card">
+      <div class="form-header">
+        <h2>Crea tu cuenta premium</h2>
+        <div class="demo-buttons">
+          <button class="ghost" type="button" id="fill-valid">✓ Datos válidos</button>
+          <button class="ghost" type="button" id="fill-invalid">✗ Datos con errores</button>
+        </div>
+      </div>
+
+      <div class="summary" id="summary" role="alert" tabindex="-1" hidden></div>
+
+      <!-- novalidate desactiva las burbujas nativas: validamos nosotros con la misma API -->
+      <form id="form" novalidate>
+        <fieldset>
+          <legend>Datos personales</legend>
+
+          <div class="field full">
+            <label for="name">Nombre completo</label>
+            <input id="name" name="name" autocomplete="name" required minlength="3" maxlength="60"
+              pattern="[\p{L}' \-]+" data-missing="Escribe tu nombre"
+              data-pattern="Usa solo letras, espacios, guiones o apóstrofos" aria-describedby="name-error">
+            <p class="error" id="name-error"></p>
+          </div>
+
+          <div class="field full">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required
+              data-missing="Necesitamos tu email para enviarte la factura" aria-describedby="email-error">
+            <p class="error" id="email-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="password">Contraseña</label>
+            <div class="input-wrap">
+              <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8"
+                data-missing="Elige una contraseña" aria-describedby="password-hint password-error">
+              <button class="toggle-password" type="button" id="toggle-password" aria-label="Mostrar contraseña">👁️</button>
+            </div>
+            <div class="strength" id="strength" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+            <p class="hint" id="password-hint">Mínimo 8 caracteres con mayúscula, minúscula y número</p>
+            <p class="error" id="password-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="confirm">Repite la contraseña</label>
+            <input id="confirm" name="confirm" type="password" autocomplete="new-password" required
+              data-missing="Repite la contraseña" aria-describedby="confirm-error">
+            <p class="error" id="confirm-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="birthdate">Fecha de nacimiento</label>
+            <input id="birthdate" name="birthdate" type="date" required min="1900-01-01"
+              data-missing="Indica tu fecha de nacimiento" aria-describedby="birthdate-hint birthdate-error">
+            <p class="hint" id="birthdate-hint">Debes ser mayor de 18 años</p>
+            <p class="error" id="birthdate-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="phone">Teléfono</label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required
+              pattern="(\+34|0034)?\s?[6-9](\s?\d){8}" placeholder="612 345 678"
+              data-missing="Escribe un teléfono de contacto"
+              data-pattern="Introduce un móvil o fijo español de 9 cifras (opcionalmente con +34)"
+              aria-describedby="phone-error">
+            <p class="error" id="phone-error"></p>
+          </div>
+
+          <div class="field full">
+            <label for="dni">DNI / NIE</label>
+            <input id="dni" name="dni" autocomplete="off" required maxlength="10" placeholder="12345678Z"
+              data-missing="El DNI o NIE es obligatorio para emitir la factura" aria-describedby="dni-hint dni-error">
+            <p class="hint" id="dni-hint">Comprobamos la letra de control</p>
+            <p class="error" id="dni-error"></p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Pago</legend>
+
+          <div class="field full">
+            <label for="card">Número de tarjeta</label>
+            <div class="input-wrap">
+              <input id="card" name="card" inputmode="numeric" autocomplete="cc-number" required
+                placeholder="1234 5678 9012 3456" data-missing="Introduce el número de la tarjeta"
+                aria-describedby="card-error">
+              <span class="badge" id="card-badge"></span>
+            </div>
+            <p class="error" id="card-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="expiry">Caducidad</label>
+            <input id="expiry" name="expiry" inputmode="numeric" autocomplete="cc-exp" required maxlength="5"
+              pattern="(0[1-9]|1[0-2])/\d{2}" placeholder="MM/AA" data-missing="Indica la fecha de caducidad"
+              data-pattern="Usa el formato MM/AA" aria-describedby="expiry-error">
+            <p class="error" id="expiry-error"></p>
+          </div>
+
+          <div class="field">
+            <label for="cvc">CVC</label>
+            <input id="cvc" name="cvc" inputmode="numeric" autocomplete="cc-csc" required maxlength="4" pattern="\d{3,4}"
+              placeholder="123" data-missing="Escribe el código de seguridad"
+              data-pattern="El CVC son 3 o 4 números" aria-describedby="cvc-hint cvc-error">
+            <p class="hint" id="cvc-hint">Los 3 dígitos del reverso (4 en Amex)</p>
+            <p class="error" id="cvc-error"></p>
+          </div>
+
+          <div class="field full">
+            <label class="checkbox">
+              <input id="terms" name="terms" type="checkbox" required
+                data-missing="Debes aceptar las condiciones para continuar" aria-describedby="terms-error">
+              Acepto las condiciones del servicio y la política de privacidad
+            </label>
+            <p class="error" id="terms-error"></p>
+          </div>
+        </fieldset>
+
+        <button class="submit" type="submit">Crear cuenta y pagar 9,99 €</button>
+      </form>
+    </main>
+  </div>
+
+  <dialog id="success">
+    <div style="font-size: 2.6rem">🎉</div>
+    <h2>¡Registro completado!</h2>
+    <dl id="success-data"></dl>
+    <button class="submit" id="close-dialog">Volver a empezar</button>
+  </dialog>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const form = $('#form')
+    const summary = $('#summary')
+
+    // Solo los campos que participan en la validación (willValidate)
+    const fields = [...form.elements].filter((element) => element.willValidate && element.tagName === 'INPUT')
+
+    // Acceso cómodo por nombre: inputs.email, inputs.card...
+    // (form.name no serviría: es el atributo name del propio formulario)
+    const inputs = Object.fromEntries(fields.map((input) => [input.name, input]))
+
+    // Campos que ya han mostrado un error: en ellos sí validamos mientras se escribe
+    const touched = new Set()
+
+    const DNI_LETTERS = 'TRWAGMYFPDXBNJZSQVHLCKE'
+
+    const CARD_BRANDS = [
+      { name: 'Amex', label: 'American Express', pattern: /^3[47]/, lengths: [15], cvc: 4, gaps: [4, 10], colors: ['#0e7490', '#164e63'] },
+      { name: 'Visa', label: 'Visa', pattern: /^4/, lengths: [13, 16, 19], cvc: 3, gaps: [4, 8, 12, 16], colors: ['#3730a3', '#1e1b4b'] },
+      { name: 'Mastercard', label: 'Mastercard', pattern: /^(5[1-5]|222[1-9]|22[3-9]\d|2[3-6]\d{2}|27[01]\d|2720)/, lengths: [16], cvc: 3, gaps: [4, 8, 12], colors: ['#ea580c', '#7c2d12'] },
+      { name: 'Discover', label: 'Discover', pattern: /^(6011|65|64[4-9])/, lengths: [16, 19], cvc: 3, gaps: [4, 8, 12, 16], colors: ['#f59e0b', '#92400e'] },
+      { name: 'Diners', label: 'Diners Club', pattern: /^3(0[0-5]|[689])/, lengths: [14], cvc: 3, gaps: [4, 10], colors: ['#475569', '#0f172a'] },
+      { name: 'JCB', label: 'JCB', pattern: /^35(2[89]|[3-8])/, lengths: [16], cvc: 3, gaps: [4, 8, 12], colors: ['#15803d', '#14532d'] }
+    ]
+
+    const listFormat = new Intl.ListFormat('es', { type: 'conjunction' })
+
+    // --- Utilidades ---
+
+    const onlyDigits = (value) => value.replace(/\D/g, '')
+
+    function detectBrand(digits) {
+      return CARD_BRANDS.find((brand) => brand.pattern.test(digits)) ?? null
+    }
+
+    function toISODate(date) {
+      const pad = (number) => String(number).padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    }
+
+    // --- Validadores personalizados ---
+    // Cada uno recibe el valor y devuelve '' si es válido o el mensaje de error.
+    // Solo se ejecutan cuando las restricciones nativas (required, pattern...) ya se cumplen.
+
+    // Contraseña: la longitud la comprueba minlength; aquí exigimos variedad de caracteres
+    function validatePassword(value) {
+      const missing = []
+      if (!/[a-z]/.test(value)) missing.push('una minúscula')
+      if (!/[A-Z]/.test(value)) missing.push('una mayúscula')
+      if (!/\d/.test(value)) missing.push('un número')
+      return missing.length ? `Añade al menos ${listFormat.format(missing)}` : ''
+    }
+
+    // Confirmación: depende de otro campo, algo imposible solo con atributos HTML
+    function validateConfirm(value) {
+      return value === inputs.password.value ? '' : 'Las contraseñas no coinciden'
+    }
+
+    // Mayor de edad: restamos años y quitamos uno si aún no ha sido su cumpleaños.
+    // Ojo: new Date('2000-05-10') se interpreta en UTC y puede darte el día anterior
+    // según tu zona horaria, por eso construimos la fecha con sus partes (hora local)
+    function validateAdult(value) {
+      const [year, month, day] = value.split('-').map(Number)
+      const today = new Date()
+      let age = today.getFullYear() - year
+      const hadBirthday = today.getMonth() + 1 > month || (today.getMonth() + 1 === month && today.getDate() >= day)
+      if (!hadBirthday) age--
+
+      if (age < 18) return `Debes ser mayor de edad (ahora tendrías ${age} años)`
+      if (age > 120) return 'Revisa el año: parece demasiado antiguo'
+      return ''
+    }
+
+    // DNI: 8 números + letra. NIE: X/Y/Z + 7 números + letra (X=0, Y=1, Z=2).
+    // La letra de control es la posición (número % 23) en la cadena DNI_LETTERS
+    function validateDni(value) {
+      const normalized = value.toUpperCase().replace(/[\s-]/g, '')
+      const match = normalized.match(/^([XYZ]\d{7}|\d{8})([A-Z])$/)
+      if (!match) return 'Formato: 8 números y letra (DNI) o X/Y/Z, 7 números y letra (NIE)'
+
+      const [, body, letter] = match
+      const number = Number(body.replace('X', '0').replace('Y', '1').replace('Z', '2'))
+      const expected = DNI_LETTERS[number % 23]
+      return letter === expected ? '' : `La letra de control no es correcta (debería ser ${expected})`
+    }
+
+    // Algoritmo de Luhn (checksum que usan todas las tarjetas): recorremos los dígitos
+    // de derecha a izquierda duplicando uno de cada dos; si el doble pasa de 9 le restamos 9.
+    // El número es válido si la suma total es múltiplo de 10. Detecta cualquier error
+    // en un dígito y la mayoría de transposiciones de dos dígitos contiguos.
+    function luhnCheck(digits) {
+      let sum = 0
+      let shouldDouble = false
+      for (let i = digits.length - 1; i >= 0; i--) {
+        let digit = Number(digits[i])
+        if (shouldDouble) {
+          digit *= 2
+          if (digit > 9) digit -= 9
+        }
+        sum += digit
+        shouldDouble = !shouldDouble
+      }
+      return sum % 10 === 0
+    }
+
+    function validateCard(value) {
+      const digits = onlyDigits(value)
+      const brand = detectBrand(digits)
+
+      if (!brand) return 'No reconocemos la marca de esta tarjeta (Visa, Mastercard, Amex...)'
+      if (!brand.lengths.includes(digits.length)) {
+        return `Una tarjeta ${brand.label} tiene ${listFormat.format(brand.lengths.map(String))} dígitos`
+      }
+      if (!luhnCheck(digits)) return 'El número no es válido: revisa que no falte o sobre ningún dígito'
+      return ''
+    }
+
+    // La tarjeta vale hasta el último día del mes indicado
+    function validateExpiry(value) {
+      const [month, year] = value.split('/').map(Number)
+      const firstDayAfterExpiry = new Date(2000 + year, month, 1) // el mes 12 pasa al año siguiente
+      const today = new Date()
+      if (firstDayAfterExpiry <= today) return 'La tarjeta está caducada'
+      if (2000 + year > today.getFullYear() + 20) return 'La fecha de caducidad es demasiado lejana'
+      return ''
+    }
+
+    // El CVC depende de la marca: 4 dígitos en American Express, 3 en el resto
+    function validateCvc(value) {
+      const brand = detectBrand(onlyDigits(inputs.card.value))
+      if (brand && value.length !== brand.cvc) return `Las tarjetas ${brand.label} tienen un CVC de ${brand.cvc} dígitos`
+      return ''
+    }
+
+    const CUSTOM_VALIDATORS = {
+      password: validatePassword,
+      confirm: validateConfirm,
+      birthdate: validateAdult,
+      dni: validateDni,
+      card: validateCard,
+      expiry: validateExpiry,
+      cvc: validateCvc
+    }
+
+    // --- Motor de validación ---
+
+    function runCustomValidation(input) {
+      // Clave: limpiar SIEMPRE el error personalizado antes de volver a validar.
+      // Si no, validity.customError se queda a true y el campo nunca sería válido
+      input.setCustomValidity('')
+      const validator = CUSTOM_VALIDATORS[input.name]
+      if (validator && input.validity.valid) input.setCustomValidity(validator(input.value))
+    }
+
+    // Traducimos cada flag del objeto ValidityState a un mensaje propio en español
+    function getErrorMessage(input) {
+      const { validity, dataset } = input
+      if (validity.valid) return ''
+      if (validity.valueMissing) return dataset.missing ?? 'Este campo es obligatorio'
+      if (validity.typeMismatch) return 'Introduce un email válido, por ejemplo nombre@dominio.com'
+      // tooShort solo se activa si el usuario ha editado el valor (no si lo cambia JS)
+      if (validity.tooShort) return `Escribe al menos ${input.minLength} caracteres (llevas ${input.value.length})`
+      if (validity.tooLong) return `Escribe como máximo ${input.maxLength} caracteres`
+      if (validity.rangeOverflow) return 'La fecha no puede estar en el futuro'
+      if (validity.rangeUnderflow) return 'Revisa el año: parece demasiado antiguo'
+      if (validity.patternMismatch) return dataset.pattern ?? 'El formato no es correcto'
+      if (validity.badInput) return 'El valor introducido no es válido'
+      if (validity.customError) return input.validationMessage
+      return input.validationMessage
+    }
+
+    function showFieldState(input) {
+      const message = getErrorMessage(input)
+      $(`#${input.id}-error`).textContent = message
+      input.setAttribute('aria-invalid', String(Boolean(message)))
+      return message
+    }
+
+    function validateField(input, { show }) {
+      runCustomValidation(input)
+      if (show) {
+        touched.add(input)
+        showFieldState(input)
+      }
+    }
+
+    // Algunos campos dependen de otros: si cambias la contraseña hay que revalidar
+    // la confirmación, y si cambias la tarjeta, el CVC (Amex usa 4 dígitos)
+    const DEPENDENCIES = { password: 'confirm', card: 'cvc' }
+
+    function validateDependent(input) {
+      const dependentName = DEPENDENCIES[input.name]
+      if (!dependentName) return
+      const dependent = inputs[dependentName]
+      if (dependent.value) validateField(dependent, { show: touched.has(dependent) })
+    }
+
+    function renderSummary(invalidFields) {
+      if (invalidFields.length === 0) {
+        summary.hidden = true
+        return
+      }
+
+      const items = invalidFields.map((input) => {
+        const label = form.querySelector(`label[for="${input.id}"]`)?.textContent ?? 'Condiciones'
+        return `<li><a href="#${input.id}">${label.trim()}</a>: ${getErrorMessage(input)}</li>`
+      })
+      const count = invalidFields.length
+      summary.innerHTML = `
+        <h3>Hay ${count} ${count === 1 ? 'campo' : 'campos'} por revisar</h3>
+        <ul>${items.join('')}</ul>
+      `
+      summary.hidden = false
+      // Llevamos el foco al resumen para que los lectores de pantalla lo anuncien
+      summary.focus()
+    }
+
+    // --- Formateo en vivo ---
+
+    function formatCardNumber(digits, brand) {
+      const gaps = brand?.gaps ?? [4, 8, 12, 16]
+      let result = ''
+      for (let i = 0; i < digits.length; i++) {
+        if (gaps.includes(i)) result += ' '
+        result += digits[i]
+      }
+      return result
+    }
+
+    let previousCardDigits = ''
+
+    function handleCardInput(event) {
+      const input = event.target
+      let digits = onlyDigits(input.value)
+
+      // ¿Cuántos dígitos hay antes del cursor? Ese número no cambia al añadir
+      // o quitar espacios, así que nos sirve para recolocar el cursor después
+      let digitsBeforeCursor = onlyDigits(input.value.slice(0, input.selectionStart)).length
+
+      // Si el usuario ha borrado un espacio, los dígitos no cambian y el espacio
+      // volvería a aparecer: borramos también el dígito que hay junto a él
+      if (digits === previousCardDigits) {
+        if (event.inputType === 'deleteContentBackward' && digitsBeforeCursor > 0) {
+          digits = digits.slice(0, digitsBeforeCursor - 1) + digits.slice(digitsBeforeCursor)
+          digitsBeforeCursor--
+        } else if (event.inputType === 'deleteContentForward') {
+          digits = digits.slice(0, digitsBeforeCursor) + digits.slice(digitsBeforeCursor + 1)
+        }
+      }
+
+      const brand = detectBrand(digits)
+      const maxLength = brand ? Math.max(...brand.lengths) : 19
+      digits = digits.slice(0, maxLength)
+      digitsBeforeCursor = Math.min(digitsBeforeCursor, digits.length)
+      previousCardDigits = digits
+
+      const formatted = formatCardNumber(digits, brand)
+      input.value = formatted
+
+      let position = 0
+      let seen = 0
+      while (position < formatted.length && seen < digitsBeforeCursor) {
+        if (formatted[position] !== ' ') seen++
+        position++
+      }
+      input.setSelectionRange(position, position)
+    }
+
+    function handleExpiryInput(event) {
+      const input = event.target
+      let digits = onlyDigits(input.value).slice(0, 4)
+      // Si empieza por 2-9 es un mes de una cifra: le añadimos el 0 delante
+      if (/^[2-9]$/.test(digits)) digits = `0${digits}`
+      input.value = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits
+    }
+
+    function handleCvcInput(event) {
+      event.target.value = onlyDigits(event.target.value).slice(0, 4)
+    }
+
+    function renderStrength() {
+      const value = inputs.password.value
+      const checks = [value.length >= 8, /[a-z]/.test(value) && /[A-Z]/.test(value), /\d/.test(value), /[^\w\s]/.test(value) || value.length >= 14]
+      const score = value ? checks.filter(Boolean).length : 0
+      const colors = ['#d92d20', '#f59e0b', '#84cc16', '#12a150']
+      document.querySelectorAll('#strength span').forEach((bar, index) => {
+        bar.style.background = index < score ? colors[score - 1] : ''
+      })
+    }
+
+    function renderCardPreview() {
+      const digits = onlyDigits(inputs.card.value)
+      const brand = detectBrand(digits)
+      const badge = $('#card-badge')
+
+      const previewLength = brand && !brand.lengths.includes(16) ? brand.lengths[0] : 16
+      const masked = formatCardNumber(digits.padEnd(previewLength, '•'), brand)
+      $('#preview-number').textContent = masked
+      $('#preview-brand').textContent = brand ? brand.label.toUpperCase() : 'TARJETA'
+      $('#preview-name').textContent = inputs.name.value.trim() || 'Tu nombre'
+      $('#preview-expiry').textContent = inputs.expiry.value || 'MM/AA'
+      $('#preview-cvc').textContent = inputs.cvc.value || '•'.repeat(brand?.cvc ?? 3)
+
+      const card = $('#card-preview')
+      card.style.setProperty('--card-from', brand?.colors[0] ?? '#334155')
+      card.style.setProperty('--card-to', brand?.colors[1] ?? '#0f172a')
+
+      badge.textContent = brand?.name ?? ''
+      badge.style.setProperty('--badge', brand?.colors[0] ?? '#94a3b8')
+      badge.classList.toggle('is-visible', Boolean(brand))
+    }
+
+    // --- Eventos ---
+
+    // Mostramos errores al salir del campo, nunca mientras el usuario aún está escribiendo
+    form.addEventListener('focusout', (event) => {
+      const input = event.target
+      if (!fields.includes(input) || input.type === 'checkbox') return
+      // Si sale sin haber escrito nada no le regañamos (salvo que ya lo hubiéramos avisado)
+      if (!input.value && !touched.has(input)) return
+      validateField(input, { show: true })
+    })
+
+    form.addEventListener('input', (event) => {
+      const input = event.target
+      if (input.id === 'card') handleCardInput(event)
+      if (input.id === 'expiry') handleExpiryInput(event)
+      if (input.id === 'cvc') handleCvcInput(event)
+      if (input.id === 'password') renderStrength()
+
+      // "Castiga tarde, premia pronto": si el campo ya mostraba un error lo
+      // revalidamos en cada pulsación para que desaparezca en cuanto se corrija
+      validateField(input, { show: touched.has(input) })
+      validateDependent(input)
+      renderCardPreview()
+    })
+
+    inputs.terms.addEventListener('change', () => validateField(inputs.terms, { show: true }))
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      fields.forEach((input) => validateField(input, { show: true }))
+
+      // checkValidity() devuelve false si algún campo incumple sus restricciones
+      if (!form.checkValidity()) {
+        renderSummary(fields.filter((input) => !input.validity.valid))
+        return
+      }
+
+      renderSummary([])
+      showSuccess()
+    })
+
+    summary.addEventListener('click', (event) => {
+      const link = event.target.closest('a')
+      if (!link) return
+      event.preventDefault()
+      const input = $(link.getAttribute('href'))
+      input.focus()
+      input.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+
+    $('#cvc').addEventListener('focus', () => $('#card-preview').classList.add('is-flipped'))
+    $('#cvc').addEventListener('blur', () => $('#card-preview').classList.remove('is-flipped'))
+
+    $('#toggle-password').addEventListener('click', (event) => {
+      const isHidden = inputs.password.type === 'password'
+      inputs.password.type = isHidden ? 'text' : 'password'
+      event.currentTarget.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña')
+    })
+
+    function showSuccess() {
+      const digits = onlyDigits(inputs.card.value)
+      const data = {
+        Nombre: inputs.name.value,
+        Email: inputs.email.value,
+        'DNI/NIE': inputs.dni.value.toUpperCase(),
+        Tarjeta: `${detectBrand(digits).label} •••• ${digits.slice(-4)}`
+      }
+      $('#success-data').innerHTML = Object.entries(data)
+        .map(([key, value]) => `<dt>${key}</dt><dd></dd>`).join('')
+      // textContent para no inyectar HTML con lo que ha escrito el usuario
+      $('#success-data').querySelectorAll('dd').forEach((dd, index) => {
+        dd.textContent = Object.values(data)[index]
+      })
+      $('#success').showModal()
+    }
+
+    $('#close-dialog').addEventListener('click', () => {
+      $('#success').close()
+      resetForm()
+    })
+
+    function resetForm() {
+      form.reset()
+      touched.clear()
+      previousCardDigits = ''
+      fields.forEach((input) => {
+        input.setCustomValidity('')
+        input.removeAttribute('aria-invalid')
+        $(`#${input.id}-error`).textContent = ''
+      })
+      summary.hidden = true
+      renderStrength()
+      renderCardPreview()
+    }
+
+    // --- Datos de ejemplo ---
+
+    const VALID_DATA = {
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+      password: 'Analitica1843',
+      confirm: 'Analitica1843',
+      birthdate: '1990-12-10',
+      phone: '612 345 678',
+      dni: '12345678Z',
+      card: '4242424242424242',
+      expiry: `12/${String(new Date().getFullYear() + 3).slice(-2)}`,
+      cvc: '123',
+      terms: true
+    }
+
+    const INVALID_DATA = {
+      name: 'Ada Lovelace',
+      email: 'ada@',
+      password: 'analitica',
+      confirm: 'analitica1',
+      birthdate: toISODate(new Date(new Date().getFullYear() - 16, 0, 15)),
+      phone: '512 345 678',
+      dni: '12345678A',
+      card: '4242424242424241',
+      expiry: '01/20',
+      cvc: '12',
+      terms: false
+    }
+
+    function fillForm(data) {
+      resetForm()
+      for (const [name, value] of Object.entries(data)) {
+        const input = inputs[name]
+        if (input.type === 'checkbox') input.checked = value
+        else input.value = value
+        // Disparamos 'input' para que se apliquen el formateo y la vista previa
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }))
+      }
+      fields.forEach((input) => validateField(input, { show: true }))
+      renderSummary(fields.filter((input) => !input.validity.valid))
+    }
+
+    $('#fill-valid').addEventListener('click', () => fillForm(VALID_DATA))
+    $('#fill-invalid').addEventListener('click', () => fillForm(INVALID_DATA))
+
+    // La fecha máxima es hoy: así el navegador marca rangeOverflow en fechas futuras
+    inputs.birthdate.max = toISODate(new Date())
+    renderCardPreview()
+  </script>
+</body>
+
+</html>

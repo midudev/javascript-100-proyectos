@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>28 - Editor de Pixel Art</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --panel: #181b24;
+      --border: #272b38;
+      --muted: #8a90a2;
+      --accent: #7c5cff;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: #e7e9f0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 22px;
+      height: 22px;
+      background:
+        conic-gradient(#ff004d 0 25%, #29adff 0 50%, #ffec27 0 75%, #00e436 0) 0 0 / 11px 11px;
+      border-radius: 4px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button,
+    select {
+      font: inherit;
+      font-size: 14px;
+      color: inherit;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #3a4050;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    button[aria-pressed="true"] {
+      background: #7c5cff33;
+      border-color: var(--accent);
+    }
+
+    main {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-self: start;
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+
+    .panel h2 {
+      margin: 2px 4px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .tools button {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .tools button[aria-pressed="true"] {
+      background: #7c5cff33;
+      border-color: var(--accent);
+    }
+
+    .tools svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* ---------- Lienzo ---------- */
+
+    .stage {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .canvas {
+      --size: 16;
+      --side: min(100%, calc(100dvh - 170px), 620px);
+      width: var(--side);
+      aspect-ratio: 1;
+      display: grid;
+      /* Con CSS Grid, la rejilla de píxeles es una sola línea de CSS */
+      grid-template-columns: repeat(var(--size), 1fr);
+      /* Fondo de cuadros para ver qué píxeles son transparentes */
+      background: repeating-conic-gradient(#e4e6ec 0 25%, #d2d5de 0 50%) 0 0 / calc(200% / var(--size)) calc(200% / var(--size));
+      border-radius: 6px;
+      box-shadow: 0 20px 60px #0008, 0 0 0 1px var(--border);
+      overflow: hidden;
+      cursor: crosshair;
+      /* Sin esto, en móvil arrastrar el dedo haría scroll en vez de pintar */
+      touch-action: none;
+      user-select: none;
+    }
+
+    .canvas.show-grid .cell {
+      box-shadow: inset 0 0 0 .5px #0000001c;
+    }
+
+    .cell:hover {
+      outline: 2px solid #ffffff80;
+      outline-offset: -2px;
+    }
+
+    .status {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- Paleta ---------- */
+
+    .current {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px;
+    }
+
+    .current input {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: none;
+      cursor: pointer;
+    }
+
+    .current input::-webkit-color-swatch-wrapper {
+      padding: 2px;
+    }
+
+    .current input::-webkit-color-swatch {
+      border: 0;
+      border-radius: 7px;
+    }
+
+    .current code {
+      font-size: 14px;
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(4, 28px);
+      gap: 6px;
+    }
+
+    .swatches button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background: var(--color);
+    }
+
+    .swatches button[aria-pressed="true"] {
+      border-color: #fff;
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    kbd {
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+        gap: 10px;
+        padding: 12px 16px;
+      }
+
+      .panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        align-self: stretch;
+        justify-content: center;
+      }
+
+      .panel h2 {
+        display: none;
+      }
+
+      .swatches {
+        grid-template-columns: repeat(8, 28px);
+      }
+
+      .canvas {
+        --side: min(100%, calc(100dvh - 330px));
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1><i class="logo"></i>Pixel Art</h1>
+    <div class="actions">
+      <select id="size" aria-label="Tamaño del lienzo">
+        <option value="16">16 × 16</option>
+        <option value="32">32 × 32</option>
+      </select>
+      <button id="grid-toggle" aria-pressed="true" title="Mostrar rejilla">Rejilla</button>
+      <button id="undo" title="Deshacer (Ctrl+Z)">Deshacer</button>
+      <button id="clear">Limpiar</button>
+      <button id="export" class="primary">Exportar PNG</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel tools" id="tools" aria-label="Herramientas">
+      <button data-tool="pencil" title="Lápiz (B)" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      </button>
+      <button data-tool="eraser" title="Goma (E)" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21" />
+          <path d="M22 21H7" />
+          <path d="m5 11 9 9" />
+        </svg>
+      </button>
+      <button data-tool="fill" title="Cubo de relleno (G)" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z" />
+          <path d="m5 2 5 5" />
+          <path d="M2 13h15" />
+          <path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" />
+        </svg>
+      </button>
+      <button data-tool="picker" title="Cuentagotas (I)" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="m2 22 1-1h3l9-9" />
+          <path d="M3 21v-3l9-9" />
+          <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+        </svg>
+      </button>
+    </aside>
+
+    <section class="stage">
+      <div class="canvas show-grid" id="canvas" role="img" aria-label="Lienzo de pixel art"></div>
+      <p class="status" id="status">Clic izquierdo pinta · clic derecho borra</p>
+    </section>
+
+    <aside class="panel" aria-label="Colores">
+      <h2>Color</h2>
+      <label class="current">
+        <input type="color" id="color-input" value="#ff004d" aria-label="Elegir color">
+        <code id="color-code">#FF004D</code>
+      </label>
+      <div class="swatches" id="swatches"></div>
+    </aside>
+  </main>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // Paleta de PICO-8: 16 colores pensados para pixel art
+    const PALETTE = [
+      '#000000', '#1d2b53', '#7e2553', '#008751',
+      '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8',
+      '#ff004d', '#ffa300', '#ffec27', '#00e436',
+      '#29adff', '#83769c', '#ff77a8', '#ffccaa'
+    ]
+    const TOOL_KEYS = { b: 'pencil', e: 'eraser', g: 'fill', i: 'picker' }
+    const TOOL_NAMES = { pencil: 'Lápiz', eraser: 'Goma', fill: 'Relleno', picker: 'Cuentagotas' }
+    const EXPORT_SIZE = 512
+    const MAX_HISTORY = 50
+    const STORAGE_PREFIX = 'pixel-art-'
+
+    // Dibujo de ejemplo para la primera visita (16x16)
+    const SAMPLE = {
+      colors: { K: '#1d2b53', R: '#ff004d', W: '#fff1e8', S: '#ffccaa' },
+      rows: [
+        '......KKKK......',
+        '....KKRRRRKK....',
+        '...KWWRRRRWWK...',
+        '..KWWWRRRRWWWK..',
+        '.KRWWRRRRRRWWRK.',
+        '.KRRRRWWWWRRRRK.',
+        'KRRRRWWWWWWRRRRK',
+        'KWRRRWWWWWWRRRWK',
+        'KWWRRWWWWWWRRWWK',
+        'KWWRRRWWWWRRRWWK',
+        'KRRKKKKKKKKKKRRK',
+        '.KKSSKSSSSKSSKK.',
+        '..KSSKSSSSKSSK..',
+        '..KSSSSSSSSSSK..',
+        '...KSSSSSSSSK...',
+        '....KKKKKKKK....'
+      ]
+    }
+
+    const $canvas = $('#canvas')
+    const $status = $('#status')
+    const $colorInput = $('#color-input')
+    const $colorCode = $('#color-code')
+    const $swatches = $('#swatches')
+    const $tools = $('#tools')
+    const $size = $('#size')
+
+    const SIZES = [16, 32]
+
+    let size = Number(localStorage.getItem(`${STORAGE_PREFIX}size`))
+    if (!SIZES.includes(size)) size = SIZES[0]
+    let pixels = [] // un color por píxel ('' = transparente)
+    let cells = []
+    let tool = 'pencil'
+    let color = '#ff004d'
+    let history = []
+    let stroke = null // trazo en curso { color, last, snapshot }
+
+    /* ---------- Lienzo ---------- */
+
+    function createCanvas() {
+      $canvas.style.setProperty('--size', size)
+      cells = Array.from({ length: size * size }, () => {
+        const cell = document.createElement('div')
+        cell.className = 'cell'
+        return cell
+      })
+      $canvas.replaceChildren(...cells)
+      pixels.forEach((value, index) => paintCell(index))
+    }
+
+    function paintCell(index) {
+      cells[index].style.backgroundColor = pixels[index] || ''
+    }
+
+    function setPixel(index, value) {
+      if (pixels[index] === value) return
+      pixels[index] = value
+      paintCell(index)
+    }
+
+    // Convierte las coordenadas del puntero en el índice del píxel.
+    // Calcularlo con getBoundingClientRect funciona igual con ratón,
+    // dedo o lápiz, y aunque el puntero esté "capturado"
+    function getCell(event) {
+      const rect = $canvas.getBoundingClientRect()
+      const x = Math.floor((event.clientX - rect.left) / rect.width * size)
+      const y = Math.floor((event.clientY - rect.top) / rect.height * size)
+      if (x < 0 || y < 0 || x >= size || y >= size) return null
+      return { x, y }
+    }
+
+    // Si mueves el ratón rápido, entre dos eventos pointermove puedes
+    // "saltarte" píxeles. Con el algoritmo de Bresenham rellenamos la
+    // línea recta entre la posición anterior y la actual.
+    function drawLine(from, to, value) {
+      let { x, y } = from
+      const dx = Math.abs(to.x - x)
+      const dy = -Math.abs(to.y - y)
+      const stepX = x < to.x ? 1 : -1
+      const stepY = y < to.y ? 1 : -1
+      let error = dx + dy
+
+      while (true) {
+        setPixel(y * size + x, value)
+        if (x === to.x && y === to.y) break
+        const double = 2 * error
+        if (double >= dy) {
+          error += dy
+          x += stepX
+        }
+        if (double <= dx) {
+          error += dx
+          y += stepY
+        }
+      }
+    }
+
+    // Cubo de relleno (flood fill) con una pila en lugar de recursión:
+    // con recursión, una zona grande podría desbordar la pila de llamadas
+    function floodFill(start, value) {
+      const target = pixels[start]
+      if (target === value) return
+
+      const stack = [start]
+      while (stack.length > 0) {
+        const index = stack.pop()
+        if (pixels[index] !== target) continue
+        setPixel(index, value)
+
+        const x = index % size
+        if (x > 0) stack.push(index - 1)
+        if (x < size - 1) stack.push(index + 1)
+        if (index >= size) stack.push(index - size)
+        if (index < size * (size - 1)) stack.push(index + size)
+      }
+    }
+
+    /* ---------- Pointer Events ---------- */
+
+    // Pointer Events unifican ratón, dedo y lápiz en una sola API
+    $canvas.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 && event.button !== 2) return
+      const cell = getCell(event)
+      if (!cell) return
+      event.preventDefault()
+
+      const index = cell.y * size + cell.x
+      // Clic derecho = pintar con transparente (borrar)
+      const value = event.button === 2 || tool === 'eraser' ? '' : color
+
+      if (tool === 'picker') {
+        if (pixels[index]) setColor(pixels[index])
+        setTool('pencil')
+        return
+      }
+
+      saveHistory()
+
+      if (tool === 'fill') {
+        floodFill(index, value)
+        commit()
+        return
+      }
+
+      // setPointerCapture: todos los eventos de este puntero llegarán al
+      // lienzo aunque salga de él. Así el trazo no se corta en los bordes
+      // y en pantallas táctiles funciona igual que con ratón
+      $canvas.setPointerCapture(event.pointerId)
+      stroke = { value, last: cell }
+      setPixel(index, value)
+    })
+
+    $canvas.addEventListener('pointermove', (event) => {
+      const cell = getCell(event)
+      if (cell) $status.textContent = `${TOOL_NAMES[tool]} · x: ${cell.x}, y: ${cell.y}`
+      if (!stroke || !cell) return
+      drawLine(stroke.last, cell, stroke.value)
+      stroke.last = cell
+    })
+
+    function endStroke() {
+      if (!stroke) return
+      stroke = null
+      commit()
+    }
+
+    $canvas.addEventListener('pointerup', endStroke)
+    $canvas.addEventListener('pointercancel', endStroke)
+    // Sin menú contextual: el botón derecho lo usamos para borrar
+    $canvas.addEventListener('contextmenu', (event) => event.preventDefault())
+
+    /* ---------- Historial y guardado ---------- */
+
+    function saveHistory() {
+      history.push([...pixels])
+      if (history.length > MAX_HISTORY) history.shift()
+    }
+
+    // Al terminar una acción: si no ha cambiado nada, la sacamos del
+    // historial; si ha cambiado, guardamos en localStorage
+    function commit() {
+      const last = history.at(-1)
+      if (last && last.every((value, index) => value === pixels[index])) {
+        history.pop()
+        return
+      }
+      save()
+    }
+
+    function undo() {
+      const previous = history.pop()
+      if (!previous) return
+      pixels = previous
+      pixels.forEach((value, index) => paintCell(index))
+      save()
+    }
+
+    function save() {
+      localStorage.setItem(`${STORAGE_PREFIX}${size}`, JSON.stringify(pixels))
+    }
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}${size}`))
+        if (Array.isArray(saved) && saved.length === size * size) return saved
+      } catch {}
+
+      if (size === SAMPLE.rows.length) {
+        return SAMPLE.rows.join('').split('').map(char => SAMPLE.colors[char] ?? '')
+      }
+      return Array(size * size).fill('')
+    }
+
+    // Cada tamaño tiene su propio dibujo guardado
+    function changeSize(newSize) {
+      size = newSize
+      localStorage.setItem(`${STORAGE_PREFIX}size`, size)
+      pixels = load()
+      history = []
+      createCanvas()
+    }
+
+    /* ---------- Exportar a PNG ---------- */
+
+    // Pintamos cada píxel como un cuadrado grande en un <canvas> que
+    // nunca añadimos al DOM, y lo convertimos en un archivo PNG
+    function exportPNG() {
+      const scale = Math.floor(EXPORT_SIZE / size)
+      const canvas = document.createElement('canvas')
+      canvas.width = size * scale
+      canvas.height = size * scale
+      const context = canvas.getContext('2d')
+
+      pixels.forEach((value, index) => {
+        if (!value) return // los transparentes se quedan transparentes
+        context.fillStyle = value
+        context.fillRect((index % size) * scale, Math.floor(index / size) * scale, scale, scale)
+      })
+
+      // toBlob es asíncrono y no bloquea como toDataURL. Creamos una URL
+      // temporal para el blob y "clicamos" un enlace con download
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `pixel-art-${size}x${size}.png`
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }, 'image/png')
+    }
+
+    /* ---------- Herramientas y colores ---------- */
+
+    function setTool(name) {
+      tool = name
+      $tools.querySelectorAll('[data-tool]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.tool === name)
+      })
+      $status.textContent = TOOL_NAMES[name]
+    }
+
+    function setColor(value) {
+      color = value.toLowerCase()
+      $colorInput.value = color
+      $colorCode.textContent = color.toUpperCase()
+      $swatches.querySelectorAll('button').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.color === color)
+      })
+    }
+
+    function createSwatches() {
+      const buttons = PALETTE.map(value => {
+        const button = document.createElement('button')
+        button.dataset.color = value
+        button.style.setProperty('--color', value)
+        button.title = value.toUpperCase()
+        return button
+      })
+      $swatches.append(...buttons)
+    }
+
+    $tools.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-tool]')
+      if (button) setTool(button.dataset.tool)
+    })
+
+    $swatches.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-color]')
+      if (!button) return
+      setColor(button.dataset.color)
+      if (tool !== 'fill') setTool('pencil')
+    })
+
+    $colorInput.addEventListener('input', () => setColor($colorInput.value))
+
+    $size.addEventListener('change', () => changeSize(Number($size.value)))
+
+    $('#grid-toggle').addEventListener('click', (event) => {
+      const visible = $canvas.classList.toggle('show-grid')
+      event.currentTarget.setAttribute('aria-pressed', visible)
+    })
+
+    $('#undo').addEventListener('click', undo)
+    $('#export').addEventListener('click', exportPNG)
+    $('#clear').addEventListener('click', () => {
+      saveHistory()
+      pixels.forEach((value, index) => setPixel(index, ''))
+      commit()
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.target.closest?.('input, select')) return
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        undo()
+        return
+      }
+      const name = TOOL_KEYS[event.key.toLowerCase()]
+      if (name && !event.ctrlKey && !event.metaKey) setTool(name)
+    })
+
+    /* ---------- Inicio ---------- */
+
+    createSwatches()
+    setColor(color)
+    $size.value = size
+    changeSize(size)
+  </script>
+</body>
+
+</html>

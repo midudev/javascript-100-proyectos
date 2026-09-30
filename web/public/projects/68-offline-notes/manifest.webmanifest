@@ -1,0 +1,19 @@
+{
+  "name": "Notas offline",
+  "short_name": "Notas",
+  "description": "Una app de notas instalable que funciona sin conexión",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbf8f1",
+  "theme_color": "#f5b301",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

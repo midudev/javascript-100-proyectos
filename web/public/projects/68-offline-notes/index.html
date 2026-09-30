@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>68 - Notas offline (PWA)</title>
+  <meta name="description" content="Una app de notas instalable que funciona sin conexión">
+  <meta name="theme-color" content="#f5b301">
+  <!-- El manifest describe la app para poder instalarla: nombre, iconos, colores… -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #fbf8f1;
+      --panel: #ffffff;
+      --ink: #26231d;
+      --muted: #7a7466;
+      --line: #ebe5d8;
+      --accent: #f5b301;
+      --accent-ink: #3b2a00;
+      --ok: #16a34a;
+      --warn: #dc2626;
+      --info: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 24px 40px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand img {
+      width: 44px;
+      height: 44px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .chip::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--chip-color, var(--muted));
+    }
+
+    .chip[data-state="ok"] {
+      --chip-color: var(--ok);
+    }
+
+    .chip[data-state="warn"] {
+      --chip-color: var(--warn);
+    }
+
+    .chip[data-state="busy"] {
+      --chip-color: var(--info);
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      padding: 8px 14px;
+      transition: background .15s, transform .1s, box-shadow .15s;
+    }
+
+    button:active {
+      transform: scale(.97);
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 700;
+    }
+
+    .primary:hover {
+      box-shadow: 0 6px 18px #f5b30155;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin: 24px 0 20px;
+    }
+
+    .toolbar input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 16px;
+      font: inherit;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      outline: none;
+    }
+
+    .toolbar input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px #f5b30133;
+    }
+
+    .offline-banner {
+      display: none;
+      margin: -8px 0 16px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #fff1f0;
+      color: #9f1c1c;
+      font-size: 14px;
+    }
+
+    body.is-offline .offline-banner {
+      display: block;
+    }
+
+    /* Rejilla tipo "masonry" con columnas CSS */
+    .notes {
+      columns: 4 230px;
+      column-gap: 16px;
+    }
+
+    .note {
+      position: relative;
+      break-inside: avoid;
+      margin-bottom: 16px;
+      padding: 16px 16px 12px;
+      border-radius: 16px;
+      background: var(--note-color, #fff);
+      border: 1px solid #0000000d;
+      box-shadow: 0 1px 2px #0000000d;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      animation: pop .25s ease both;
+    }
+
+    .note:hover,
+    .note:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px #0000001a;
+      outline: none;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: scale(.97);
+      }
+    }
+
+    .note h2 {
+      margin: 0 0 6px;
+      padding-right: 28px;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .note p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-line-clamp: 8;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .note time {
+      display: block;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #00000073;
+    }
+
+    .note .delete {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 4px 6px;
+      border: 0;
+      background: transparent;
+      opacity: 0;
+      font-size: 14px;
+    }
+
+    .note:hover .delete,
+    .note .delete:focus-visible {
+      opacity: .7;
+    }
+
+    .note .delete:hover {
+      opacity: 1;
+      background: #00000010;
+    }
+
+    .empty {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    /* --- Editor --- */
+    dialog {
+      width: min(560px, calc(100% - 32px));
+      padding: 0;
+      border: 0;
+      border-radius: 22px;
+      background: var(--note-color, #fff);
+      box-shadow: 0 30px 80px #00000040;
+    }
+
+    dialog::backdrop {
+      background: #26231d66;
+      backdrop-filter: blur(3px);
+    }
+
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 20px;
+    }
+
+    .editor input,
+    .editor textarea {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      color: inherit;
+      outline: none;
+    }
+
+    .editor input {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .editor textarea {
+      min-height: 220px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .editor-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .colors {
+      display: flex;
+      gap: 6px;
+    }
+
+    .colors label {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--swatch);
+      border: 2px solid #00000022;
+      cursor: pointer;
+    }
+
+    .colors input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .colors label:has(input:checked) {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 2px #fff inset;
+    }
+
+    .colors label:has(input:focus-visible) {
+      outline: 2px solid var(--info);
+      outline-offset: 2px;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .danger {
+      color: var(--warn);
+    }
+
+    .saved {
+      font-size: 12px;
+      color: #00000080;
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 14px;
+      box-shadow: 0 10px 30px #0004;
+      translate: 0 150%;
+      opacity: 0;
+      visibility: hidden;
+      transition: translate .3s ease, opacity .3s, visibility .3s;
+    }
+
+    .toast.is-visible {
+      translate: 0 0;
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .toast button {
+      padding: 4px 10px;
+      background: transparent;
+      color: var(--accent);
+      border-color: #ffffff33;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 16px;
+      }
+
+      .notes {
+        columns: 2 150px;
+        column-gap: 10px;
+      }
+
+      .note {
+        margin-bottom: 10px;
+      }
+
+      .toast {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <img src="icon.svg" alt="">
+        <div>
+          <h1>Notas offline</h1>
+          <p>Tus notas, con o sin conexión</p>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <span class="chip" id="network-status">Comprobando red…</span>
+        <span class="chip" id="sw-status" title="Estado del Service Worker">Service Worker…</span>
+        <span class="chip" id="cache-status" title="Archivos guardados en la Cache API" hidden></span>
+        <button type="button" class="primary" id="install" hidden>📲 Instalar app</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar notas…" aria-label="Buscar notas">
+      <button type="button" class="primary" id="new-note">＋ Nueva nota</button>
+    </div>
+
+    <p class="offline-banner" role="status">📴 Estás sin conexión. No pasa nada: la app se sirve desde la caché y tus notas se guardan igual.</p>
+
+    <main class="notes" id="notes" aria-live="polite"></main>
+  </div>
+
+  <dialog id="editor">
+    <form class="editor" method="dialog">
+      <input id="note-title" placeholder="Título" aria-label="Título" autocomplete="off">
+      <textarea id="note-content" placeholder="Escribe algo…" aria-label="Contenido"></textarea>
+      <div class="editor-footer">
+        <div class="colors" id="colors" role="radiogroup" aria-label="Color de la nota"></div>
+        <span class="saved" id="saved"></span>
+        <div class="editor-actions">
+          <button type="button" class="danger" id="delete-note">🗑 Borrar</button>
+          <button type="submit" class="primary">Listo</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status">
+    <span id="toast-text"></span>
+    <button type="button" id="toast-undo">Deshacer</button>
+  </div>
+
+  <script type="module">
+    const STORAGE_KEY = 'offline-notes'
+    const CACHE_PREFIX = 'notas-offline-'
+    const COLORS = {
+      amarillo: '#fff3b0',
+      rosa: '#ffd9e2',
+      verde: '#d6f5dd',
+      azul: '#d8e9ff',
+      morado: '#e9ddff',
+      blanco: '#ffffff'
+    }
+    const EXAMPLE_NOTES = [
+      { title: '👋 ¡Bienvenido!', content: 'Esta app funciona sin conexión.\n\nLas notas se guardan en tu navegador (localStorage) y los archivos de la app en la Cache API gracias a un Service Worker.', color: 'amarillo' },
+      { title: '✈️ Prueba el modo avión', content: 'Abre DevTools → Application → Service Workers y marca «Offline» (o desconecta el WiFi). Recarga la página: ¡seguirá funcionando!', color: 'azul' },
+      { title: '📲 Instálala', content: 'Si tu navegador lo permite aparecerá el botón «Instalar app» arriba. Se abrirá en su propia ventana, como una app nativa.', color: 'verde' },
+      { title: '🛒 Lista de la compra', content: '- Leche\n- Pan\n- Café\n- Tomates\n- Aguacates', color: 'rosa' },
+      { title: '💡 Idea', content: 'Terminar los 100 proyectos de JavaScript 🚀', color: 'morado' },
+      { title: '📚 Para leer', content: 'Ciclo de vida del Service Worker: install → waiting → activate → fetch', color: 'blanco' }
+    ]
+    const SW_STATES = {
+      installing: ['Instalando…', 'busy'],
+      installed: ['Instalado, esperando…', 'busy'],
+      activating: ['Activando…', 'busy'],
+      activated: ['Activo', 'ok'],
+      redundant: ['Reemplazado', 'warn']
+    }
+
+    const $notes = document.querySelector('#notes')
+    const $search = document.querySelector('#search')
+    const $editor = document.querySelector('#editor')
+    const $title = document.querySelector('#note-title')
+    const $content = document.querySelector('#note-content')
+    const $colors = document.querySelector('#colors')
+    const $saved = document.querySelector('#saved')
+    const $network = document.querySelector('#network-status')
+    const $sw = document.querySelector('#sw-status')
+    const $cache = document.querySelector('#cache-status')
+    const $install = document.querySelector('#install')
+    const $toast = document.querySelector('#toast')
+    const $toastText = document.querySelector('#toast-text')
+    const $toastUndo = document.querySelector('#toast-undo')
+
+    const relativeTime = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
+
+    let notes = loadNotes()
+    let editingId = null
+    let deferredInstallPrompt = null
+    let lastDeleted = null
+    let toastTimer = null
+
+    // --- Datos ---
+
+    function createExampleNotes() {
+      const now = Date.now()
+      return EXAMPLE_NOTES.map((note, index) => ({
+        id: crypto.randomUUID?.() ?? String(now + index),
+        ...note,
+        createdAt: now - index * 3_600_000,
+        updatedAt: now - index * 3_600_000
+      }))
+    }
+
+    function loadNotes() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        if (Array.isArray(saved)) return saved
+      } catch { }
+      return createExampleNotes()
+    }
+
+    function saveNotes() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
+      } catch {
+        showToast('⚠️ No se pudo guardar (almacenamiento lleno o bloqueado)')
+      }
+    }
+
+    function getNote(id) {
+      return notes.find(note => note.id === id)
+    }
+
+    // --- Render ---
+
+    function normalize(text) {
+      return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    }
+
+    function formatRelative(timestamp) {
+      const seconds = Math.round((timestamp - Date.now()) / 1000)
+      const units = [['day', 86400], ['hour', 3600], ['minute', 60]]
+      for (const [unit, size] of units) {
+        if (Math.abs(seconds) >= size) return relativeTime.format(Math.round(seconds / size), unit)
+      }
+      return 'ahora mismo'
+    }
+
+    function renderNotes() {
+      const query = normalize($search.value.trim())
+      const visible = notes
+        .filter(note => !query || normalize(`${note.title} ${note.content}`).includes(query))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+
+      if (!visible.length) {
+        const empty = document.createElement('p')
+        empty.className = 'empty'
+        empty.textContent = query ? `No hay notas que coincidan con «${$search.value}»` : 'No tienes notas. ¡Crea la primera!'
+        $notes.replaceChildren(empty)
+        return
+      }
+
+      $notes.replaceChildren(...visible.map(note => {
+        const article = document.createElement('article')
+        article.className = 'note'
+        article.tabIndex = 0
+        article.dataset.id = note.id
+        article.style.setProperty('--note-color', COLORS[note.color] ?? COLORS.blanco)
+
+        const title = document.createElement('h2')
+        title.textContent = note.title || 'Sin título'
+        const content = document.createElement('p')
+        content.textContent = note.content
+        const time = document.createElement('time')
+        time.dateTime = new Date(note.updatedAt).toISOString()
+        time.textContent = `Editada ${formatRelative(note.updatedAt)}`
+        const remove = document.createElement('button')
+        remove.type = 'button'
+        remove.className = 'delete'
+        remove.setAttribute('aria-label', 'Borrar nota')
+        remove.textContent = '🗑'
+
+        article.append(title, content, time, remove)
+        return article
+      }))
+    }
+
+    // --- Editor ---
+
+    function renderColorPicker() {
+      $colors.replaceChildren(...Object.entries(COLORS).map(([name, value]) => {
+        const label = document.createElement('label')
+        label.style.setProperty('--swatch', value)
+        label.title = name
+        label.innerHTML = `<input type="radio" name="color" value="${name}" aria-label="${name}">`
+        return label
+      }))
+    }
+
+    function openEditor(id) {
+      const note = getNote(id)
+      if (!note) return
+      editingId = id
+      $title.value = note.title
+      $content.value = note.content
+      const color = COLORS[note.color] ? note.color : 'blanco'
+      $colors.querySelector(`input[value="${color}"]`).checked = true
+      $editor.style.setProperty('--note-color', COLORS[color])
+      $saved.textContent = ''
+      $editor.showModal()
+      if (!note.title && !note.content) $title.focus()
+    }
+
+    function updateEditingNote(changes) {
+      const note = getNote(editingId)
+      if (!note) return
+      Object.assign(note, changes, { updatedAt: Date.now() })
+      saveNotes()
+      $saved.textContent = '✓ Guardado'
+    }
+
+    function createNote() {
+      const now = Date.now()
+      const note = { id: crypto.randomUUID?.() ?? String(now), title: '', content: '', color: 'amarillo', createdAt: now, updatedAt: now }
+      notes.push(note)
+      saveNotes()
+      renderNotes()
+      openEditor(note.id)
+    }
+
+    function deleteNote(id) {
+      const index = notes.findIndex(note => note.id === id)
+      if (index === -1) return
+      lastDeleted = notes[index]
+      notes.splice(index, 1)
+      saveNotes()
+      renderNotes()
+      showToast('Nota borrada', { undo: true })
+    }
+
+    function undoDelete() {
+      if (!lastDeleted) return
+      notes.push(lastDeleted)
+      lastDeleted = null
+      saveNotes()
+      renderNotes()
+      hideToast()
+    }
+
+    function showToast(message, { undo = false } = {}) {
+      $toastText.textContent = message
+      $toastUndo.hidden = !undo
+      $toast.classList.add('is-visible')
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(hideToast, 5000)
+    }
+
+    function hideToast() {
+      $toast.classList.remove('is-visible')
+    }
+
+    // --- Estado de la red ---
+
+    function updateNetworkStatus() {
+      // navigator.onLine solo sabe si hay una red, no si hay Internet de verdad
+      const online = navigator.onLine
+      $network.textContent = online ? 'En línea' : 'Sin conexión'
+      $network.dataset.state = online ? 'ok' : 'warn'
+      document.body.classList.toggle('is-offline', !online)
+    }
+
+    // --- Service Worker ---
+
+    function setSwStatus(text, state) {
+      $sw.textContent = `SW: ${text}`
+      $sw.dataset.state = state
+    }
+
+    function trackWorker(worker) {
+      if (!worker) return
+      const update = () => {
+        const [text, state] = SW_STATES[worker.state] ?? [worker.state, 'busy']
+        const controlled = navigator.serviceWorker.controller && worker.state === 'activated'
+        setSwStatus(controlled ? 'activo, controla la página' : text, state)
+        if (worker.state === 'activated') updateCacheStatus()
+      }
+      update()
+      worker.addEventListener('statechange', update)
+    }
+
+    async function updateCacheStatus() {
+      if (!('caches' in window)) return
+      try {
+        const keys = (await caches.keys()).filter(key => key.startsWith(CACHE_PREFIX))
+        let total = 0
+        for (const key of keys) total += (await (await caches.open(key)).keys()).length
+        $cache.hidden = false
+        $cache.textContent = `${total} archivos en caché`
+        $cache.dataset.state = total ? 'ok' : 'warn'
+      } catch {
+        $cache.hidden = true
+      }
+    }
+
+    async function registerServiceWorker() {
+      if (!('serviceWorker' in navigator)) {
+        setSwStatus('no soportado', 'warn')
+        return
+      }
+
+      try {
+        // Ruta relativa y scope './': el SW solo controla esta carpeta
+        const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' })
+
+        // Seguimos al worker más "nuevo" que exista en cada momento
+        trackWorker(registration.installing ?? registration.waiting ?? registration.active)
+        registration.addEventListener('updatefound', () => trackWorker(registration.installing))
+
+        // controllerchange: un SW nuevo ha empezado a controlar esta página (clients.claim)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          setSwStatus('activo, controla la página', 'ok')
+          updateCacheStatus()
+        })
+      } catch (error) {
+        // Por ejemplo si la página no es un contexto seguro (https o localhost)
+        setSwStatus('error al registrar', 'warn')
+        console.warn('No se pudo registrar el Service Worker:', error.message)
+      }
+    }
+
+    // --- Instalación (PWA) ---
+
+    /*
+      Cuando el navegador considera que la app es instalable (manifest
+      válido + Service Worker + https) lanza 'beforeinstallprompt'.
+      Lo guardamos para mostrar nuestro propio botón en lugar del aviso
+      por defecto. Solo existe en navegadores basados en Chromium.
+    */
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault()
+      deferredInstallPrompt = event
+      $install.hidden = false
+    })
+
+    $install.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return
+      deferredInstallPrompt.prompt()
+      const { outcome } = await deferredInstallPrompt.userChoice
+      deferredInstallPrompt = null
+      $install.hidden = true
+      if (outcome === 'accepted') showToast('📲 ¡App instalada!')
+    })
+
+    window.addEventListener('appinstalled', () => {
+      $install.hidden = true
+    })
+
+    // --- Eventos ---
+
+    $notes.addEventListener('click', (event) => {
+      const article = event.target.closest('.note')
+      if (!article) return
+      if (event.target.closest('.delete')) deleteNote(article.dataset.id)
+      else openEditor(article.dataset.id)
+    })
+
+    $notes.addEventListener('keydown', (event) => {
+      const article = event.target.closest('.note')
+      if (!article || event.target !== article) return
+      if (event.key === 'Enter') openEditor(article.dataset.id)
+      if (event.key === 'Delete') deleteNote(article.dataset.id)
+    })
+
+    $title.addEventListener('input', () => updateEditingNote({ title: $title.value }))
+    $content.addEventListener('input', () => updateEditingNote({ content: $content.value }))
+    $colors.addEventListener('change', (event) => {
+      updateEditingNote({ color: event.target.value })
+      $editor.style.setProperty('--note-color', COLORS[event.target.value])
+    })
+
+    document.querySelector('#delete-note').addEventListener('click', () => {
+      const id = editingId
+      $editor.close()
+      deleteNote(id)
+    })
+
+    $editor.addEventListener('close', () => {
+      const note = getNote(editingId)
+      // Una nota nueva que se cierra vacía no merece la pena guardarla
+      if (note && !note.title.trim() && !note.content.trim()) {
+        notes = notes.filter(n => n.id !== note.id)
+        saveNotes()
+      }
+      editingId = null
+      renderNotes()
+    })
+
+    // Click en el fondo (backdrop) del diálogo para cerrarlo
+    $editor.addEventListener('click', (event) => {
+      if (event.target === $editor) $editor.close()
+    })
+
+    document.querySelector('#new-note').addEventListener('click', createNote)
+    $search.addEventListener('input', renderNotes)
+    $toastUndo.addEventListener('click', undoDelete)
+
+    window.addEventListener('online', updateNetworkStatus)
+    window.addEventListener('offline', updateNetworkStatus)
+
+    // Si editas en otra pestaña, esta se actualiza sola
+    window.addEventListener('storage', (event) => {
+      if (event.key !== STORAGE_KEY) return
+      notes = loadNotes()
+      renderNotes()
+    })
+
+    renderColorPicker()
+    renderNotes()
+    saveNotes()
+    updateNetworkStatus()
+    registerServiceWorker()
+  </script>
+</body>
+
+</html>

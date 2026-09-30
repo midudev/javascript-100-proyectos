@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>50 - Piano sintetizador</title>
+  <style>
+    :root {
+      --bg: #0c0a14;
+      --panel: #16131f;
+      --border: #2b2638;
+      --text: #efeaf8;
+      --muted: #978fae;
+      --accent: #a78bfa;
+      --accent-2: #22d3ee;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 14px;
+      padding: 16px clamp(16px, 3vw, 32px);
+      background:
+        radial-gradient(900px 400px at 50% 120%, rgb(167 139 250 / 22%), transparent),
+        radial-gradient(600px 300px at 100% 0%, rgb(34 211 238 / 10%), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 26px);
+    }
+
+    h1 small {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .display {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 260px;
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0a0812;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .display strong {
+      font-size: 26px;
+      color: var(--accent);
+      text-shadow: 0 0 16px rgb(167 139 250 / 60%);
+    }
+
+    .display span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(200px, 1fr) minmax(320px, 1.6fr) minmax(220px, 1fr);
+      gap: 14px;
+    }
+
+    .panel {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--muted);
+    }
+
+    .waves {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .waves label {
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      padding: 6px 2px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .waves input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .waves svg {
+      width: 30px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .waves label:has(input:checked) {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgb(167 139 250 / 15%);
+    }
+
+    .waves label:has(input:focus-visible) {
+      outline: 2px solid var(--accent);
+    }
+
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    button {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #1f1a2c;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    .adsr {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+      align-items: center;
+    }
+
+    .sliders {
+      display: grid;
+      gap: 6px;
+    }
+
+    .slider {
+      display: grid;
+      grid-template-columns: 62px 1fr 48px;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .slider output {
+      text-align: right;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      border-radius: 8px;
+      background: #0a0812;
+    }
+
+    #adsr-graph {
+      height: 110px;
+    }
+
+    #scope {
+      height: 70px;
+    }
+
+    .octave {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .octave strong {
+      min-width: 70px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- Piano ---------- */
+
+    .piano-wrapper {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    .piano {
+      position: relative;
+      display: flex;
+      width: min(100%, 1100px);
+      height: min(100%, 300px);
+      min-height: 150px;
+      padding: 14px 14px 10px;
+      border-radius: 16px 16px 12px 12px;
+      background: linear-gradient(#221c30, #151120);
+      box-shadow: 0 30px 60px -30px black, inset 0 1px 0 rgb(255 255 255 / 8%);
+      user-select: none;
+      /* Evita que el navegador haga scroll/zoom al tocar las teclas */
+      touch-action: none;
+    }
+
+    .keys {
+      position: relative;
+      display: flex;
+      flex: 1;
+    }
+
+    .key {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 4px;
+      padding-bottom: 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .key.white {
+      flex: 1;
+      margin: 0 1px;
+      border-radius: 0 0 8px 8px;
+      background: linear-gradient(#fff 80%, #e9e6f2);
+      color: #6a6280;
+      box-shadow: inset 0 -6px 0 #d4cfe0;
+      transition: background .05s, box-shadow .05s;
+    }
+
+    .key.black {
+      position: absolute;
+      top: 0;
+      z-index: 1;
+      width: calc(100% / var(--whites) * .6);
+      height: 62%;
+      border-radius: 0 0 6px 6px;
+      background: linear-gradient(#2d2640, #0e0b16);
+      color: #b8b0cf;
+      box-shadow: inset 0 -5px 0 #000, 0 4px 8px rgb(0 0 0 / 50%);
+      transform: translateX(-50%);
+    }
+
+    .key kbd {
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 12px;
+      opacity: .8;
+    }
+
+    .key.white.active {
+      background: linear-gradient(#e4dbff, var(--accent));
+      box-shadow: inset 0 -2px 0 #8b6cf0, 0 0 24px rgb(167 139 250 / 70%);
+      color: #2a1f45;
+    }
+
+    .key.black.active {
+      background: linear-gradient(#6d4fd8, #3b2a7a);
+      box-shadow: inset 0 -2px 0 #000, 0 0 20px rgb(167 139 250 / 80%);
+    }
+
+    footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer kbd {
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      color: var(--text);
+    }
+
+    @media (width < 900px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+        overflow: auto;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .adsr {
+        grid-template-columns: 1fr;
+      }
+
+      .piano {
+        height: 220px;
+      }
+
+      .key kbd {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const WHITE_SEMITONES = [0, 2, 4, 5, 7, 9, 11]
+    const NOTE_NAMES_ES = ['Do', 'Do♯', 'Re', 'Re♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si']
+    const NOTE_NAMES_EN = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+    const TOTAL_KEYS = 25 // dos octavas + el Do final
+    const MIN_OCTAVE = 1
+    const MAX_OCTAVE = 6
+    const PEAK_GAIN = 0.3
+    const HOLD_PREVIEW = 0.6 // segundos de "sustain" que dibujamos en la gráfica
+
+    // Usamos event.code (tecla FÍSICA) y no event.key: así funciona igual en
+    // un teclado español, inglés o francés. El valor es el semitono desde el primer Do
+    const KEY_TO_SEMITONE = {
+      KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8,
+      KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16,
+      Quote: 17, BracketRight: 18
+    }
+    const FALLBACK_LABELS = { Semicolon: 'Ñ', Quote: '´', BracketRight: '+' }
+
+    const PRESETS = {
+      Piano: { wave: 'triangle', attack: 0.005, decay: 0.6, sustain: 0.25, release: 0.5 },
+      Órgano: { wave: 'sine', attack: 0.02, decay: 0.1, sustain: 0.9, release: 0.1 },
+      Pluck: { wave: 'sawtooth', attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 },
+      Pad: { wave: 'sawtooth', attack: 0.8, decay: 0.5, sustain: 0.7, release: 1.5 },
+      '8 bits': { wave: 'square', attack: 0.001, decay: 0.05, sustain: 0.6, release: 0.05 }
+    }
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const keysElement = $('#keys')
+    const noteDisplay = $('#note')
+    const frequencyDisplay = $('#frequency')
+    const chordDisplay = $('#chord')
+    const octaveDisplay = $('#octave')
+    const graphCanvas = $('#adsr-graph')
+    const scopeCanvas = $('#scope')
+
+    const sliders = {
+      attack: $('#attack'),
+      decay: $('#decay'),
+      sustain: $('#sustain'),
+      release: $('#release'),
+      volume: $('#volume')
+    }
+
+    let audioContext = null
+    let masterGain = null
+    let analyser = null
+    let baseOctave = 4
+    let keyLabels = {}
+
+    // Polifonía: cada nota que suena tiene su propio oscilador y su propia envolvente.
+    // Map<númeroMIDI, { oscillator, gain }>
+    const activeVoices = new Map()
+    // Qué nota está tocando cada dedo/ratón (para multitáctil)
+    const pointerNotes = new Map()
+
+    // ---------- Teoría musical ----------
+
+    // La nota MIDI 69 es el La4 (A4), que por convenio suena a 440 Hz.
+    // Cada semitono multiplica la frecuencia por 2^(1/12): tras 12 semitones
+    // (una octava) la frecuencia se duplica. De ahí la fórmula:
+    //   f = 440 · 2^((n - 69) / 12)
+    function midiToFrequency(midi) {
+      return 440 * 2 ** ((midi - 69) / 12)
+    }
+
+    function getNoteName(midi, names = NOTE_NAMES_ES) {
+      const octave = Math.floor(midi / 12) - 1
+      return `${names[midi % 12]}${octave}`
+    }
+
+    const getBaseMidi = () => (baseOctave + 1) * 12 // Do de la octava base
+
+    // ---------- Audio ----------
+
+    function getSettings() {
+      return {
+        wave: document.querySelector('input[name="wave"]:checked').value,
+        attack: Number(sliders.attack.value),
+        decay: Number(sliders.decay.value),
+        sustain: Number(sliders.sustain.value),
+        release: Number(sliders.release.value)
+      }
+    }
+
+    function initAudio() {
+      // El navegador solo deja crear/arrancar audio tras una interacción del usuario
+      if (!audioContext) {
+        audioContext = new AudioContext()
+        masterGain = new GainNode(audioContext, { gain: Number(sliders.volume.value) })
+        // Un compresor evita que se sature al tocar muchos acordes
+        const compressor = new DynamicsCompressorNode(audioContext, { threshold: -12, ratio: 6 })
+        analyser = new AnalyserNode(audioContext, { fftSize: 2048 })
+        masterGain.connect(compressor).connect(analyser).connect(audioContext.destination)
+      }
+      if (audioContext.state === 'suspended') audioContext.resume()
+    }
+
+    function noteOn(midi) {
+      initAudio()
+      if (activeVoices.has(midi)) return
+
+      const { wave, attack, decay, sustain } = getSettings()
+      const now = audioContext.currentTime
+
+      const oscillator = new OscillatorNode(audioContext, { type: wave, frequency: midiToFrequency(midi) })
+      const gain = new GainNode(audioContext, { gain: 0 })
+
+      // Envolvente ADSR: programamos cómo cambia el volumen en el tiempo
+      //  A (attack): de 0 al máximo
+      //  D (decay): del máximo al nivel de sustain
+      //  S (sustain): se mantiene mientras la tecla siga pulsada
+      //  R (release): al soltar, baja a 0 (en noteOff)
+      gain.gain.setValueAtTime(0, now)
+      gain.gain.linearRampToValueAtTime(PEAK_GAIN, now + attack)
+      gain.gain.linearRampToValueAtTime(PEAK_GAIN * sustain, now + attack + decay)
+
+      oscillator.connect(gain).connect(masterGain)
+      oscillator.start(now)
+
+      activeVoices.set(midi, { oscillator, gain })
+      getKeyElement(midi)?.classList.add('active')
+      updateDisplay(midi)
+    }
+
+    function noteOff(midi) {
+      const voice = activeVoices.get(midi)
+      if (!voice) return
+      activeVoices.delete(midi)
+
+      const { release } = getSettings()
+      const now = audioContext.currentTime
+      const { gain, oscillator } = voice
+
+      // Si soltamos a mitad del attack/decay, partimos del volumen ACTUAL
+      // (si no, el volumen saltaría de golpe y se oiría un "clic")
+      if (gain.gain.cancelAndHoldAtTime) {
+        gain.gain.cancelAndHoldAtTime(now)
+      } else {
+        const currentValue = gain.gain.value
+        gain.gain.cancelScheduledValues(now)
+        gain.gain.setValueAtTime(currentValue, now)
+      }
+      gain.gain.linearRampToValueAtTime(0, now + release)
+
+      oscillator.stop(now + release + 0.02)
+      // Al terminar desconectamos los nodos para que el recolector de basura los libere
+      oscillator.addEventListener('ended', () => {
+        oscillator.disconnect()
+        gain.disconnect()
+      })
+
+      getKeyElement(midi)?.classList.remove('active')
+      updateDisplay()
+    }
+
+    function stopAll() {
+      for (const midi of [...activeVoices.keys()]) noteOff(midi)
+      pointerNotes.clear()
+    }
+
+    // ---------- Piano ----------
+
+    function getKeyElement(midi) {
+      return keysElement.querySelector(`[data-midi="${midi}"]`)
+    }
+
+    function buildPiano() {
+      stopAll()
+      const baseMidi = getBaseMidi()
+      const semitoneToCode = Object.fromEntries(Object.entries(KEY_TO_SEMITONE).map(([code, semitone]) => [semitone, code]))
+      const whiteCount = Array.from({ length: TOTAL_KEYS }, (_, i) => i).filter((i) => WHITE_SEMITONES.includes(i % 12)).length
+
+      keysElement.style.setProperty('--whites', whiteCount)
+      keysElement.innerHTML = ''
+      let whiteIndex = 0
+
+      for (let semitone = 0; semitone < TOTAL_KEYS; semitone++) {
+        const midi = baseMidi + semitone
+        const isWhite = WHITE_SEMITONES.includes(semitone % 12)
+        const code = semitoneToCode[semitone]
+        const key = document.createElement('div')
+
+        key.className = `key ${isWhite ? 'white' : 'black'}`
+        key.dataset.midi = midi
+        key.setAttribute('aria-label', getNoteName(midi))
+        key.innerHTML = `${code ? `<kbd>${keyLabels[code]}</kbd>` : ''}${isWhite && semitone % 12 === 0 ? `<span>${getNoteName(midi)}</span>` : ''}`
+
+        // Las teclas negras se colocan encima, en la frontera entre dos blancas
+        if (!isWhite) key.style.left = `calc(100% / ${whiteCount} * ${whiteIndex})`
+        else whiteIndex++
+
+        keysElement.append(key)
+      }
+
+      octaveDisplay.textContent = `${getNoteName(baseMidi)} – ${getNoteName(baseMidi + TOTAL_KEYS - 1)}`
+    }
+
+    function changeOctave(delta) {
+      const next = Math.min(Math.max(baseOctave + delta, MIN_OCTAVE), MAX_OCTAVE)
+      if (next === baseOctave) return
+      baseOctave = next
+      buildPiano()
+    }
+
+    function setDefaultKeyLabels() {
+      keyLabels = Object.fromEntries(Object.keys(KEY_TO_SEMITONE).map((code) => [
+        code,
+        FALLBACK_LABELS[code] ?? code.replace('Key', '')
+      ]))
+    }
+
+    async function loadKeyLabels() {
+      // En Chrome podemos preguntar qué letra hay realmente en cada tecla física
+      try {
+        const layout = await navigator.keyboard?.getLayoutMap()
+        if (!layout) return
+        for (const code of Object.keys(keyLabels)) {
+          if (layout.has(code)) keyLabels[code] = layout.get(code).toUpperCase()
+        }
+        if (activeVoices.size === 0) buildPiano()
+      } catch {
+        // Sin permiso (por ejemplo dentro de un iframe) usamos las etiquetas por defecto
+      }
+    }
+
+    function updateDisplay(midi) {
+      const notes = [...activeVoices.keys()].sort((a, b) => a - b)
+      const lastNote = midi ?? notes.at(-1)
+
+      if (lastNote !== undefined) {
+        noteDisplay.textContent = getNoteName(lastNote)
+        frequencyDisplay.textContent = `${getNoteName(lastNote, NOTE_NAMES_EN)} · ${midiToFrequency(lastNote).toFixed(2)} Hz`
+      }
+      chordDisplay.textContent = notes.length > 1 ? notes.map((note) => getNoteName(note)).join(' ') : ''
+    }
+
+    // ---------- Gráficas: envolvente ADSR y osciloscopio ----------
+
+    function setupCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1
+      const { width, height } = canvas.getBoundingClientRect()
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      const context = canvas.getContext('2d')
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
+      return { context, width, height }
+    }
+
+    function drawEnvelope() {
+      const { context, width, height } = setupCanvas(graphCanvas)
+      const { attack, decay, sustain, release } = getSettings()
+      const total = attack + decay + HOLD_PREVIEW + release
+      const pad = 10
+      const top = 24 // hueco arriba para las etiquetas A D S R
+      const x = (time) => pad + (time / total) * (width - pad * 2)
+      const y = (level) => height - pad - level * (height - pad - top)
+
+      const points = [
+        [0, 0],
+        [attack, 1],
+        [attack + decay, sustain],
+        [attack + decay + HOLD_PREVIEW, sustain],
+        [total, 0]
+      ]
+
+      const gradient = context.createLinearGradient(0, 0, width, 0)
+      gradient.addColorStop(0, '#22d3ee')
+      gradient.addColorStop(1, '#a78bfa')
+
+      context.beginPath()
+      points.forEach(([time, level], index) => {
+        index === 0 ? context.moveTo(x(time), y(level)) : context.lineTo(x(time), y(level))
+      })
+      context.lineTo(x(total), y(0))
+      context.strokeStyle = gradient
+      context.lineWidth = 2.5
+      context.lineJoin = 'round'
+      context.stroke()
+
+      context.lineTo(x(0), y(0))
+      context.globalAlpha = 0.15
+      context.fillStyle = gradient
+      context.fill()
+      context.globalAlpha = 1
+
+      // Etiquetas de cada fase
+      context.fillStyle = '#978fae'
+      context.font = '600 11px system-ui'
+      context.textAlign = 'center'
+      const labels = ['A', 'D', 'S', 'R']
+      for (let i = 0; i < 4; i++) {
+        const middle = (points[i][0] + points[i + 1][0]) / 2
+        context.fillText(labels[i], x(middle), 15)
+      }
+    }
+
+    const scope = setupCanvas(scopeCanvas)
+    let scopeData = null
+
+    function getIdealWave(type, phase) {
+      const WAVES = {
+        sine: () => Math.sin(phase * Math.PI * 2),
+        square: () => (phase % 1 < 0.5 ? 1 : -1),
+        sawtooth: () => 2 * (phase % 1) - 1,
+        triangle: () => 1 - 4 * Math.abs((phase % 1) - 0.5)
+      }
+      return WAVES[type]()
+    }
+
+    function drawScope() {
+      const { context, width, height } = scope
+      context.clearRect(0, 0, width, height)
+      context.lineWidth = 2
+      context.beginPath()
+
+      if (analyser && !scopeData) scopeData = new Float32Array(analyser.fftSize)
+      const data = analyser ? scopeData : null
+      if (data) analyser.getFloatTimeDomainData(data)
+      const isPlaying = data && data.some((value) => Math.abs(value) > 0.002)
+
+      if (isPlaying) {
+        // "Trigger" como en un osciloscopio real: empezamos a dibujar en un cruce
+        // por cero ascendente para que la onda se vea quieta y no bailando
+        let start = 0
+        for (let i = 1; i < data.length / 2; i++) {
+          if (data[i - 1] < 0 && data[i] >= 0) {
+            start = i
+            break
+          }
+        }
+        const samples = data.length / 2
+        for (let i = 0; i < samples; i++) {
+          const px = (i / samples) * width
+          const py = height / 2 - data[start + i] * height * 1.2
+          i === 0 ? context.moveTo(px, py) : context.lineTo(px, py)
+        }
+        context.strokeStyle = '#22d3ee'
+        context.shadowColor = '#22d3ee'
+        context.shadowBlur = 8
+      } else {
+        // Sin sonido mostramos la forma ideal de la onda elegida
+        const { wave } = getSettings()
+        for (let px = 0; px <= width; px++) {
+          const py = height / 2 - getIdealWave(wave, (px / width) * 3) * height * 0.32
+          px === 0 ? context.moveTo(px, py) : context.lineTo(px, py)
+        }
+        context.strokeStyle = 'rgb(167 139 250 / 55%)'
+        context.shadowBlur = 0
+      }
+
+      context.stroke()
+      context.shadowBlur = 0
+      requestAnimationFrame(drawScope)
+    }
+
+    function updateSliderOutputs() {
+      for (const [name, input] of Object.entries(sliders)) {
+        const value = Number(input.value)
+        const output = document.querySelector(`output[for="${name}"]`)
+        output.textContent = ['sustain', 'volume'].includes(name) ? `${Math.round(value * 100)}%` : `${value.toFixed(2)} s`
+      }
+      if (masterGain) masterGain.gain.setTargetAtTime(Number(sliders.volume.value), audioContext.currentTime, 0.02)
+      drawEnvelope()
+    }
+
+    function applyPreset(name) {
+      const { wave, ...envelope } = PRESETS[name]
+      document.querySelector(`input[name="wave"][value="${wave}"]`).checked = true
+      for (const [param, value] of Object.entries(envelope)) sliders[param].value = value
+      updateSliderOutputs()
+    }
+
+    // ---------- Eventos: teclado del ordenador ----------
+
+    document.addEventListener('keydown', (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      // Al mantener una tecla, el sistema repite keydown sin parar (key repeat).
+      // Si no lo ignoramos, la nota se reiniciaría constantemente
+      if (event.repeat) return
+
+      if (event.code === 'KeyZ') return changeOctave(-1)
+      if (event.code === 'KeyX') return changeOctave(1)
+
+      const semitone = KEY_TO_SEMITONE[event.code]
+      if (semitone === undefined) return
+      event.preventDefault()
+      noteOn(getBaseMidi() + semitone)
+    })
+
+    document.addEventListener('keyup', (event) => {
+      const semitone = KEY_TO_SEMITONE[event.code]
+      if (semitone !== undefined) noteOff(getBaseMidi() + semitone)
+    })
+
+    // Si la ventana pierde el foco no recibiremos los keyup: paramos todo
+    window.addEventListener('blur', stopAll)
+
+    // ---------- Eventos: ratón y pantallas táctiles ----------
+
+    function playPointerNote(pointerId, midi) {
+      const previous = pointerNotes.get(pointerId)
+      if (previous === midi) return
+      if (previous !== undefined) noteOff(previous)
+      pointerNotes.set(pointerId, midi)
+      noteOn(midi)
+    }
+
+    function releasePointer(event) {
+      const midi = pointerNotes.get(event.pointerId)
+      if (midi === undefined) return
+      pointerNotes.delete(event.pointerId)
+      // Solo paramos la nota si ningún otro dedo la está tocando
+      if (![...pointerNotes.values()].includes(midi)) noteOff(midi)
+    }
+
+    keysElement.addEventListener('pointerdown', (event) => {
+      const key = event.target.closest('.key')
+      if (!key) return
+      // En táctil el navegador "captura" el puntero en el elemento donde empezó
+      // y no dispara eventos en las demás teclas. La liberamos para poder hacer glissando
+      key.releasePointerCapture?.(event.pointerId)
+      playPointerNote(event.pointerId, Number(key.dataset.midi))
+    })
+
+    keysElement.addEventListener('pointerover', (event) => {
+      if (!pointerNotes.has(event.pointerId)) return
+      const key = event.target.closest('.key')
+      if (key) playPointerNote(event.pointerId, Number(key.dataset.midi))
+    })
+
+    document.addEventListener('pointerup', releasePointer)
+    document.addEventListener('pointercancel', releasePointer)
+    keysElement.addEventListener('pointerleave', releasePointer)
+
+    // ---------- Controles ----------
+
+    for (const input of Object.values(sliders)) input.addEventListener('input', updateSliderOutputs)
+    document.querySelectorAll('input[name="wave"]').forEach((radio) => radio.addEventListener('change', drawEnvelope))
+    $('#octave-down').addEventListener('click', () => changeOctave(-1))
+    $('#octave-up').addEventListener('click', () => changeOctave(1))
+
+    $('#presets').innerHTML = Object.keys(PRESETS).map((name) => `<button data-preset="${name}">${name}</button>`).join('')
+    $('#presets').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-preset]')
+      if (button) applyPreset(button.dataset.preset)
+    })
+
+    window.addEventListener('resize', () => {
+      Object.assign(scope, setupCanvas(scopeCanvas))
+      drawEnvelope()
+    })
+
+    setDefaultKeyLabels()
+    buildPiano()
+    loadKeyLabels()
+    applyPreset('Piano')
+    drawScope()
+  </script>
+</head>
+
+<body>
+  <header>
+    <h1>🎹 Piano sintetizador <small>Toca con el teclado del ordenador, el ratón o los dedos</small></h1>
+    <div class="display" aria-live="polite">
+      <strong id="note">La4</strong>
+      <span id="frequency">A4 · 440.00 Hz</span>
+      <span id="chord"></span>
+    </div>
+  </header>
+
+  <section class="controls">
+    <div class="panel">
+      <h2>Forma de onda</h2>
+      <div class="waves">
+        <label>
+          <input type="radio" name="wave" value="sine">
+          <svg viewBox="0 0 30 18"><path d="M1 9 C 5 -2, 10 -2, 15 9 S 25 20, 29 9" /></svg>
+          Seno
+        </label>
+        <label>
+          <input type="radio" name="wave" value="square">
+          <svg viewBox="0 0 30 18"><path d="M1 15 V3 H15 V15 H29 V3" /></svg>
+          Cuadrada
+        </label>
+        <label>
+          <input type="radio" name="wave" value="sawtooth">
+          <svg viewBox="0 0 30 18"><path d="M1 15 L15 3 V15 L29 3 V15" /></svg>
+          Sierra
+        </label>
+        <label>
+          <input type="radio" name="wave" value="triangle" checked>
+          <svg viewBox="0 0 30 18"><path d="M1 15 L8 3 L15 15 L22 3 L29 15" /></svg>
+          Triángulo
+        </label>
+      </div>
+      <h2>Presets</h2>
+      <div id="presets" class="presets"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Envolvente ADSR</h2>
+      <div class="adsr">
+        <div class="sliders">
+          <label class="slider">Attack <input id="attack" type="range" min="0.001" max="2" step="0.001"><output for="attack"></output></label>
+          <label class="slider">Decay <input id="decay" type="range" min="0.01" max="2" step="0.01"><output for="decay"></output></label>
+          <label class="slider">Sustain <input id="sustain" type="range" min="0" max="1" step="0.01"><output for="sustain"></output></label>
+          <label class="slider">Release <input id="release" type="range" min="0.01" max="3" step="0.01"><output for="release"></output></label>
+        </div>
+        <canvas id="adsr-graph" aria-label="Gráfica de la envolvente ADSR"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Salida</h2>
+      <canvas id="scope" aria-label="Osciloscopio"></canvas>
+      <label class="slider">Volumen <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7"><output for="volume"></output></label>
+      <div class="octave">
+        <button id="octave-down" aria-label="Bajar octava">− <kbd>Z</kbd></button>
+        <strong id="octave"></strong>
+        <button id="octave-up" aria-label="Subir octava">+ <kbd>X</kbd></button>
+      </div>
+    </div>
+  </section>
+
+  <div class="piano-wrapper">
+    <div class="piano">
+      <div id="keys" class="keys"></div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Blancas: <kbd>A</kbd>…<kbd>L</kbd></span>
+    <span>Negras: <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>O</kbd> <kbd>P</kbd></span>
+    <span>Octava: <kbd>Z</kbd> / <kbd>X</kbd></span>
+  </footer>
+</body>
+
+</html>

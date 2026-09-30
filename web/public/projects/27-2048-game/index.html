@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>27 - 2048</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --size: 4;
+      --gap: clamp(8px, 2vmin, 14px);
+      --board: min(440px, 92vw, calc(100dvh - 230px));
+      --cell: calc((var(--board) - var(--gap) * (var(--size) + 1)) / var(--size));
+      --slide: 110ms;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: #faf8ef;
+      color: #776e65;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .game {
+      width: var(--board);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(44px, 9vmin, 64px);
+      font-weight: 900;
+      line-height: 1;
+      color: #776e65;
+    }
+
+    .scores {
+      display: flex;
+      gap: 6px;
+    }
+
+    .score {
+      position: relative;
+      min-width: 76px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #bbada0;
+      color: #fff;
+      text-align: center;
+    }
+
+    .score small {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #eee4da;
+    }
+
+    .score strong {
+      font-size: 20px;
+    }
+
+    .gain {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 20px;
+      font-weight: 800;
+      color: #776e65cc;
+      animation: gain .6s ease-in forwards;
+    }
+
+    @keyframes gain {
+      to {
+        top: -24px;
+        opacity: 0;
+      }
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .controls p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    button {
+      font: inherit;
+      font-weight: 700;
+      padding: 9px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #8f7a66;
+      color: #f9f6f2;
+      cursor: pointer;
+    }
+
+    button svg {
+      display: block;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    /* ---------- Tablero ---------- */
+
+    .board {
+      position: relative;
+      width: var(--board);
+      height: var(--board);
+      padding: var(--gap);
+      border-radius: 10px;
+      background: #bbada0;
+      /* Evita que el navegador haga scroll al deslizar el dedo */
+      touch-action: none;
+    }
+
+    .cells {
+      display: grid;
+      grid-template-columns: repeat(var(--size), var(--cell));
+      gap: var(--gap);
+    }
+
+    .cells span {
+      height: var(--cell);
+      border-radius: 6px;
+      background: #cdc1b4;
+    }
+
+    /* Cada ficha se posiciona con variables CSS (--x, --y). Al cambiarlas,
+       la transición de transform hace que la ficha "se deslice" */
+    .tile {
+      position: absolute;
+      top: var(--gap);
+      left: var(--gap);
+      width: var(--cell);
+      height: var(--cell);
+      transform: translate(calc(var(--x) * (var(--cell) + var(--gap))),
+          calc(var(--y) * (var(--cell) + var(--gap))));
+      transition: transform var(--slide) ease-in-out;
+    }
+
+    .tile-inner {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: calc(var(--cell) * .45);
+      background: var(--bg);
+      color: var(--fg, #f9f6f2);
+      box-shadow: var(--glow, none);
+    }
+
+    .tile.new .tile-inner {
+      animation: appear 200ms ease var(--slide) backwards;
+    }
+
+    .tile.merged {
+      z-index: 2;
+    }
+
+    .tile.merged .tile-inner {
+      animation: pop 200ms ease var(--slide) backwards;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        scale: 0;
+      }
+    }
+
+    @keyframes pop {
+      0% {
+        scale: 0;
+      }
+
+      50% {
+        scale: 1.2;
+      }
+
+      100% {
+        scale: 1;
+      }
+    }
+
+    /* Colores por valor */
+    .tile[data-value="2"] { --bg: #eee4da; --fg: #776e65 }
+    .tile[data-value="4"] { --bg: #ede0c8; --fg: #776e65 }
+    .tile[data-value="8"] { --bg: #f2b179 }
+    .tile[data-value="16"] { --bg: #f59563 }
+    .tile[data-value="32"] { --bg: #f67c5f }
+    .tile[data-value="64"] { --bg: #f65e3b }
+    .tile[data-value="128"] { --bg: #edcf72; --glow: 0 0 20px 4px #f3d77466 }
+    .tile[data-value="256"] { --bg: #edcc61; --glow: 0 0 20px 6px #f3d77477 }
+    .tile[data-value="512"] { --bg: #edc850; --glow: 0 0 22px 8px #f3d77488 }
+    .tile[data-value="1024"] { --bg: #edc53f; --glow: 0 0 24px 10px #f3d77499 }
+    .tile[data-value="2048"] { --bg: #edc22e; --glow: 0 0 28px 12px #f3d774aa }
+    .tile.super { --bg: #3c3a32 }
+
+    .tile[data-value="128"] .tile-inner,
+    .tile[data-value="256"] .tile-inner,
+    .tile[data-value="512"] .tile-inner {
+      font-size: calc(var(--cell) * .38);
+    }
+
+    .tile[data-value="1024"] .tile-inner,
+    .tile[data-value="2048"] .tile-inner,
+    .tile.super .tile-inner {
+      font-size: calc(var(--cell) * .3);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      border-radius: 10px;
+      background: #eee4daba;
+      animation: fade .5s ease .3s backwards;
+    }
+
+    .overlay.win {
+      background: #edc22e88;
+      color: #f9f6f2;
+    }
+
+    .overlay[hidden] {
+      display: none;
+    }
+
+    .overlay h2 {
+      margin: 0;
+      font-size: clamp(26px, 5.5vmin, 42px);
+    }
+
+    .overlay div {
+      display: flex;
+      gap: 8px;
+    }
+
+    @keyframes fade {
+      from {
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="game">
+    <div class="top">
+      <h1>2048</h1>
+      <div class="scores">
+        <div class="score"><small>Puntos</small><strong id="score">0</strong></div>
+        <div class="score"><small>Mejor</small><strong id="best">0</strong></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <p>Une las fichas y llega a <strong>2048</strong>. Usa las flechas o desliza el dedo.</p>
+      <div class="buttons">
+        <button id="undo" title="Deshacer (Z)" aria-label="Deshacer" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 14 4 9l5-5" />
+            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+          </svg>
+        </button>
+        <button id="new-game">Nueva</button>
+      </div>
+    </div>
+
+    <div class="board" id="board">
+      <div class="cells" id="cells"></div>
+      <div id="tiles"></div>
+      <div class="overlay" id="overlay" hidden>
+        <h2 id="overlay-title"></h2>
+        <div>
+          <button id="keep-playing">Seguir jugando</button>
+          <button id="retry">Otra partida</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const SIZE = 4
+    const WIN_VALUE = 2048
+    const SLIDE_MS = 110
+    const MIN_SWIPE = 30
+    const BEST_KEY = '2048-best'
+    const DIRECTIONS = {
+      ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+      a: 'left', d: 'right', w: 'up', s: 'down'
+    }
+
+    const $board = $('#board')
+    const $tiles = $('#tiles')
+    const $score = $('#score')
+    const $best = $('#best')
+    const $undo = $('#undo')
+    const $overlay = $('#overlay')
+
+    // Estado: la matriz 4x4 guarda fichas { id, value } o null
+    let grid = []
+    let score = 0
+    let best = Number(localStorage.getItem(BEST_KEY)) || 0
+    let previous = null // para deshacer 1 movimiento
+    let hasWon = false
+    let keepPlaying = false
+    let nextId = 1
+    const elements = new Map() // id de ficha -> elemento del DOM
+
+    /* ---------- Operaciones con matrices ---------- */
+
+    const emptyGrid = () => Array.from({ length: SIZE }, () => Array(SIZE).fill(null))
+
+    // Transponer: las filas pasan a ser columnas (y al revés)
+    const transpose = (matrix) => matrix[0].map((_, col) => matrix.map(row => row[col]))
+
+    // Invertir cada fila (espejo horizontal)
+    const reverseRows = (matrix) => matrix.map(row => [...row].reverse())
+
+    // EL TRUCO: solo programamos el movimiento hacia la IZQUIERDA.
+    // Para las otras direcciones transformamos la matriz para que el
+    // movimiento se convierta en "izquierda", movemos, y deshacemos
+    // la transformación:
+    //  - derecha: invertir filas → izquierda → invertir filas
+    //  - arriba: transponer → izquierda → transponer
+    //  - abajo: transponer + invertir → izquierda → invertir + transponer
+    const TO_LEFT = {
+      left: (m) => m,
+      right: (m) => reverseRows(m),
+      up: (m) => transpose(m),
+      down: (m) => reverseRows(transpose(m))
+    }
+
+    const FROM_LEFT = {
+      left: (m) => m,
+      right: (m) => reverseRows(m),
+      up: (m) => transpose(m),
+      down: (m) => transpose(reverseRows(m))
+    }
+
+    // Desliza una fila a la izquierda y fusiona fichas iguales.
+    // Ejemplos: [2,2,2,2] → [4,4,_,_]   [4,4,8,_] → [8,8,_,_] (¡no 16!)
+    function slideRowLeft(row) {
+      const tiles = row.filter(Boolean) // quitamos los huecos
+      const result = []
+      let gained = 0
+
+      for (let i = 0; i < tiles.length; i++) {
+        const current = tiles[i]
+        const next = tiles[i + 1]
+
+        if (next && current.value === next.value) {
+          // Creamos una ficha nueva y SALTAMOS la siguiente (i++):
+          // así cada ficha solo se fusiona una vez por movimiento
+          const merged = { id: nextId++, value: current.value * 2, mergedFrom: [current, next] }
+          result.push(merged)
+          gained += merged.value
+          i++
+        } else {
+          result.push(current)
+        }
+      }
+
+      while (result.length < SIZE) result.push(null)
+      return { row: result, gained }
+    }
+
+    function move(direction) {
+      const rotated = TO_LEFT[direction](grid)
+      let gained = 0
+      const slid = rotated.map(row => {
+        const result = slideRowLeft(row)
+        gained += result.gained
+        return result.row
+      })
+      const newGrid = FROM_LEFT[direction](slid)
+
+      // Si ninguna ficha ha cambiado de sitio, el movimiento no cuenta
+      const moved = newGrid.some((row, y) => row.some((tile, x) => tile?.id !== grid[y][x]?.id))
+      if (!moved) return
+
+      previous = { grid: cloneGrid(grid), score }
+      grid = newGrid
+      score += gained
+      addRandomTile()
+      render(gained)
+      checkGameState()
+    }
+
+    /* ---------- Reglas ---------- */
+
+    function emptyCells() {
+      const cells = []
+      grid.forEach((row, y) => row.forEach((tile, x) => {
+        if (!tile) cells.push({ x, y })
+      }))
+      return cells
+    }
+
+    function addRandomTile() {
+      const cells = emptyCells()
+      if (cells.length === 0) return
+      const { x, y } = cells[Math.floor(Math.random() * cells.length)]
+      // 90% de probabilidad de un 2, 10% de un 4 (como el original)
+      grid[y][x] = { id: nextId++, value: Math.random() < 0.9 ? 2 : 4, isNew: true }
+    }
+
+    // Quedan movimientos si hay un hueco o dos fichas vecinas iguales
+    function canMove() {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const value = grid[y][x]?.value
+          if (!value) return true
+          if (x < SIZE - 1 && grid[y][x + 1]?.value === value) return true
+          if (y < SIZE - 1 && grid[y + 1][x]?.value === value) return true
+        }
+      }
+      return false
+    }
+
+    function checkGameState() {
+      const reachedWin = grid.flat().some(tile => tile?.value >= WIN_VALUE)
+      if (reachedWin && !hasWon && !keepPlaying) {
+        hasWon = true
+        showOverlay('¡Has ganado! 🎉', true)
+      } else if (!canMove()) {
+        showOverlay('¡Fin de la partida!', false)
+      }
+    }
+
+    // Copia solo lo necesario (sin referencias a fusiones anteriores)
+    function cloneGrid(matrix) {
+      return matrix.map(row => row.map(tile => tile && { id: tile.id, value: tile.value }))
+    }
+
+    /* ---------- Render ---------- */
+
+    function createTileElement(tile, className) {
+      const element = document.createElement('div')
+      element.className = `tile ${className}`
+      element.innerHTML = '<div class="tile-inner"></div>'
+      $tiles.append(element)
+      elements.set(tile.id, element)
+      return element
+    }
+
+    function placeElement(element, tile, x, y) {
+      element.style.setProperty('--x', x)
+      element.style.setProperty('--y', y)
+      element.dataset.value = tile.value
+      element.classList.toggle('super', tile.value > WIN_VALUE)
+      element.firstElementChild.textContent = tile.value
+    }
+
+    function render(gained = 0) {
+      const alive = new Set()
+
+      grid.forEach((row, y) => row.forEach((tile, x) => {
+        if (!tile) return
+        alive.add(tile.id)
+
+        if (tile.mergedFrom) {
+          // Las dos fichas originales se deslizan hasta aquí
+          // y desaparecen cuando termina la transición
+          for (const source of tile.mergedFrom) {
+            const element = elements.get(source.id)
+            if (!element) continue
+            element.style.setProperty('--x', x)
+            element.style.setProperty('--y', y)
+            elements.delete(source.id)
+            setTimeout(() => element.remove(), SLIDE_MS)
+          }
+          placeElement(createTileElement(tile, 'merged'), tile, x, y)
+        } else {
+          const element = elements.get(tile.id) ?? createTileElement(tile, 'new')
+          placeElement(element, tile, x, y)
+        }
+
+        // Limpiamos las marcas para que no se repitan en el siguiente render
+        delete tile.mergedFrom
+        delete tile.isNew
+      }))
+
+      // Eliminamos fichas que ya no existen (por ejemplo, al deshacer)
+      for (const [id, element] of elements) {
+        if (!alive.has(id)) {
+          element.remove()
+          elements.delete(id)
+        }
+      }
+
+      updateScore(gained)
+      $undo.disabled = previous === null
+    }
+
+    function updateScore(gained) {
+      $score.textContent = score
+      if (gained > 0) {
+        const label = document.createElement('span')
+        label.className = 'gain'
+        label.textContent = `+${gained}`
+        $score.parentElement.append(label)
+        label.addEventListener('animationend', () => label.remove())
+      }
+      if (score > best) {
+        best = score
+        localStorage.setItem(BEST_KEY, best)
+      }
+      $best.textContent = best
+    }
+
+    function showOverlay(title, isWin) {
+      $('#overlay-title').textContent = title
+      $overlay.classList.toggle('win', isWin)
+      $('#keep-playing').hidden = !isWin
+      $overlay.hidden = false
+    }
+
+    /* ---------- Partida ---------- */
+
+    function newGame() {
+      grid = emptyGrid()
+      score = 0
+      previous = null
+      hasWon = false
+      keepPlaying = false
+      $overlay.hidden = true
+      addRandomTile()
+      addRandomTile()
+      render()
+    }
+
+    function undo() {
+      if (!previous) return
+      grid = previous.grid
+      score = previous.score
+      previous = null
+      $overlay.hidden = true
+      render()
+    }
+
+    function createCells() {
+      const cells = Array.from({ length: SIZE * SIZE }, () => document.createElement('span'))
+      $('#cells').append(...cells)
+    }
+
+    /* ---------- Controles ---------- */
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'z' || event.key === 'Z') return undo()
+      const direction = DIRECTIONS[event.key] ?? DIRECTIONS[event.key.toLowerCase()]
+      if (!direction) return
+      event.preventDefault() // evita que las flechas hagan scroll
+      if (!$overlay.hidden) return
+      move(direction)
+    })
+
+    // Gestos táctiles: guardamos dónde empieza el toque y, al soltar,
+    // miramos en qué eje se ha movido más el dedo
+    let touchStart = null
+
+    $board.addEventListener('touchstart', (event) => {
+      if (event.touches.length > 1) return
+      const { clientX, clientY } = event.touches[0]
+      touchStart = { x: clientX, y: clientY }
+    }, { passive: true })
+
+    $board.addEventListener('touchend', (event) => {
+      if (!touchStart || !$overlay.hidden) return
+      const { clientX, clientY } = event.changedTouches[0]
+      const dx = clientX - touchStart.x
+      const dy = clientY - touchStart.y
+      touchStart = null
+
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < MIN_SWIPE) return
+      if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left')
+      else move(dy > 0 ? 'down' : 'up')
+    })
+
+    $('#new-game').addEventListener('click', newGame)
+    $('#retry').addEventListener('click', newGame)
+    $undo.addEventListener('click', undo)
+    $('#keep-playing').addEventListener('click', () => {
+      keepPlaying = true
+      $overlay.hidden = true
+    })
+
+    createCells()
+    newGame()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>76 - Chat entre pestañas</title>
+  <style>
+    :root {
+      --bg: #eef2f8;
+      --surface: #ffffff;
+      --surface-2: #f6f8fc;
+      --border: #e1e6f0;
+      --text: #1a2233;
+      --muted: #6b7489;
+      --accent: #2563eb;
+      --me: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 100% 0, #dbe7ff 0, transparent 45%),
+        radial-gradient(circle at 0 100%, #fde7f3 0, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      max-width: 1080px;
+      height: 100%;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 30px 60px -30px #1a223355;
+    }
+
+    /* --- Barra lateral --- */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 20px 18px;
+      background: var(--surface-2);
+      border-right: 1px solid var(--border);
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .me {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+
+    .me-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .avatar {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      background: color-mix(in srgb, var(--color) 18%, white);
+      box-shadow: inset 0 0 0 2px var(--color);
+    }
+
+    .avatar.small {
+      width: 32px;
+      height: 32px;
+      font-size: 1rem;
+    }
+
+    #name {
+      flex: 1;
+      width: 100%;
+      min-width: 0;
+      padding: 9px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font: inherit;
+      font-weight: 600;
+    }
+
+    #name:focus-visible,
+    #message:focus-visible {
+      outline: 2px solid var(--me);
+      outline-offset: 1px;
+    }
+
+    .colors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .colors button {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: var(--color);
+      box-shadow: 0 0 0 1px var(--border);
+      cursor: pointer;
+    }
+
+    .colors button[aria-pressed="true"] {
+      box-shadow: 0 0 0 2px var(--color);
+    }
+
+    .peers {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .peer {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      animation: pop .25s ease-out;
+    }
+
+    .peer div {
+      display: grid;
+      min-width: 0;
+    }
+
+    .peer strong {
+      font-size: .9rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .peer small {
+      color: var(--muted);
+      font-size: .75rem;
+    }
+
+    .peer .dot {
+      margin-left: auto;
+      width: 8px;
+      height: 8px;
+      flex: none;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 3px #22c55e33;
+    }
+
+    .peer.is-hidden .dot {
+      background: #f59e0b;
+      box-shadow: 0 0 0 3px #f59e0b33;
+    }
+
+    .empty-peers {
+      font-size: .82rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    /* --- Chat --- */
+    .chat {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      min-height: 0;
+    }
+
+    .chat>header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    h1+p {
+      margin: 2px 0 0;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .button.primary {
+      border-color: transparent;
+      background: var(--me);
+      color: white;
+    }
+
+    .messages {
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      max-width: min(560px, 85%);
+      animation: pop .2s ease-out;
+    }
+
+    .message.mine {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .bubble {
+      padding: 9px 13px;
+      border-radius: 16px 16px 16px 4px;
+      background: color-mix(in srgb, var(--color) 12%, white);
+      border: 1px solid color-mix(in srgb, var(--color) 25%, white);
+    }
+
+    .mine .bubble {
+      border-radius: 16px 16px 4px 16px;
+      background: var(--color);
+      border-color: var(--color);
+      color: white;
+    }
+
+    .bubble header {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      font-size: .75rem;
+      margin-bottom: 2px;
+    }
+
+    .bubble header strong {
+      color: color-mix(in srgb, var(--color) 75%, black);
+    }
+
+    .mine .bubble header strong,
+    .mine .bubble time {
+      color: #ffffffcc;
+    }
+
+    .bubble time {
+      color: var(--muted);
+      font-size: .7rem;
+    }
+
+    .bubble p {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .system {
+      align-self: center;
+      font-size: .78rem;
+      color: var(--muted);
+      background: var(--surface-2);
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    .typing {
+      min-height: 22px;
+      padding: 0 20px;
+      font-size: .8rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .composer {
+      display: flex;
+      gap: 10px;
+      padding: 12px 20px 18px;
+    }
+
+    #message {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      font: inherit;
+    }
+
+    .composer .button {
+      border-radius: 999px;
+      padding: 0 20px;
+    }
+
+    .info {
+      margin-top: auto;
+      font-size: .78rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .info code {
+      color: var(--accent);
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+    }
+
+    /* En pantallas estrechas la barra lateral pasa arriba y se compacta */
+    @media (max-width: 720px) {
+      body {
+        padding: 0;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        border-radius: 0;
+        border: 0;
+      }
+
+      .sidebar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        max-height: 40dvh;
+      }
+
+      .sidebar>section {
+        flex: 1 1 240px;
+      }
+
+      .peers {
+        display: flex;
+        overflow-x: auto;
+      }
+
+      .peer {
+        flex: none;
+      }
+
+      .info {
+        display: none;
+      }
+
+      .chat>header {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <section class="me">
+        <h2 class="section-title">Tu pestaña</h2>
+        <div class="me-row">
+          <span class="avatar" id="my-avatar"></span>
+          <input id="name" maxlength="24" aria-label="Tu nombre" autocomplete="off">
+        </div>
+        <div class="colors" id="colors" aria-label="Elige tu color"></div>
+      </section>
+
+      <section>
+        <h2 class="section-title">Conectadas (<span id="peer-count">1</span>)</h2>
+        <ul class="peers" id="peers"></ul>
+      </section>
+
+      <p class="info">
+        Los mensajes viajan con <code>BroadcastChannel</code> y el historial se guarda en
+        <code>localStorage</code>. Todo ocurre en tu navegador, sin servidor.
+      </p>
+    </aside>
+
+    <main class="chat">
+      <header>
+        <div>
+          <h1>Chat entre pestañas</h1>
+          <p>Abre esta página en varias pestañas y habla contigo mismo 😄</p>
+        </div>
+        <div class="actions">
+          <button class="button" id="clear">Vaciar historial</button>
+          <button class="button primary" id="open-tab">＋ Abrir otra pestaña</button>
+        </div>
+      </header>
+
+      <div class="messages" id="messages" aria-live="polite"></div>
+      <div class="typing" id="typing"></div>
+
+      <form class="composer" id="composer">
+        <input id="message" placeholder="Escribe un mensaje…" autocomplete="off" maxlength="500" aria-label="Mensaje">
+        <button class="button primary">Enviar</button>
+      </form>
+    </main>
+  </div>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    const CHANNEL_NAME = 'midu-tabs-chat'
+    const HISTORY_KEY = 'tabs-chat:history'
+    const PROFILE_KEY = 'tabs-chat:profile'
+    const MAX_HISTORY = 200
+    const HEARTBEAT_MS = 2000
+    const PEER_TIMEOUT_MS = 6000
+    // Los navegadores ralentizan los temporizadores de las pestañas ocultas
+    // (hasta 1 vez por minuto en Chrome), así que a esas les damos más margen
+    const HIDDEN_PEER_TIMEOUT_MS = 75000
+    const TYPING_TIMEOUT_MS = 3000
+    const BASE_TITLE = document.title
+
+    const ANIMALS = [
+      ['🦊', 'Zorro'], ['🐼', 'Panda'], ['🐸', 'Rana'], ['🐙', 'Pulpo'], ['🦉', 'Búho'],
+      ['🐧', 'Pingüino'], ['🐯', 'Tigre'], ['🦄', 'Unicornio'], ['🐨', 'Koala'], ['🐳', 'Ballena']
+    ]
+    const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0d9488']
+
+    const DEMO_MESSAGES = [
+      { user: { id: 'demo-1', name: 'Panda', emoji: '🐼', color: '#16a34a' }, text: '¡Hola! Soy otra pestaña de este mismo navegador 👋', minutesAgo: 6 },
+      { user: { id: 'demo-2', name: 'Pulpo', emoji: '🐙', color: '#db2777' }, text: 'Y yo otra. Nos hablamos con BroadcastChannel, sin servidor ni WebSockets.', minutesAgo: 5 },
+      { user: { id: 'demo-1', name: 'Panda', emoji: '🐼', color: '#16a34a' }, text: 'Pulsa «Abrir otra pestaña» y escribe algo: aparecerá al instante en todas.', minutesAgo: 4 },
+      { user: { id: 'demo-2', name: 'Pulpo', emoji: '🐙', color: '#db2777' }, text: 'Si me escondes en segundo plano verás los no leídos en el título de la pestaña 🔔', minutesAgo: 3 }
+    ]
+
+    // BroadcastChannel: un "canal de radio" entre todos los contextos del mismo
+    // origen (pestañas, ventanas, iframes, workers) que usan el mismo nombre.
+    // postMessage envía cualquier dato clonable a TODOS los demás, pero no a sí mismo.
+    const channel = new BroadcastChannel(CHANNEL_NAME)
+
+    // ESTADO
+    const me = loadProfile()
+    const peers = new Map() // id → { user, lastSeen, visible }
+    const typingUsers = new Map() // id → { user, timeoutId }
+    let unread = 0
+    let isTyping = false
+    let typingTimeout = null
+    let isLeaving = false
+
+    // --- Almacenamiento ---
+
+    function readJSON(storage, key, fallback) {
+      try {
+        const value = storage.getItem(key)
+        return value === null ? fallback : JSON.parse(value)
+      } catch {
+        return fallback
+      }
+    }
+
+    function writeJSON(storage, key, value) {
+      try {
+        storage.setItem(key, JSON.stringify(value))
+      } catch {}
+    }
+
+    // El perfil va en sessionStorage: es propio de cada pestaña y sobrevive a recargas
+    function loadProfile() {
+      const saved = readJSON(sessionStorage, PROFILE_KEY, null)
+      const [emoji, name] = ANIMALS[Math.floor(Math.random() * ANIMALS.length)]
+      const profile = saved ?? { name, emoji, color: COLORS[Math.floor(Math.random() * COLORS.length)] }
+      // El id es nuevo en cada carga para no chocar si una pestaña duplica a otra
+      return { ...profile, id: crypto.randomUUID?.() ?? String(Math.random()).slice(2) }
+    }
+
+    function saveProfile() {
+      const { name, emoji, color } = me
+      writeJSON(sessionStorage, PROFILE_KEY, { name, emoji, color })
+    }
+
+    function getHistory() {
+      return readJSON(localStorage, HISTORY_KEY, [])
+    }
+
+    // Solo la pestaña que envía un mensaje lo guarda en el historial compartido
+    function appendToHistory(message) {
+      const history = getHistory()
+      history.push(message)
+      writeJSON(localStorage, HISTORY_KEY, history.slice(-MAX_HISTORY))
+    }
+
+    function seedDemoHistory() {
+      if (readJSON(localStorage, HISTORY_KEY, null) !== null) return
+      const now = Date.now()
+      const messages = DEMO_MESSAGES.map(({ user, text, minutesAgo }, index) => ({
+        id: `demo-${index}`,
+        user,
+        text,
+        time: now - minutesAgo * 60000
+      }))
+      writeJSON(localStorage, HISTORY_KEY, messages)
+    }
+
+    // --- Mensajes del canal ---
+
+    function publicUser() {
+      const { id, name, emoji, color } = me
+      return { id, name, emoji, color, visible: document.visibilityState === 'visible' }
+    }
+
+    function send(type, payload = {}) {
+      // Tras despedirnos no enviamos nada más (al cerrar, 'visibilitychange' llega después de 'pagehide')
+      if (isLeaving) return
+      channel.postMessage({ type, user: publicUser(), ...payload })
+    }
+
+    channel.addEventListener('message', ({ data }) => {
+      const { type, user } = data
+      const isNew = !peers.has(user.id)
+
+      // Cualquier mensaje recibido demuestra que esa pestaña sigue viva
+      if (type !== 'bye') {
+        peers.set(user.id, { user, lastSeen: Date.now() })
+        if (isNew) addSystemMessage(`${user.emoji} ${user.name} se ha conectado`)
+      }
+
+      if (type === 'ping' && isNew) {
+        // Respondemos a una pestaña nueva para que nos descubra sin esperar al siguiente latido
+        send('pong')
+      } else if (type === 'bye') {
+        removePeer(user.id, 'ha cerrado la pestaña')
+      } else if (type === 'typing') {
+        setTyping(user, data.isTyping)
+      } else if (type === 'message') {
+        setTyping(user, false)
+        renderMessage(data.message)
+        notifyUnread()
+      }
+
+      renderPeers()
+    })
+
+    function removePeer(id, reason) {
+      const peer = peers.get(id)
+      if (!peer) return
+      peers.delete(id)
+      setTyping(peer.user, false)
+      addSystemMessage(`${peer.user.emoji} ${peer.user.name} ${reason}`)
+    }
+
+    // Heartbeat: cada pocos segundos avisamos de que seguimos aquí y
+    // eliminamos las pestañas de las que no sabemos nada desde hace rato
+    function heartbeat() {
+      send('ping')
+      const now = Date.now()
+      for (const [id, { user, lastSeen }] of peers) {
+        const timeout = user.visible ? PEER_TIMEOUT_MS : HIDDEN_PEER_TIMEOUT_MS
+        if (now - lastSeen > timeout) removePeer(id, 'se ha desconectado')
+      }
+      renderPeers()
+    }
+
+    // --- Escribiendo... ---
+
+    function setTyping(user, value) {
+      const current = typingUsers.get(user.id)
+      clearTimeout(current?.timeoutId)
+      typingUsers.delete(user.id)
+
+      if (value) {
+        // Si no llega el aviso de "ha dejado de escribir" lo quitamos igualmente
+        const timeoutId = setTimeout(() => setTyping(user, false), TYPING_TIMEOUT_MS + 1000)
+        typingUsers.set(user.id, { user, timeoutId })
+      }
+      renderTyping()
+    }
+
+    function handleTyping() {
+      clearTimeout(typingTimeout)
+      const hasText = $('#message').value.trim() !== ''
+      if (hasText !== isTyping) {
+        isTyping = hasText
+        send('typing', { isTyping })
+      }
+      if (hasText) {
+        typingTimeout = setTimeout(() => {
+          isTyping = false
+          send('typing', { isTyping: false })
+        }, TYPING_TIMEOUT_MS)
+      }
+    }
+
+    // --- No leídos (Page Visibility API) ---
+
+    function notifyUnread() {
+      if (!document.hidden) return
+      unread++
+      document.title = `(${unread}) ${BASE_TITLE}`
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        unread = 0
+        document.title = BASE_TITLE
+      }
+      // Contamos a las demás si ahora estamos visibles o en segundo plano
+      send('ping')
+      renderPeers()
+    })
+
+    // --- Render ---
+
+    const timeFormat = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' })
+
+    function createAvatar(user, className = 'avatar small') {
+      const avatar = document.createElement('span')
+      avatar.className = className
+      avatar.style.setProperty('--color', user.color)
+      avatar.textContent = user.emoji
+      return avatar
+    }
+
+    function renderMessage(message) {
+      const isMine = message.user.id === me.id
+      const article = document.createElement('article')
+      article.className = `message ${isMine ? 'mine' : ''}`
+      article.style.setProperty('--color', message.user.color)
+
+      const bubble = document.createElement('div')
+      bubble.className = 'bubble'
+      bubble.innerHTML = '<header><strong></strong><time></time></header><p></p>'
+      // textContent y no innerHTML: el texto viene de otra pestaña y podría contener HTML
+      bubble.querySelector('strong').textContent = isMine ? 'Tú' : message.user.name
+      bubble.querySelector('time').textContent = timeFormat.format(message.time)
+      bubble.querySelector('p').textContent = message.text
+
+      article.append(createAvatar(message.user), bubble)
+      appendToChat(article)
+    }
+
+    function addSystemMessage(text) {
+      const element = document.createElement('div')
+      element.className = 'system'
+      element.textContent = text
+      appendToChat(element)
+    }
+
+    function appendToChat(element) {
+      const list = $('#messages')
+      const isAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80
+      list.append(element)
+      if (isAtBottom) list.scrollTop = list.scrollHeight
+    }
+
+    function renderPeers() {
+      const list = $('#peers')
+      list.replaceChildren()
+
+      const everyone = [{ user: publicUser(), isMe: true }, ...[...peers.values()].map(({ user }) => ({ user }))]
+      for (const { user, isMe } of everyone) {
+        const item = document.createElement('li')
+        item.className = `peer ${user.visible ? '' : 'is-hidden'}`
+        const info = document.createElement('div')
+        info.innerHTML = '<strong></strong><small></small>'
+        info.querySelector('strong').textContent = isMe ? `${user.name} (tú)` : user.name
+        info.querySelector('small').textContent = user.visible ? 'Visible' : 'En segundo plano'
+        const dot = document.createElement('span')
+        dot.className = 'dot'
+        item.append(createAvatar(user), info, dot)
+        list.append(item)
+      }
+
+      if (peers.size === 0) {
+        const hint = document.createElement('li')
+        hint.className = 'empty-peers'
+        hint.textContent = 'Aún no hay más pestañas. Pulsa «Abrir otra pestaña» para empezar a chatear.'
+        list.append(hint)
+      }
+
+      $('#peer-count').textContent = everyone.length
+    }
+
+    function renderTyping() {
+      const names = [...typingUsers.values()].map(({ user }) => `${user.emoji} ${user.name}`)
+      const text = names.length === 0
+        ? ''
+        : names.length === 1
+          ? `${names[0]} está escribiendo…`
+          : `${new Intl.ListFormat('es').format(names)} están escribiendo…`
+      $('#typing').textContent = text
+    }
+
+    function renderProfile() {
+      document.documentElement.style.setProperty('--me', me.color)
+      const avatar = $('#my-avatar')
+      avatar.style.setProperty('--color', me.color)
+      avatar.textContent = me.emoji
+      $('#name').value = me.name
+
+      $('#colors').innerHTML = COLORS.map((color) => `
+        <button type="button" style="--color: ${color}" data-color="${color}"
+          aria-pressed="${color === me.color}" aria-label="Color ${color}"></button>
+      `).join('')
+    }
+
+    function renderHistory() {
+      $('#messages').replaceChildren()
+      getHistory().forEach(renderMessage)
+      addSystemMessage('Te has unido al chat')
+    }
+
+    // --- Eventos de la interfaz ---
+
+    $('#composer').addEventListener('submit', (event) => {
+      event.preventDefault()
+      const input = $('#message')
+      const text = input.value.trim()
+      if (!text) return
+
+      const message = { id: crypto.randomUUID?.() ?? String(Date.now()), user: publicUser(), text, time: Date.now() }
+      appendToHistory(message)
+      renderMessage(message)
+      $('#messages').scrollTop = $('#messages').scrollHeight
+      send('message', { message })
+
+      input.value = ''
+      handleTyping()
+    })
+
+    $('#message').addEventListener('input', handleTyping)
+
+    $('#name').addEventListener('input', (event) => {
+      me.name = event.target.value.trim() || 'Anónimo'
+      saveProfile()
+      send('ping') // así las demás pestañas ven el nuevo nombre al momento
+      renderPeers()
+    })
+
+    $('#colors').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      me.color = button.dataset.color
+      saveProfile()
+      renderProfile()
+      renderPeers()
+      send('ping')
+    })
+
+    // 'noopener' evita que la nueva pestaña herede sessionStorage (y con él el perfil)
+    $('#open-tab').addEventListener('click', () => window.open(location.href, '_blank', 'noopener'))
+
+    // Vaciar el historial: borramos la clave de localStorage. Esta pestaña limpia
+    // su vista directamente porque el evento 'storage' NO se dispara en la pestaña
+    // que hace el cambio; solo en las demás.
+    $('#clear').addEventListener('click', () => {
+      try {
+        localStorage.setItem(HISTORY_KEY, '[]')
+      } catch {}
+      $('#messages').replaceChildren()
+      addSystemMessage('Has vaciado el historial')
+    })
+
+    // Evento storage vs BroadcastChannel:
+    // - storage salta en las OTRAS pestañas cuando cambia localStorage. Solo transporta
+    //   strings (key, oldValue, newValue) y exige escribir en disco para comunicarse.
+    // - BroadcastChannel envía objetos arbitrarios (structured clone) al instante y
+    //   sin persistir nada. Por eso lo usamos para los mensajes en tiempo real y
+    //   dejamos el evento storage para sincronizar el estado guardado (el historial).
+    window.addEventListener('storage', (event) => {
+      if (event.key !== HISTORY_KEY && event.key !== null) return
+      const history = readJSON(localStorage, HISTORY_KEY, [])
+      if (history.length === 0) {
+        $('#messages').replaceChildren()
+        addSystemMessage('Otra pestaña ha vaciado el historial')
+      }
+    })
+
+    // Al cerrar la pestaña nos despedimos para desaparecer de la lista al instante
+    window.addEventListener('pagehide', () => {
+      send('bye')
+      isLeaving = true
+    })
+    // Si la página vuelve desde la caché de navegación (bfcache) nos anunciamos de nuevo
+    window.addEventListener('pageshow', (event) => {
+      isLeaving = false
+      if (event.persisted) send('ping')
+    })
+
+    seedDemoHistory()
+    saveProfile()
+    renderProfile()
+    renderHistory()
+    renderPeers()
+    send('ping')
+    setInterval(heartbeat, HEARTBEAT_MS)
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>48 - Paleta de comandos</title>
+  <style>
+    :root {
+      --accent: #8b5cf6;
+      --bg: #09090b;
+      --surface: #131316;
+      --surface-2: #1c1c21;
+      --border: #2a2a31;
+      --text: #f4f4f5;
+      --muted: #9d9da8;
+      --shadow: 0 30px 80px -20px rgb(0 0 0 / 70%);
+    }
+
+    [data-theme="light"] {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --surface-2: #f2f2f5;
+      --border: #e4e4e9;
+      --text: #18181b;
+      --muted: #6b6b76;
+      --shadow: 0 30px 80px -20px rgb(0 0 0 / 25%);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 80px;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(800px 400px at 50% -10%, color-mix(in srgb, var(--accent) 25%, transparent), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: background-color .3s, color .3s;
+    }
+
+    kbd {
+      display: inline-grid;
+      place-content: center;
+      min-width: 1.6em;
+      padding: .1em .4em;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .75rem;
+    }
+
+    /* ---------- Página de ejemplo ---------- */
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 14px clamp(16px, 5vw, 48px);
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 80%, transparent);
+      backdrop-filter: blur(10px);
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
+    .logo span {
+      color: var(--accent);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 18px;
+      font-size: .9rem;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    .search-trigger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+      padding: 7px 8px 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--muted);
+      font: inherit;
+      font-size: .9rem;
+      cursor: pointer;
+    }
+
+    .search-trigger:hover {
+      border-color: var(--accent);
+    }
+
+    section {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 56px clamp(16px, 5vw, 48px);
+    }
+
+    .hero {
+      text-align: center;
+      padding-top: 80px;
+    }
+
+    .hero h1 {
+      margin: 0 0 16px;
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
+      line-height: 1.05;
+      letter-spacing: -.03em;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero p {
+      max-width: 560px;
+      margin: 0 auto 28px;
+      color: var(--muted);
+      font-size: 1.1rem;
+      line-height: 1.5;
+    }
+
+    .cta {
+      padding: 12px 22px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 10px 30px -10px var(--accent);
+    }
+
+    h2 {
+      margin: 0 0 20px;
+      font-size: 1.6rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .card h3 {
+      margin: 8px 0;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .price {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    details {
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      margin-bottom: 10px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* ---------- Paleta de comandos ---------- */
+
+    .palette {
+      width: min(640px, calc(100% - 32px));
+      max-height: min(520px, calc(100dvh - 120px));
+      margin: 12vh auto auto;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .palette[open] {
+      display: flex;
+      flex-direction: column;
+      animation: palette-in .18s ease-out;
+    }
+
+    /* ::backdrop es la capa que el navegador pinta detrás de un <dialog> modal */
+    .palette::backdrop {
+      background: rgb(0 0 0 / 45%);
+      backdrop-filter: blur(2px);
+    }
+
+    @keyframes palette-in {
+      from {
+        opacity: 0;
+        transform: translateY(-8px) scale(.98);
+      }
+    }
+
+    .palette-search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .palette-search svg {
+      flex-shrink: 0;
+      width: 20px;
+      color: var(--muted);
+    }
+
+    .palette-search input {
+      flex: 1;
+      min-width: 0;
+      height: 56px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 1.05rem;
+      outline: none;
+    }
+
+    .results {
+      flex: 1;
+      margin: 0;
+      padding: 8px;
+      list-style: none;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .group-label {
+      padding: 10px 10px 6px;
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      scroll-margin: 8px;
+    }
+
+    .option[aria-selected="true"] {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .option .icon {
+      display: grid;
+      place-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      font-size: 15px;
+    }
+
+    .option .title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .option .hint {
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    mark {
+      background: none;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .empty {
+      padding: 36px 16px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .palette-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      padding: 12px 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      transform: translateY(150%);
+      transition: transform .3s cubic-bezier(.2, .9, .3, 1.3);
+    }
+
+    .toast.show {
+      transform: translateY(0);
+    }
+
+    .confetti {
+      position: fixed;
+      top: -20px;
+      z-index: 10;
+      pointer-events: none;
+      font-size: 22px;
+    }
+
+    @media (width < 640px) {
+      .nav-links {
+        display: none;
+      }
+
+      .search-trigger .label {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const RECENT_KEY = 'command-palette:recent'
+    const MAX_RECENT = 3
+    const ACCENTS = {
+      Violeta: '#8b5cf6',
+      Azul: '#3b82f6',
+      Verde: '#10b981',
+      Naranja: '#f97316',
+      Rosa: '#ec4899'
+    }
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const dialog = $('#palette')
+    const input = $('#palette-input')
+    const list = $('#results')
+    const toastElement = $('#toast')
+
+    // Detectamos la plataforma para usar Cmd en Mac y Ctrl en el resto
+    const platform = navigator.userAgentData?.platform ?? navigator.platform ?? ''
+    const IS_MAC = /mac|iphone|ipad/i.test(platform)
+    const MOD_LABEL = IS_MAC ? '⌘' : 'Ctrl'
+
+    let results = []
+    let activeIndex = 0
+    let recentIds = loadRecent()
+
+    // ---------- Comandos: todos hacen algo real en la página ----------
+
+    function scrollToSection(id) {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    }
+
+    function setFontSize(delta) {
+      const current = parseFloat(document.documentElement.style.fontSize) || 100
+      const next = delta === 0 ? 100 : Math.min(Math.max(current + delta, 80), 130)
+      document.documentElement.style.fontSize = `${next}%`
+      toast(`Tamaño de texto: ${next}%`)
+    }
+
+    async function copyToClipboard(text, message) {
+      try {
+        await navigator.clipboard.writeText(text)
+        toast(message)
+      } catch {
+        toast('❌ El navegador no ha permitido copiar al portapapeles')
+      }
+    }
+
+    const COMMANDS = [
+      { id: 'go-home', group: 'Navegación', icon: '🏠', title: 'Ir a Inicio', keywords: 'arriba principal top', run: () => scrollToSection('inicio') },
+      { id: 'go-features', group: 'Navegación', icon: '✨', title: 'Ir a Características', keywords: 'features funciones', run: () => scrollToSection('caracteristicas') },
+      { id: 'go-pricing', group: 'Navegación', icon: '💳', title: 'Ir a Precios', keywords: 'pricing planes coste', run: () => scrollToSection('precios') },
+      { id: 'go-faq', group: 'Navegación', icon: '❓', title: 'Ir a Preguntas frecuentes', keywords: 'faq ayuda dudas', run: () => scrollToSection('faq') },
+      {
+        id: 'toggle-theme',
+        group: 'Apariencia',
+        icon: '🌓',
+        get title() {
+          return document.documentElement.dataset.theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'
+        },
+        keywords: 'modo dark light oscuro claro tema',
+        run: () => {
+          const { dataset } = document.documentElement
+          dataset.theme = dataset.theme === 'dark' ? 'light' : 'dark'
+          toast(dataset.theme === 'dark' ? '🌙 Tema oscuro activado' : '☀️ Tema claro activado')
+        }
+      },
+      ...Object.entries(ACCENTS).map(([name, color]) => ({
+        id: `accent-${name}`,
+        group: 'Apariencia',
+        icon: '🎨',
+        title: `Color de acento: ${name}`,
+        keywords: 'color acento tono',
+        run: () => {
+          document.documentElement.style.setProperty('--accent', color)
+          toast(`🎨 Acento cambiado a ${name.toLowerCase()}`)
+        }
+      })),
+      { id: 'font-up', group: 'Apariencia', icon: '🔠', title: 'Aumentar tamaño de texto', keywords: 'zoom fuente letra grande', run: () => setFontSize(10) },
+      { id: 'font-down', group: 'Apariencia', icon: '🔡', title: 'Reducir tamaño de texto', keywords: 'zoom fuente letra pequeña', run: () => setFontSize(-10) },
+      { id: 'font-reset', group: 'Apariencia', icon: '↺', title: 'Restablecer tamaño de texto', keywords: 'zoom fuente reset', run: () => setFontSize(0) },
+      { id: 'copy-url', group: 'Acciones', icon: '🔗', title: 'Copiar URL de la página', keywords: 'enlace link compartir portapapeles', run: () => copyToClipboard(location.href, '🔗 URL copiada al portapapeles') },
+      { id: 'copy-title', group: 'Acciones', icon: '📋', title: 'Copiar título de la página', keywords: 'portapapeles nombre', run: () => copyToClipboard(document.title, '📋 Título copiado') },
+      { id: 'confetti', group: 'Acciones', icon: '🎉', title: 'Lanzar confeti', keywords: 'fiesta celebrar party', run: launchConfetti },
+      {
+        id: 'fullscreen',
+        group: 'Acciones',
+        icon: '⛶',
+        title: 'Alternar pantalla completa',
+        keywords: 'fullscreen maximizar',
+        run: async () => {
+          try {
+            if (document.fullscreenElement) await document.exitFullscreen()
+            else await document.documentElement.requestFullscreen()
+          } catch {
+            toast('❌ Pantalla completa no disponible (¿estás dentro de un iframe?)')
+          }
+        }
+      },
+      { id: 'help', group: 'Ayuda', icon: '⌨️', title: 'Ver atajos de teclado', keywords: 'shortcuts teclas ayuda', run: () => toast(`${MOD_LABEL}+K abrir · ↑↓ moverse · Enter ejecutar · Esc cerrar`) }
+    ]
+
+    // ---------- Búsqueda fuzzy ----------
+
+    // Normalizamos cada carácter por separado (minúsculas y sin tildes) para que
+    // "codigo" encuentre "código" y los índices sigan coincidiendo con el texto original
+    function normalizeChars(text) {
+      return [...text].map((char) => char.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase())
+    }
+
+    const isWordStart = (chars, index) => index === 0 || /[\s\-_:/.]/.test(chars[index - 1])
+
+    // Busca las letras de la consulta EN ORDEN (no hace falta que estén seguidas)
+    // y puntúa la coincidencia: letras consecutivas e inicios de palabra valen más.
+    // Así "cta" encuentra "Cambiar a TemA" pero puntúa mejor "Copiar Título…"
+    function matchFrom(queryChars, textChars, startIndex) {
+      const indices = []
+      let score = 0
+      let queryIndex = 0
+
+      for (let i = startIndex; i < textChars.length && queryIndex < queryChars.length; i++) {
+        if (textChars[i] !== queryChars[queryIndex]) continue
+
+        let points = 1
+        if (indices.at(-1) === i - 1) points += 10 // consecutiva a la anterior
+        if (isWordStart(textChars, i)) points += 8 // inicio de palabra
+        if (i === 0) points += 4 // inicio del texto
+        score += points
+        indices.push(i)
+        queryIndex++
+      }
+
+      if (queryIndex < queryChars.length) return null
+      // Penalizamos los huecos: cuanto más dispersas estén las letras, peor
+      const spread = indices.at(-1) - indices[0] + 1 - indices.length
+      return { score: score - spread, indices }
+    }
+
+    function fuzzyMatch(query, text) {
+      const queryChars = normalizeChars(query.replaceAll(' ', ''))
+      if (queryChars.length === 0) return { score: 0, indices: [] }
+      const textChars = normalizeChars(text)
+
+      // Un recorrido voraz desde la primera coincidencia no siempre da la mejor
+      // puntuación, así que probamos a empezar en cada aparición de la primera letra
+      let best = null
+      textChars.forEach((char, index) => {
+        if (char !== queryChars[0]) return
+        const match = matchFrom(queryChars, textChars, index)
+        if (match && (!best || match.score > best.score)) best = match
+      })
+      return best
+    }
+
+    function search(query) {
+      if (!query.trim()) {
+        // Sin búsqueda mostramos los recientes y luego todo agrupado
+        const recent = recentIds
+          .map((id) => COMMANDS.find((command) => command.id === id))
+          .filter(Boolean)
+          .map((command) => ({ command, group: 'Recientes', indices: [] }))
+        const all = COMMANDS.map((command) => ({ command, group: command.group, indices: [] }))
+        return [...recent, ...all]
+      }
+
+      return COMMANDS
+        .map((command) => {
+          const titleMatch = fuzzyMatch(query, command.title)
+          if (titleMatch) return { command, score: titleMatch.score, indices: titleMatch.indices }
+          // Si no está en el título, buscamos en las palabras clave (puntúan menos)
+          const keywordMatch = fuzzyMatch(query, command.keywords)
+          return keywordMatch ? { command, score: keywordMatch.score * 0.5, indices: [] } : null
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score)
+    }
+
+    // ---------- Pintar resultados ----------
+
+    function escapeHTML(text) {
+      return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    }
+
+    function highlight(text, indices) {
+      const set = new Set(indices)
+      return [...text].map((char, index) => (set.has(index) ? `<mark>${escapeHTML(char)}</mark>` : escapeHTML(char))).join('')
+    }
+
+    function render() {
+      const query = input.value
+      results = search(query)
+      activeIndex = Math.min(activeIndex, Math.max(results.length - 1, 0))
+
+      if (results.length === 0) {
+        list.innerHTML = `<li class="empty" role="presentation">😶 No hay comandos para «${escapeHTML(query)}»</li>`
+        input.removeAttribute('aria-activedescendant')
+        return
+      }
+
+      const isGrouped = !query.trim()
+      let lastGroup = null
+
+      list.innerHTML = results.map(({ command, group, indices }, index) => {
+        const label = isGrouped && group !== lastGroup
+          ? `<li class="group-label" role="presentation">${group}</li>`
+          : ''
+        lastGroup = group
+
+        return `${label}
+          <li class="option" id="option-${index}" role="option" data-index="${index}" aria-selected="${index === activeIndex}">
+            <span class="icon" aria-hidden="true">${command.icon}</span>
+            <span class="title">${highlight(command.title, indices)}</span>
+            ${isGrouped ? '' : `<span class="hint">${command.group}</span>`}
+          </li>`
+      }).join('')
+
+      updateActive()
+    }
+
+    function updateActive() {
+      list.querySelectorAll('[role="option"]').forEach((option) => {
+        option.setAttribute('aria-selected', Number(option.dataset.index) === activeIndex)
+      })
+
+      // aria-activedescendant indica al lector de pantalla qué opción está activa
+      // mientras el foco REAL sigue en el input (así se puede seguir escribiendo)
+      const activeOption = document.getElementById(`option-${activeIndex}`)
+      if (activeOption) {
+        input.setAttribute('aria-activedescendant', activeOption.id)
+        activeOption.scrollIntoView({ block: 'nearest' })
+      }
+    }
+
+    function moveActive(delta) {
+      if (results.length === 0) return
+      // El módulo hace que al pasar del último volvamos al primero (y al revés)
+      activeIndex = (activeIndex + delta + results.length) % results.length
+      updateActive()
+    }
+
+    // ---------- Abrir, cerrar y ejecutar ----------
+
+    function openPalette() {
+      if (dialog.open) return
+      input.value = ''
+      activeIndex = 0
+      render()
+      // showModal() (a diferencia de show()) bloquea el resto de la página,
+      // atrapa el foco dentro del diálogo, pinta ::backdrop y cierra con Esc
+      dialog.showModal()
+      input.focus()
+    }
+
+    function closePalette() {
+      if (dialog.open) dialog.close()
+    }
+
+    function runCommand(index) {
+      const result = results[index]
+      if (!result) return
+
+      closePalette()
+      saveRecent(result.command.id)
+      result.command.run()
+    }
+
+    function loadRecent() {
+      try {
+        return JSON.parse(localStorage.getItem(RECENT_KEY)) ?? []
+      } catch {
+        return []
+      }
+    }
+
+    function saveRecent(id) {
+      recentIds = [id, ...recentIds.filter((recentId) => recentId !== id)].slice(0, MAX_RECENT)
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds))
+      } catch {
+        // Sin localStorage (modo privado, iframe...) los recientes solo viven en memoria
+      }
+    }
+
+    // ---------- Extras: toast y confeti ----------
+
+    let toastTimeout
+    function toast(message) {
+      toastElement.textContent = message
+      toastElement.classList.add('show')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => toastElement.classList.remove('show'), 2600)
+    }
+
+    function launchConfetti() {
+      const EMOJIS = ['🎉', '✨', '🎊', '💜', '⭐']
+      for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('span')
+        piece.className = 'confetti'
+        piece.textContent = EMOJIS[i % EMOJIS.length]
+        piece.style.left = `${Math.random() * 100}vw`
+        document.body.append(piece)
+
+        const drift = (Math.random() - 0.5) * 300
+        piece.animate([
+          { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+          { transform: `translate(${drift}px, 105vh) rotate(${Math.random() * 720}deg)`, opacity: 0.8 }
+        ], {
+          duration: 1800 + Math.random() * 1600,
+          delay: Math.random() * 400,
+          easing: 'cubic-bezier(.2, .6, .4, 1)'
+        }).finished.then(() => piece.remove())
+      }
+    }
+
+    // ---------- Eventos de teclado ----------
+
+    document.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase()
+      const isModifierPressed = IS_MAC ? event.metaKey : event.ctrlKey
+
+      // Cmd+K / Ctrl+K abre (o cierra) la paleta desde cualquier sitio.
+      // preventDefault evita el atajo del navegador (en Chrome, Ctrl+K busca en la barra)
+      if (isModifierPressed && key === 'k') {
+        event.preventDefault()
+        dialog.open ? closePalette() : openPalette()
+        return
+      }
+
+      // "/" también la abre si no estamos escribiendo en otro campo
+      const isTyping = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')
+      if (key === '/' && !isTyping && !dialog.open) {
+        event.preventDefault()
+        openPalette()
+      }
+    })
+
+    input.addEventListener('keydown', (event) => {
+      const ACTIONS = {
+        ArrowDown: () => moveActive(1),
+        ArrowUp: () => moveActive(-1),
+        Home: () => moveActive(-activeIndex),
+        End: () => moveActive(results.length - 1 - activeIndex),
+        Enter: () => runCommand(activeIndex)
+      }
+
+      const action = ACTIONS[event.key]
+      if (!action) return
+      // Evitamos que las flechas muevan el cursor dentro del input
+      event.preventDefault()
+      action()
+    })
+
+    input.addEventListener('input', () => {
+      activeIndex = 0
+      render()
+    })
+
+    // Usamos pointermove (y no mouseover) para que al hacer scroll con el teclado
+    // la opción bajo el ratón no "robe" la selección
+    list.addEventListener('pointermove', (event) => {
+      const option = event.target.closest('[role="option"]')
+      if (!option || Number(option.dataset.index) === activeIndex) return
+      activeIndex = Number(option.dataset.index)
+      updateActive()
+    })
+
+    list.addEventListener('click', (event) => {
+      const option = event.target.closest('[role="option"]')
+      if (option) runCommand(Number(option.dataset.index))
+    })
+
+    // Clic fuera de la caja (sobre el ::backdrop) => cerrar.
+    // El backdrop no es un elemento, así que el clic llega al propio <dialog>:
+    // comprobamos si las coordenadas quedan fuera de su rectángulo
+    dialog.addEventListener('click', (event) => {
+      const rect = dialog.getBoundingClientRect()
+      const isOutside = event.clientX < rect.left || event.clientX > rect.right ||
+        event.clientY < rect.top || event.clientY > rect.bottom
+      if (isOutside) closePalette()
+    })
+
+    document.querySelectorAll('[data-open-palette]').forEach((button) => {
+      button.addEventListener('click', openPalette)
+    })
+
+    document.querySelectorAll('[data-mod]').forEach((element) => {
+      element.textContent = MOD_LABEL
+    })
+
+    // Abrimos la paleta al cargar para enseñarla directamente
+    openPalette()
+  </script>
+</head>
+
+<body>
+  <nav class="nav">
+    <div class="logo">⚡ Nebula<span>.</span></div>
+    <div class="nav-links">
+      <a href="#inicio">Inicio</a>
+      <a href="#caracteristicas">Características</a>
+      <a href="#precios">Precios</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <button class="search-trigger" data-open-palette>
+      <span class="label">Buscar comandos...</span>
+      <kbd data-mod>⌘</kbd><kbd>K</kbd>
+    </button>
+  </nav>
+
+  <main>
+    <section id="inicio" class="hero">
+      <h1>Todo tu producto,<br>a un <em>atajo</em> de distancia</h1>
+      <p>Pulsa <kbd data-mod>⌘</kbd> <kbd>K</kbd> (o <kbd>/</kbd>) para abrir la paleta de comandos: cambia el tema,
+        el color, navega por la página o copia la URL sin tocar el ratón.</p>
+      <button class="cta" data-open-palette>Abrir la paleta de comandos</button>
+    </section>
+
+    <section id="caracteristicas">
+      <h2>✨ Características</h2>
+      <div class="cards">
+        <article class="card">
+          <div>⌨️</div>
+          <h3>Atajos de teclado</h3>
+          <p>Detectamos si usas Mac (⌘) o Windows/Linux (Ctrl) para mostrar el atajo correcto.</p>
+        </article>
+        <article class="card">
+          <div>🪟</div>
+          <h3>&lt;dialog&gt; nativo</h3>
+          <p>Modal accesible con foco atrapado, cierre con Esc y fondo con ::backdrop sin librerías.</p>
+        </article>
+        <article class="card">
+          <div>🔍</div>
+          <h3>Búsqueda fuzzy</h3>
+          <p>Encuentra comandos aunque escribas solo algunas letras, sin tildes y desordenadas por palabras.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="precios">
+      <h2>💳 Precios</h2>
+      <div class="cards">
+        <article class="card">
+          <h3>Gratis</h3>
+          <div class="price">0 €</div>
+          <p>Para proyectos personales y pruebas.</p>
+        </article>
+        <article class="card">
+          <h3>Pro</h3>
+          <div class="price">9 €</div>
+          <p>Todos los comandos y atajos personalizados.</p>
+        </article>
+        <article class="card">
+          <h3>Equipos</h3>
+          <div class="price">29 €</div>
+          <p>Comandos compartidos con todo tu equipo.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2>❓ Preguntas frecuentes</h2>
+      <details open>
+        <summary>¿Por qué usar &lt;dialog&gt; en vez de un div?</summary>
+        <p>Porque el navegador ya gestiona el foco, la tecla Escape, la capa superior (top layer) y la accesibilidad.</p>
+      </details>
+      <details>
+        <summary>¿Qué es aria-activedescendant?</summary>
+        <p>Permite que el foco se quede en el input mientras el lector de pantalla anuncia la opción resaltada.</p>
+      </details>
+    </section>
+  </main>
+
+  <dialog id="palette" class="palette" aria-label="Paleta de comandos">
+    <div class="palette-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input id="palette-input" type="text" placeholder="Escribe un comando o busca..." autocomplete="off"
+        spellcheck="false" role="combobox" aria-expanded="true" aria-controls="results" aria-autocomplete="list">
+      <kbd>Esc</kbd>
+    </div>
+    <ul id="results" class="results" role="listbox" aria-label="Comandos"></ul>
+    <div class="palette-footer">
+      <span><kbd>↑</kbd> <kbd>↓</kbd> navegar</span>
+      <span><kbd>↵</kbd> ejecutar</span>
+      <span><kbd>Esc</kbd> cerrar</span>
+      <span><kbd data-mod>⌘</kbd> <kbd>K</kbd> abrir / cerrar</span>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+
+</html>

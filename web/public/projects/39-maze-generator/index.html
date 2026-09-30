@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>39 - Laberintos</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0b1020;
+      --panel: #121a31;
+      --border: #22305a;
+      --text: #e6ebff;
+      --muted: #8c97c2;
+      --accent: #7c5cff;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      background:
+        radial-gradient(circle at 30% 20%, #1a2350 0, transparent 50%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+      padding: 20px;
+    }
+
+    canvas {
+      display: block;
+      border-radius: 10px;
+      box-shadow: 0 30px 80px rgb(0 0 0 / .5);
+      touch-action: none;
+    }
+
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 24px 24px 24px 0;
+      overflow-y: auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      margin: -10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .panel {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    label span {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    label strong {
+      color: var(--text);
+    }
+
+    input[type='range'] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .check input {
+      accent-color: var(--accent);
+    }
+
+    .buttons {
+      display: grid;
+      gap: 8px;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #1a2548;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #0e1530;
+    }
+
+    .stat small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .stat strong {
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status {
+      margin: 0;
+      min-height: 2.8em;
+      color: #c7d0ff;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .info {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .info strong {
+      color: var(--text);
+    }
+
+    kbd {
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    @media (width < 760px) {
+      body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        height: auto;
+        min-height: 100dvh;
+      }
+
+      .stage {
+        padding: 16px 16px 0;
+      }
+
+      aside {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="stage" id="stage">
+    <canvas id="canvas" aria-label="Laberinto"></canvas>
+  </main>
+
+  <aside>
+    <h1>🧭 Laberintos</h1>
+    <p class="subtitle">Genera con DFS, resuelve con BFS</p>
+
+    <section class="panel">
+      <label>
+        <span>Tamaño <strong id="size-label">25 × 25</strong></span>
+        <input type="range" id="size" min="5" max="60" value="25">
+      </label>
+      <label>
+        <span>Velocidad <strong id="speed-label">5</strong></span>
+        <input type="range" id="speed" min="1" max="10" value="5">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="loops"> Añadir atajos (varios caminos)
+      </label>
+    </section>
+
+    <div class="buttons">
+      <button class="primary" id="generate">🧱 Generar laberinto (DFS)</button>
+      <button id="solve">🔍 Resolver (BFS)</button>
+      <button id="play">🎮 Jugar</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><small>Celdas exploradas</small><strong id="explored">0</strong></div>
+      <div class="stat"><small>Camino más corto</small><strong id="path-length">–</strong></div>
+    </div>
+
+    <p class="status" id="status"></p>
+
+    <p class="info">
+      <strong>DFS</strong> (pila) avanza hasta el fondo antes de retroceder: crea pasillos largos y retorcidos.
+      <strong>BFS</strong> (cola) explora por capas, como una onda: el primer camino que llega a la salida es el más corto.
+    </p>
+  </aside>
+
+  <script type="module">
+    const $canvas = document.querySelector('#canvas')
+    const ctx = $canvas.getContext('2d')
+    const $stage = document.querySelector('#stage')
+    const $size = document.querySelector('#size')
+    const $speed = document.querySelector('#speed')
+    const $loops = document.querySelector('#loops')
+    const $generate = document.querySelector('#generate')
+    const $solve = document.querySelector('#solve')
+    const $play = document.querySelector('#play')
+    const $status = document.querySelector('#status')
+    const $explored = document.querySelector('#explored')
+    const $pathLength = document.querySelector('#path-length')
+
+    // Cada celda guarda sus paredes como bits: 1 = norte, 2 = este, 4 = sur, 8 = oeste.
+    // Una celda con valor 15 (1+2+4+8) tiene las cuatro paredes
+    const ALL_WALLS = 15
+    const DIRECTIONS = [
+      { wall: 1, opposite: 4, dx: 0, dy: -1, keys: ['ArrowUp', 'w'] },
+      { wall: 2, opposite: 8, dx: 1, dy: 0, keys: ['ArrowRight', 'd'] },
+      { wall: 4, opposite: 1, dx: 0, dy: 1, keys: ['ArrowDown', 's'] },
+      { wall: 8, opposite: 2, dx: -1, dy: 0, keys: ['ArrowLeft', 'a'] }
+    ]
+    const STEPS_PER_FRAME = [1, 2, 4, 8, 16, 32, 64, 128, 512, 4096]
+    const LOOP_RATIO = 0.08
+
+    const COLORS = {
+      background: '#0e1530',
+      visited: '#1b2750',
+      stack: '#4c3aa8',
+      current: '#ff5fa2',
+      wall: '#c9d3ff',
+      path: '#ffd23f',
+      start: '#2ee6a6',
+      end: '#ff5f6d',
+      player: '#38bdf8',
+      trail: 'rgb(56 189 248 / .25)'
+    }
+
+    let size = Number($size.value)
+    let walls = new Uint8Array(size * size).fill(ALL_WALLS)
+    let mode = 'idle' // idle | generating | solving | playing
+    let task = null // iterador del algoritmo que se está animando
+    let generation = null
+    let search = null
+    let player = null
+    let cellSize = 20
+
+    const getIndex = (x, y) => y * size + x
+    const getX = index => index % size
+    const getY = index => Math.floor(index / size)
+    // La entrada es la esquina superior izquierda y la salida la inferior derecha
+    const START = 0
+    const getEnd = () => size * size - 1
+
+    function getNeighbor(index, direction) {
+      const x = getX(index) + direction.dx
+      const y = getY(index) + direction.dy
+      if (x < 0 || y < 0 || x >= size || y >= size) return -1
+      return getIndex(x, y)
+    }
+
+    function removeWall(index, direction) {
+      // Hay que quitar la pared en las DOS celdas: la de un lado y la del otro
+      walls[index] &= ~direction.wall
+      walls[getNeighbor(index, direction)] &= ~direction.opposite
+    }
+
+    // ---------- GENERACIÓN: DFS ITERATIVO (recursive backtracker) ----------
+    // Usamos una función generadora (function*): cada "yield" pausa el
+    // algoritmo, así podemos ejecutar unos pocos pasos por frame y animarlo.
+    // La recursión se sustituye por una PILA explícita (stack): así no hay
+    // riesgo de desbordar la pila de llamadas con laberintos grandes.
+    function* generateMaze() {
+      walls = new Uint8Array(size * size).fill(ALL_WALLS)
+      const visited = new Uint8Array(size * size)
+      const stack = [START]
+      visited[START] = 1
+      generation = { visited, stack }
+
+      while (stack.length > 0) {
+        const current = stack.at(-1)
+        const options = DIRECTIONS
+          .map(direction => ({ direction, next: getNeighbor(current, direction) }))
+          .filter(({ next }) => next !== -1 && !visited[next])
+
+        if (options.length === 0) {
+          // Callejón sin salida: retrocedemos (backtracking) sacando de la pila
+          stack.pop()
+        } else {
+          // Elegimos un vecino al azar, tiramos la pared y avanzamos hacia él
+          const { direction, next } = options[Math.floor(Math.random() * options.length)]
+          removeWall(current, direction)
+          visited[next] = 1
+          stack.push(next)
+        }
+        yield
+      }
+
+      // El DFS crea un laberinto "perfecto": un solo camino entre dos celdas
+      // cualesquiera. Si quitamos algunas paredes más aparecen bucles y
+      // varios caminos posibles: ahí es donde BFS demuestra que da el más corto
+      if ($loops.checked) addLoops()
+      generation = null
+    }
+
+    function addLoops() {
+      const count = Math.floor(size * size * LOOP_RATIO)
+      for (let i = 0; i < count; i++) {
+        const index = Math.floor(Math.random() * size * size)
+        const direction = DIRECTIONS[1 + Math.floor(Math.random() * 2)] // este o sur
+        if (getNeighbor(index, direction) !== -1) removeWall(index, direction)
+      }
+    }
+
+    // ---------- RESOLUCIÓN: BFS ----------
+    // BFS usa una COLA (FIFO): visita primero todas las celdas a distancia 1,
+    // luego las de distancia 2, etc. Por eso, en un grafo sin pesos, la
+    // primera vez que alcanza la salida lo hace por el camino más corto.
+    function* solveMaze() {
+      const total = size * size
+      const distance = new Int32Array(total).fill(-1)
+      const parent = new Int32Array(total).fill(-1)
+      // Usamos un índice "head" en vez de queue.shift(): shift es O(n)
+      // porque reordena todo el array, y el índice es O(1)
+      const queue = [START]
+      distance[START] = 0
+      search = { distance, parent, queue, head: 0, maxDistance: 1, path: [], shown: 0 }
+
+      while (search.head < queue.length) {
+        const current = queue[search.head++]
+        if (current === getEnd()) break
+
+        for (const direction of DIRECTIONS) {
+          if (walls[current] & direction.wall) continue
+          const next = getNeighbor(current, direction)
+          if (distance[next] !== -1) continue
+          distance[next] = distance[current] + 1
+          parent[next] = current
+          search.maxDistance = Math.max(search.maxDistance, distance[next])
+          queue.push(next)
+        }
+        yield
+      }
+
+      // Reconstruimos el camino siguiendo los "padres" desde la salida
+      const path = []
+      for (let cell = getEnd(); cell !== -1; cell = parent[cell]) path.push(cell)
+      search.path = path.reverse()
+
+      // Animamos el dibujo del camino
+      while (search.shown < search.path.length) {
+        search.shown++
+        yield
+      }
+    }
+
+    // ---------- CONTROL DE LAS ANIMACIONES ----------
+    function runTask(iterator, newMode, instant = false) {
+      task = iterator
+      mode = newMode
+      if (instant) {
+        while (!task.next().done) {}
+        finishTask()
+      }
+      updateUI()
+    }
+
+    function finishTask() {
+      const finished = mode
+      task = null
+      mode = 'idle'
+      if (finished === 'generating') {
+        setStatus(`Laberinto de ${size} × ${size} listo. ¡Pulsa «Resolver» para ver el BFS en acción!`)
+      } else if (finished === 'solving') {
+        setStatus(`BFS ha explorado ${search.head} celdas y el camino más corto mide ${search.path.length - 1} pasos.`)
+      }
+      updateUI()
+    }
+
+    function step() {
+      if (!task) return
+      const steps = STEPS_PER_FRAME[Number($speed.value) - 1]
+      for (let i = 0; i < steps; i++) {
+        if (task.next().done) {
+          finishTask()
+          return
+        }
+      }
+    }
+
+    function startGeneration(instant = false) {
+      size = Number($size.value)
+      search = null
+      player = null
+      resize()
+      setStatus('Generando con DFS: la celda rosa avanza y el camino morado es la pila.')
+      runTask(generateMaze(), 'generating', instant)
+    }
+
+    function startSolving(instant = false) {
+      player = null
+      setStatus('BFS explorando por capas… el color indica la distancia a la entrada.')
+      runTask(solveMaze(), 'solving', instant)
+    }
+
+    function startPlaying() {
+      task = null
+      search = null
+      mode = 'playing'
+      player = { index: START, moves: 0, trail: new Set([START]) }
+      setStatus('Usa las flechas (o WASD, o desliza el dedo) para llegar a la salida roja.')
+      updateUI()
+    }
+
+    function movePlayer(direction) {
+      if (mode !== 'playing' || !player) return
+      if (walls[player.index] & direction.wall) return
+      player.index = getNeighbor(player.index, direction)
+      player.moves++
+      player.trail.add(player.index)
+      updateUI()
+
+      if (player.index === getEnd()) {
+        mode = 'idle'
+        // Calculamos el óptimo con BFS (sin animación) para comparar
+        const optimal = shortestPathLength()
+        setStatus(`🎉 ¡Has salido en ${player.moves} movimientos! El camino más corto era de ${optimal}.`)
+        updateUI()
+      }
+    }
+
+    function shortestPathLength() {
+      const iterator = solveMaze()
+      while (!iterator.next().done) {}
+      const length = search.path.length - 1
+      search = null
+      return length
+    }
+
+    // ---------- DIBUJO ----------
+    function resize() {
+      const rect = $stage.getBoundingClientRect()
+      const style = getComputedStyle($stage)
+      const available = Math.min(
+        rect.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        (window.innerWidth < 760 ? rect.width : rect.height) - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      )
+      cellSize = Math.max(4, Math.floor(available / size))
+      const side = cellSize * size
+      const dpr = window.devicePixelRatio || 1
+      $canvas.width = side * dpr
+      $canvas.height = side * dpr
+      $canvas.style.width = `${side}px`
+      $canvas.style.height = `${side}px`
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    function fillCell(index, color, inset = 0) {
+      ctx.fillStyle = color
+      ctx.fillRect(
+        getX(index) * cellSize + inset,
+        getY(index) * cellSize + inset,
+        cellSize - inset * 2,
+        cellSize - inset * 2
+      )
+    }
+
+    function drawCells() {
+      const total = size * size
+      ctx.fillStyle = COLORS.background
+      ctx.fillRect(0, 0, size * cellSize, size * cellSize)
+
+      if (generation) {
+        for (let i = 0; i < total; i++) if (generation.visited[i]) fillCell(i, COLORS.visited)
+        for (const index of generation.stack) fillCell(index, COLORS.stack)
+        const current = generation.stack.at(-1)
+        if (current !== undefined) fillCell(current, COLORS.current)
+        return
+      }
+
+      ctx.fillStyle = COLORS.visited
+      ctx.fillRect(0, 0, size * cellSize, size * cellSize)
+
+      if (search) {
+        const { distance, queue, head, maxDistance } = search
+        for (let i = 0; i < total; i++) {
+          if (distance[i] === -1) continue
+          const hue = 190 + (distance[i] / maxDistance) * 130
+          fillCell(i, `hsl(${hue} 70% 32%)`)
+        }
+        // La "frontera": celdas en la cola que aún no se han procesado
+        if (mode === 'solving') {
+          for (let i = head; i < queue.length; i++) fillCell(queue[i], 'hsl(320 90% 65%)')
+        }
+      }
+
+      if (player) {
+        for (const index of player.trail) fillCell(index, COLORS.trail)
+      }
+    }
+
+    function drawPath() {
+      if (!search || search.shown === 0) return
+      ctx.strokeStyle = COLORS.path
+      ctx.lineWidth = Math.max(2, cellSize * 0.3)
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.shadowColor = COLORS.path
+      ctx.shadowBlur = 10
+      ctx.beginPath()
+      search.path.slice(0, search.shown).forEach((index, i) => {
+        const x = (getX(index) + 0.5) * cellSize
+        const y = (getY(index) + 0.5) * cellSize
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    }
+
+    function drawWalls() {
+      ctx.strokeStyle = COLORS.wall
+      ctx.lineWidth = Math.max(1, cellSize * 0.12)
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      for (let index = 0; index < size * size; index++) {
+        const x = getX(index) * cellSize
+        const y = getY(index) * cellSize
+        const cell = walls[index]
+        // Basta con dibujar las paredes norte y oeste de cada celda
+        // (más el borde este y sur del laberinto) porque son compartidas
+        if (cell & 1) {
+          ctx.moveTo(x, y)
+          ctx.lineTo(x + cellSize, y)
+        }
+        if (cell & 8) {
+          ctx.moveTo(x, y)
+          ctx.lineTo(x, y + cellSize)
+        }
+        if (getX(index) === size - 1 && cell & 2) {
+          ctx.moveTo(x + cellSize, y)
+          ctx.lineTo(x + cellSize, y + cellSize)
+        }
+        if (getY(index) === size - 1 && cell & 4) {
+          ctx.moveTo(x, y + cellSize)
+          ctx.lineTo(x + cellSize, y + cellSize)
+        }
+      }
+      ctx.stroke()
+    }
+
+    function drawMarkers() {
+      const inset = Math.max(1, cellSize * 0.2)
+      fillCell(START, COLORS.start, inset)
+      fillCell(getEnd(), COLORS.end, inset)
+
+      if (player) {
+        ctx.fillStyle = COLORS.player
+        ctx.shadowColor = COLORS.player
+        ctx.shadowBlur = 12
+        ctx.beginPath()
+        ctx.arc(
+          (getX(player.index) + 0.5) * cellSize,
+          (getY(player.index) + 0.5) * cellSize,
+          cellSize * 0.3,
+          0,
+          Math.PI * 2
+        )
+        ctx.fill()
+        ctx.shadowBlur = 0
+      }
+    }
+
+    function draw() {
+      drawCells()
+      drawPath()
+      drawWalls()
+      if (!generation) drawMarkers()
+    }
+
+    function loop() {
+      step()
+      draw()
+      if (mode === 'generating' || mode === 'solving') updateStats()
+      requestAnimationFrame(loop)
+    }
+
+    // ---------- UI ----------
+    function setStatus(text) {
+      $status.textContent = text
+    }
+
+    function updateStats() {
+      $explored.textContent = search ? search.head : generation ? generation.visited.reduce((a, b) => a + b, 0) : 0
+      $pathLength.textContent = search?.path.length ? search.path.length - 1 : player ? player.moves : '–'
+    }
+
+    function updateUI() {
+      const busy = mode === 'generating'
+      $solve.disabled = busy
+      $play.disabled = busy
+      $solve.classList.toggle('primary', mode === 'idle' && !search && !player)
+      $generate.classList.toggle('primary', !$solve.classList.contains('primary'))
+      document.querySelector('.stat:last-child small').textContent = player ? 'Tus movimientos' : 'Camino más corto'
+      updateStats()
+    }
+
+    $size.addEventListener('input', () => {
+      document.querySelector('#size-label').textContent = `${$size.value} × ${$size.value}`
+    })
+    $size.addEventListener('change', () => startGeneration())
+    $speed.addEventListener('input', () => {
+      document.querySelector('#speed-label').textContent = $speed.value
+    })
+    $generate.addEventListener('click', () => startGeneration())
+    $solve.addEventListener('click', () => startSolving())
+    $play.addEventListener('click', startPlaying)
+
+    window.addEventListener('keydown', (event) => {
+      if (mode !== 'playing') return
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+      const direction = DIRECTIONS.find(({ keys }) => keys.includes(key))
+      if (!direction) return
+      event.preventDefault()
+      movePlayer(direction)
+    })
+
+    // Control táctil: deslizar el dedo en una dirección
+    let swipeStart = null
+    $canvas.addEventListener('pointerdown', (event) => {
+      swipeStart = { x: event.clientX, y: event.clientY }
+    })
+    $canvas.addEventListener('pointerup', (event) => {
+      if (!swipeStart) return
+      const dx = event.clientX - swipeStart.x
+      const dy = event.clientY - swipeStart.y
+      swipeStart = null
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return
+      const direction = Math.abs(dx) > Math.abs(dy)
+        ? DIRECTIONS[dx > 0 ? 1 : 3]
+        : DIRECTIONS[dy > 0 ? 2 : 0]
+      movePlayer(direction)
+    })
+
+    window.addEventListener('resize', resize)
+
+    // Estado inicial: un laberinto ya generado y resuelto para que se vea algo
+    startGeneration(true)
+    startSolving(true)
+    setStatus('Pulsa «Generar» para ver el DFS paso a paso, o «Jugar» para intentarlo tú.')
+    requestAnimationFrame(loop)
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>69 - Probador de RegExp</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #1c2330;
+      --line: #2a3140;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #7ee787;
+      --accent-2: #79c0ff;
+      --match-a: #7ee78740;
+      --match-a-border: #7ee787;
+      --match-b: #79c0ff40;
+      --match-b-border: #79c0ff;
+      --error: #ff7b72;
+      --mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px 290px;
+      grid-template-rows: auto auto 1fr;
+      gap: 14px 16px;
+      height: 100dvh;
+      padding: 18px 24px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    h1 code {
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* --- Patrón y flags --- */
+    .pattern-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 16px;
+    }
+
+    .pattern {
+      flex: 1 1 420px;
+      display: flex;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-family: var(--mono);
+      font-size: 17px;
+      padding: 0 14px;
+    }
+
+    .pattern:focus-within {
+      border-color: var(--accent-2);
+    }
+
+    .pattern.has-error {
+      border-color: var(--error);
+    }
+
+    .slash {
+      color: var(--muted);
+    }
+
+    .pattern input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 6px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+
+    .flags-preview {
+      color: var(--accent-2);
+      min-width: 3ch;
+    }
+
+    .flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .flag {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      font-family: var(--mono);
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+
+    .flag input {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .flag:has(input:checked) {
+      background: #79c0ff22;
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+    }
+
+    .flag:has(input:focus-visible) {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+
+    .error {
+      grid-column: 1 / -1;
+      margin: -6px 0 0;
+      min-height: 0;
+      color: var(--error);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .error:empty {
+      display: none;
+    }
+
+    /* --- Paneles --- */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #0d1117;
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .badge.is-zero {
+      background: var(--line);
+      color: var(--muted);
+    }
+
+    .left {
+      display: grid;
+      grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    /*
+      Resaltado sobre un <textarea>: detrás colocamos un <div> con el
+      MISMO texto, fuente y tamaño, pero con las coincidencias envueltas
+      en <mark>. El textarea va encima con el texto transparente: así se
+      puede escribir con normalidad y vemos el resaltado de debajo.
+    */
+    .editor {
+      position: relative;
+      flex: 1;
+      min-height: 120px;
+    }
+
+    .editor textarea,
+    .highlights {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      padding: 14px;
+      border: 0;
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      overflow-y: auto;
+      tab-size: 2;
+    }
+
+    .highlights {
+      color: var(--text);
+      pointer-events: none;
+      /* Siempre con barra reservada para que el ajuste de líneas coincida */
+      scrollbar-gutter: stable;
+    }
+
+    .editor textarea {
+      background: transparent;
+      color: transparent;
+      caret-color: var(--text);
+      resize: none;
+      outline: none;
+      scrollbar-gutter: stable;
+    }
+
+    .editor textarea::selection {
+      background: #79c0ff55;
+      color: transparent;
+    }
+
+    mark {
+      color: inherit;
+      border-radius: 3px;
+      background: var(--match-a);
+      box-shadow: inset 0 -2px 0 var(--match-a-border);
+    }
+
+    mark.odd {
+      background: var(--match-b);
+      box-shadow: inset 0 -2px 0 var(--match-b-border);
+    }
+
+    mark.empty {
+      display: inline-block;
+      width: 2px;
+      height: 1.2em;
+      margin: 0 -1px;
+      vertical-align: text-bottom;
+      background: var(--accent);
+      box-shadow: none;
+    }
+
+    mark.is-active {
+      outline: 2px solid #fff;
+    }
+
+    .replace-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .replace-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .replace-row input:focus {
+      border-color: var(--accent-2);
+    }
+
+    .result {
+      flex: 1;
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      color: var(--accent);
+    }
+
+    /* --- Lista de coincidencias --- */
+    .matches {
+      flex: 1;
+      overflow-y: auto;
+      margin: 0;
+      padding: 8px;
+      list-style: none;
+    }
+
+    .match {
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      cursor: default;
+    }
+
+    .match:hover {
+      background: var(--panel-2);
+      border-color: var(--line);
+    }
+
+    .match-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .match-value {
+      display: block;
+      margin: 4px 0 2px;
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--accent);
+      overflow-wrap: anywhere;
+    }
+
+    .groups {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2px 10px;
+      margin: 6px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .groups dt {
+      color: var(--accent-2);
+    }
+
+    .groups dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .groups .undefined {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .empty-state {
+      padding: 20px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* --- Chuleta --- */
+    .cheatsheet {
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .cheatsheet h3 {
+      margin: 6px 4px 8px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .examples {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .cheatsheet button {
+      font: inherit;
+      font-size: 13px;
+      text-align: left;
+      color: var(--text);
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 9px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+
+    .cheatsheet button:hover {
+      border-color: var(--accent-2);
+    }
+
+    .tokens {
+      display: grid;
+      gap: 4px;
+    }
+
+    .tokens button {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 9px;
+    }
+
+    .tokens code {
+      font-family: var(--mono);
+      color: var(--accent);
+    }
+
+    .tokens span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .app {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+        height: auto;
+      }
+
+      .left {
+        grid-column: 1 / -1;
+        grid-template-rows: 340px 220px;
+      }
+
+      .panel.matches-panel,
+      .panel.cheatsheet-panel {
+        max-height: 460px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .app {
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <h1>Probador de <code>RegExp</code></h1>
+      <p>Escribe una expresión regular y mira las coincidencias al instante</p>
+    </header>
+
+    <div class="pattern-bar">
+      <label class="pattern" id="pattern-box">
+        <span class="slash">/</span>
+        <input id="pattern" spellcheck="false" autocomplete="off" aria-label="Expresión regular">
+        <span class="slash">/</span><span class="flags-preview" id="flags-preview"></span>
+      </label>
+      <div class="flags" id="flags" role="group" aria-label="Flags"></div>
+    </div>
+
+    <p class="error" id="error" role="alert"></p>
+
+    <div class="left">
+      <section class="panel">
+        <div class="panel-title">Texto de prueba <span class="badge" id="count">0</span></div>
+        <div class="editor">
+          <div class="highlights" id="highlights" aria-hidden="true"></div>
+          <textarea id="text" spellcheck="false" aria-label="Texto de prueba"></textarea>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Reemplazar</div>
+        <div class="replace-row">
+          <input id="replacement" spellcheck="false" autocomplete="off" placeholder="$1, $<nombre>, $&…"
+            aria-label="Texto de reemplazo">
+        </div>
+        <pre class="result" id="result"></pre>
+      </section>
+    </div>
+
+    <section class="panel matches-panel">
+      <div class="panel-title">Coincidencias</div>
+      <ol class="matches" id="matches"></ol>
+    </section>
+
+    <section class="panel cheatsheet-panel">
+      <div class="panel-title">Chuleta</div>
+      <div class="cheatsheet">
+        <h3>Ejemplos</h3>
+        <div class="examples" id="examples"></div>
+        <h3>Sintaxis (click para insertar)</h3>
+        <div class="tokens" id="tokens"></div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    // Evita que un texto enorme con miles de coincidencias congele la página
+    const MAX_MATCHES = 1000
+    const FLAGS = [
+      { flag: 'g', title: 'global: buscar todas las coincidencias, no solo la primera' },
+      { flag: 'i', title: 'ignoreCase: no distinguir mayúsculas de minúsculas' },
+      { flag: 'm', title: 'multiline: ^ y $ coinciden al inicio y final de cada línea' },
+      { flag: 's', title: 'dotAll: el punto también coincide con saltos de línea' },
+      { flag: 'u', title: 'unicode: trata el texto como puntos de código Unicode' },
+      { flag: 'y', title: 'sticky: la coincidencia debe empezar justo en lastIndex' },
+      { flag: 'd', title: 'hasIndices: guarda el inicio y fin de cada grupo (match.indices)' }
+    ]
+    const EXAMPLES = [
+      {
+        name: '📅 Fecha',
+        pattern: String.raw`(?<dia>\d{2})\/(?<mes>\d{2})\/(?<anio>\d{4})`,
+        flags: 'g',
+        replacement: '$<anio>-$<mes>-$<dia>',
+        text: 'Nací el 23/04/1995 y mi hermana el 07/11/1998.\nLa reunión es el 15/09/2025 a las 10:30.\nEsto no es una fecha: 1/2/34'
+      },
+      {
+        name: '✉️ Email',
+        pattern: String.raw`(?<usuario>[\w.+-]+)@(?<dominio>[\w-]+(?:\.[\w-]+)+)`,
+        flags: 'gi',
+        replacement: '$<usuario>@[oculto]',
+        text: 'Escríbeme a hola@midu.dev o a soporte+web@ejemplo.com.es\nEsto no vale: @usuario ni correo@sinpunto'
+      },
+      {
+        name: '🔗 URL',
+        pattern: String.raw`https?:\/\/(?<dominio>[\w-]+(?:\.[\w-]+)+)(?<ruta>\/[^\s]*)?`,
+        flags: 'gi',
+        replacement: '[$<dominio>]',
+        text: 'Visita https://midu.dev y https://developer.mozilla.org/es/docs/Web/JavaScript\nTambién http://localhost no tiene punto, pero http://127.0.0.1:5555 sí.'
+      },
+      {
+        name: '🪪 DNI',
+        pattern: String.raw`\b(?<numero>\d{8})-?(?<letra>[A-HJ-NP-TV-Z])\b`,
+        flags: 'gi',
+        replacement: '****$<letra>',
+        text: 'Mi DNI es 12345678Z y el de mi padre 87654321-X.\nEstos no valen: 1234567A, 123456789B, 12345678I (la I no se usa).'
+      },
+      {
+        name: '🎨 Color hex',
+        pattern: String.raw`#(?:[0-9a-f]{3}){1,2}\b`,
+        flags: 'gi',
+        replacement: '<$&>',
+        text: 'color: #fff; background: #0d1117; border-color: #79C0FF;\nNo válidos: #12 #abcd #ggg'
+      },
+      {
+        name: '🔁 Repetidas',
+        pattern: String.raw`\b(\w+)\s+\1\b`,
+        flags: 'gi',
+        replacement: '$1',
+        text: 'Esto es es un texto con con palabras repetidas.\nEl el principio también cuenta.'
+      },
+      {
+        name: '📞 Teléfono',
+        pattern: String.raw`(?:\+34\s?)?(?<numero>[6-9]\d{2}(?:\s?\d{3}){2})`,
+        flags: 'g',
+        replacement: 'tel:$<numero>',
+        text: 'Llama al 612 345 678 o al +34 911234567.\nEste no: 512 345 678'
+      },
+      {
+        name: '∅ Vacías',
+        pattern: 'a*',
+        flags: 'g',
+        replacement: '-',
+        text: 'baaac'
+      }
+    ]
+    const TOKENS = [
+      ['.', 'cualquier carácter'],
+      ['\\d', 'dígito'],
+      ['\\w', 'letra, número o _'],
+      ['\\s', 'espacio en blanco'],
+      ['\\b', 'límite de palabra'],
+      ['^', 'inicio'],
+      ['$', 'final'],
+      ['*', '0 o más'],
+      ['+', '1 o más'],
+      ['?', 'opcional'],
+      ['{2,4}', 'entre 2 y 4'],
+      ['[abc]', 'uno de estos'],
+      ['[^abc]', 'ninguno de estos'],
+      ['(…)', 'grupo'],
+      ['(?<nombre>…)', 'grupo con nombre'],
+      ['(?:…)', 'grupo sin captura'],
+      ['a|b', 'a o b'],
+      ['(?=…)', 'seguido de'],
+      ['(?<!…)', 'no precedido de'],
+      ['\\1', 'repite el grupo 1']
+    ]
+
+    const $pattern = document.querySelector('#pattern')
+    const $patternBox = document.querySelector('#pattern-box')
+    const $flags = document.querySelector('#flags')
+    const $flagsPreview = document.querySelector('#flags-preview')
+    const $error = document.querySelector('#error')
+    const $text = document.querySelector('#text')
+    const $highlights = document.querySelector('#highlights')
+    const $count = document.querySelector('#count')
+    const $matches = document.querySelector('#matches')
+    const $replacement = document.querySelector('#replacement')
+    const $result = document.querySelector('#result')
+
+    // --- Utilidades ---
+
+    // Nunca metemos texto del usuario en innerHTML sin escaparlo:
+    // un "<b>" en el texto de prueba debe verse, no interpretarse
+    function escapeHTML(text) {
+      return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+    }
+
+    function getFlags() {
+      return [...$flags.querySelectorAll('input:checked')].map(input => input.value).join('')
+    }
+
+    function setFlags(flags) {
+      $flags.querySelectorAll('input').forEach(input => {
+        input.checked = flags.includes(input.value)
+      })
+    }
+
+    function createRegex() {
+      // new RegExp lanza un SyntaxError si el patrón no es válido: lo
+      // capturamos para mostrarlo sin romper la app
+      try {
+        return { regex: new RegExp($pattern.value, getFlags()) }
+      } catch (error) {
+        return { error: error.message }
+      }
+    }
+
+    /*
+      matchAll devuelve un iterador con TODAS las coincidencias, cada una
+      con su índice y sus grupos. Exige el flag 'g' (si no, lanza un
+      TypeError), así que sin 'g' usamos exec, que solo da la primera:
+      exactamente lo que haría el motor de verdad.
+
+      ⚠️ El clásico bucle `while ((m = regex.exec(text)))` se queda
+      colgado con patrones que pueden coincidir con la cadena vacía
+      (como a* con el flag g): la coincidencia vacía no avanza lastIndex y exec
+      devuelve lo mismo una y otra vez. matchAll lo resuelve por dentro
+      avanzando lastIndex una posición cuando la coincidencia está vacía.
+    */
+    function findMatches(regex, text) {
+      if (!regex.global) {
+        const match = regex.exec(text)
+        return match ? [match] : []
+      }
+
+      const matches = []
+      for (const match of text.matchAll(regex)) {
+        matches.push(match)
+        if (matches.length >= MAX_MATCHES) break
+      }
+      return matches
+    }
+
+    // --- Render ---
+
+    function renderHighlights(text, matches) {
+      let html = ''
+      let lastIndex = 0
+
+      matches.forEach((match, i) => {
+        const start = match.index
+        const end = start + match[0].length
+        html += escapeHTML(text.slice(lastIndex, start))
+        const className = match[0].length === 0 ? 'empty' : i % 2 ? 'odd' : ''
+        html += `<mark class="${className}" data-index="${i}">${escapeHTML(match[0])}</mark>`
+        lastIndex = end
+      })
+
+      html += escapeHTML(text.slice(lastIndex))
+      // Un salto de línea final no ocupa espacio en un div: añadimos uno extra
+      // para que la altura coincida con la del textarea
+      if (text.endsWith('\n')) html += ' '
+      $highlights.innerHTML = html
+      syncScroll()
+    }
+
+    function renderGroupRow(label, value, range) {
+      const content = value === undefined
+        ? '<span class="undefined">undefined</span>'
+        : `"${escapeHTML(value)}"${range ? ` [${range.join(', ')}]` : ''}`
+      return `<dt>${escapeHTML(label)}</dt><dd>${content}</dd>`
+    }
+
+    // Los grupos con nombre también tienen número: aparecen en las dos listas.
+    // Con el flag 'd', match.indices guarda [inicio, fin] de cada grupo.
+    function renderGroups(match) {
+      const rows = []
+      for (let i = 1; i < match.length; i++) {
+        rows.push(renderGroupRow(`$${i}`, match[i], match.indices?.[i]))
+      }
+      for (const [name, value] of Object.entries(match.groups ?? {})) {
+        rows.push(renderGroupRow(`<${name}>`, value, match.indices?.groups?.[name]))
+      }
+      return rows.length ? `<dl class="groups">${rows.join('')}</dl>` : ''
+    }
+
+    function renderMatches(matches, { limited }) {
+      $count.textContent = matches.length + (limited ? '+' : '')
+      $count.classList.toggle('is-zero', matches.length === 0)
+
+      if (!matches.length) {
+        $matches.innerHTML = '<li class="empty-state">Sin coincidencias 🤷‍♂️</li>'
+        return
+      }
+
+      $matches.innerHTML = matches.map((match, i) => {
+        const start = match.index
+        const end = start + match[0].length
+        return `<li class="match" data-index="${i}">
+          <div class="match-head"><span>#${i + 1}</span><span>índice ${start}${end !== start ? `–${end}` : ' (vacía)'}</span></div>
+          <code class="match-value">"${escapeHTML(match[0])}"</code>
+          ${renderGroups(match)}
+        </li>`
+      }).join('') + (limited ? `<li class="empty-state">Mostrando solo las ${MAX_MATCHES} primeras</li>` : '')
+    }
+
+    function renderReplacement(regex, text) {
+      // replace entiende $1, $2… $<nombre>, $& (todo) y $$ (un dólar).
+      // Sin el flag 'g' solo reemplaza la primera coincidencia.
+      // Con 'y' (sticky) el motor empieza a buscar en lastIndex, que exec
+      // ha modificado al buscar coincidencias: lo reiniciamos.
+      regex.lastIndex = 0
+      $result.textContent = text.replace(regex, $replacement.value)
+    }
+
+    function update() {
+      const text = $text.value
+      const flags = getFlags()
+      $flagsPreview.textContent = flags
+
+      const { regex, error } = createRegex()
+      $error.textContent = error ? `⚠️ ${error}` : ''
+      $patternBox.classList.toggle('has-error', Boolean(error))
+
+      if (error || !$pattern.value) {
+        renderHighlights(text, [])
+        $count.textContent = '0'
+        $count.classList.add('is-zero')
+        $matches.innerHTML = `<li class="empty-state">${error ? 'Corrige el patrón para ver coincidencias' : 'Escribe un patrón para empezar'}</li>`
+        $result.textContent = text
+        return
+      }
+
+      const matches = findMatches(regex, text)
+      renderHighlights(text, matches)
+      renderMatches(matches, { limited: matches.length >= MAX_MATCHES })
+      renderReplacement(regex, text)
+    }
+
+    function syncScroll() {
+      $highlights.scrollTop = $text.scrollTop
+      $highlights.scrollLeft = $text.scrollLeft
+    }
+
+    // --- Chuleta ---
+
+    function loadExample(example) {
+      $pattern.value = example.pattern
+      $text.value = example.text
+      $replacement.value = example.replacement
+      setFlags(example.flags)
+      update()
+    }
+
+    function insertToken(token) {
+      const snippet = token.replace('…', '')
+      const { selectionStart, selectionEnd, value } = $pattern
+      $pattern.value = value.slice(0, selectionStart) + snippet + value.slice(selectionEnd)
+      // Dejamos el cursor dentro del grupo si el token lo tenía (…)
+      const cursor = selectionStart + (token.includes('…') ? token.indexOf('…') : snippet.length)
+      $pattern.focus()
+      $pattern.setSelectionRange(cursor, cursor)
+      update()
+    }
+
+    function renderCheatsheet() {
+      const $examples = document.querySelector('#examples')
+      EXAMPLES.forEach(example => {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.textContent = example.name
+        button.title = `/${example.pattern}/${example.flags}`
+        button.addEventListener('click', () => loadExample(example))
+        $examples.append(button)
+      })
+
+      const $tokens = document.querySelector('#tokens')
+      TOKENS.forEach(([token, description]) => {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.innerHTML = `<code>${escapeHTML(token)}</code><span>${description}</span>`
+        button.addEventListener('click', () => insertToken(token))
+        $tokens.append(button)
+      })
+    }
+
+    function renderFlags() {
+      $flags.innerHTML = FLAGS.map(({ flag, title }) => `
+        <label class="flag" title="${title}">
+          <input type="checkbox" value="${flag}" aria-label="${title}">${flag}
+        </label>`).join('')
+    }
+
+    // --- Eventos ---
+
+    $pattern.addEventListener('input', update)
+    $text.addEventListener('input', update)
+    $replacement.addEventListener('input', update)
+    $flags.addEventListener('change', update)
+    $text.addEventListener('scroll', syncScroll)
+
+    // Al pasar por una coincidencia de la lista, la marcamos en el texto
+    $matches.addEventListener('pointerover', (event) => {
+      const item = event.target.closest('.match')
+      $highlights.querySelectorAll('mark.is-active').forEach(mark => mark.classList.remove('is-active'))
+      if (item) $highlights.querySelector(`mark[data-index="${item.dataset.index}"]`)?.classList.add('is-active')
+    })
+
+    $matches.addEventListener('pointerleave', () => {
+      $highlights.querySelectorAll('mark.is-active').forEach(mark => mark.classList.remove('is-active'))
+    })
+
+    renderFlags()
+    renderCheatsheet()
+    loadExample(EXAMPLES[0])
+  </script>
+</body>
+
+</html>

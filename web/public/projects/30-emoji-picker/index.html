@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>30 - Selector de emojis</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #eef1f7;
+      --card: #ffffff;
+      --border: #e1e5ee;
+      --text: #1b2033;
+      --muted: #6c7489;
+      --accent: #4f6bff;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(600px 400px at 15% 10%, #ffd9ec, transparent),
+        radial-gradient(600px 400px at 90% 90%, #d8e4ff, transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .composer {
+      width: min(580px, 100%);
+      /* Dejamos hueco encima para que el popover no tape el mensaje */
+      margin-top: 370px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: 0 24px 60px -24px #1b203340;
+      overflow: hidden;
+    }
+
+    .composer header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px 12px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .composer h1 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .composer header span {
+      margin-left: auto;
+      margin-right: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      height: 170px;
+      padding: 18px 20px;
+      border: 0;
+      resize: none;
+      font: inherit;
+      font-size: 17px;
+      line-height: 1.6;
+      color: inherit;
+      background: transparent;
+      outline: none;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      background: #fafbfd;
+    }
+
+    .toolbar small {
+      margin-right: auto;
+      padding-left: 6px;
+      color: var(--muted);
+    }
+
+    .toolbar button {
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      color: inherit;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+
+    .emoji-button {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      font-size: 22px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      /* Anchor positioning: le ponemos nombre al botón para colocar
+         el popover justo encima de él */
+      anchor-name: --emoji-button;
+    }
+
+    .emoji-button:hover {
+      background: #f1f3f9;
+    }
+
+    .toolbar .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .warning {
+      margin: 0;
+      padding: 10px 20px;
+      background: #fff4d6;
+      color: #7a5600;
+      font-size: 14px;
+    }
+
+    /* ---------- Popover ---------- */
+
+    .picker {
+      width: min(360px, calc(100vw - 32px));
+      height: 360px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 24px 60px -12px #1b203355;
+      /* El popover abierto es flex. OJO: si lo ponemos sin :popover-open
+         anularíamos el display: none que lo oculta cuando está cerrado */
+    }
+
+    .picker:popover-open {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Si el navegador soporta anchor positioning, lo pegamos al botón.
+       Si no, se queda centrado en la pantalla (comportamiento por defecto) */
+    @supports (anchor-name: --a) {
+      .picker {
+        position-anchor: --emoji-button;
+        inset: auto;
+        bottom: anchor(top);
+        right: anchor(right);
+        margin: 0 0 10px;
+        position-try-fallbacks: flip-block;
+      }
+
+      /* En móvil lo centramos en horizontal para que no se salga */
+      @media (max-width: 640px) {
+        .picker {
+          left: 0;
+          right: 0;
+          margin-inline: auto;
+        }
+      }
+    }
+
+    .picker .search {
+      margin: 12px 12px 8px;
+      padding: 9px 12px;
+      font: inherit;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      background: #f6f7fb;
+    }
+
+    .picker .search:focus {
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tabs button {
+      flex: 1;
+      padding: 6px 0 8px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: none;
+      font-size: 18px;
+      cursor: pointer;
+      filter: grayscale(1);
+      opacity: .6;
+    }
+
+    .tabs button:hover,
+    .tabs button[aria-selected="true"] {
+      filter: none;
+      opacity: 1;
+    }
+
+    .tabs button[aria-selected="true"] {
+      border-bottom-color: var(--accent);
+    }
+
+    .picker h2 {
+      margin: 10px 14px 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      align-content: start;
+      padding: 0 8px 8px;
+      overflow-y: auto;
+    }
+
+    .grid button {
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 10px;
+      background: none;
+      font-size: 24px;
+      cursor: pointer;
+      transition: scale .1s;
+    }
+
+    .grid button:hover {
+      background: #eef1f8;
+      scale: 1.15;
+    }
+
+    .grid p {
+      grid-column: 1 / -1;
+      margin: 30px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      background: #fafbfd;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .preview span:first-child {
+      font-size: 28px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      translate: -50% 0;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: var(--text);
+      color: #fff;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+
+    .toast.visible {
+      opacity: 1;
+    }
+
+    @media (max-height: 700px) {
+      .composer {
+        margin-top: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="composer">
+    <header>
+      <h1>✍️ Nuevo mensaje</h1>
+      <span id="counter"></span>
+      <!-- popovertarget: el navegador abre y cierra el popover. ¡Sin JavaScript! -->
+      <button class="emoji-button" popovertarget="picker" aria-label="Abrir selector de emojis">😊</button>
+    </header>
+    <p class="warning" id="warning" hidden>⚠️ Tu navegador no soporta la Popover API, así que el selector no funcionará.</p>
+    <textarea id="message" aria-label="Mensaje">¡Hola! Estoy probando el selector de emojis hecho con la Popover API 
+Coloca el cursor donde quieras y elige un emoji.</textarea>
+    <div class="toolbar">
+      <small>Esc o clic fuera para cerrar el selector</small>
+      <button class="primary" id="copy">Copiar texto</button>
+    </div>
+  </main>
+
+  <!-- popover (="auto"): se muestra por encima de todo (top layer) y se
+       cierra solo al hacer clic fuera o pulsar Escape (light dismiss) -->
+  <div class="picker" id="picker" popover>
+    <input class="search" id="search" type="search" placeholder="Buscar emoji…" aria-label="Buscar emoji"
+      autocomplete="off">
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Categorías"></nav>
+    <h2 id="section-title"></h2>
+    <div class="grid" id="grid"></div>
+    <div class="preview" id="preview"><span>😊</span><span>Pasa el ratón por un emoji</span></div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module">
+    import { CATEGORIES, EMOJIS } from './emojis.js'
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const RECENTS_KEY = 'emoji-picker-recents'
+    const MAX_RECENTS = 24
+    const RECENTS_TAB = { id: 'recientes', name: 'Usados recientemente', icon: '🕘' }
+
+    const $picker = $('#picker')
+    const $message = $('#message')
+    const $search = $('#search')
+    const $tabs = $('#tabs')
+    const $grid = $('#grid')
+    const $title = $('#section-title')
+    const $preview = $('#preview')
+    const $counter = $('#counter')
+
+    // Buscamos por nombre para mostrar la vista previa al pasar por encima
+    const EMOJI_NAMES = new Map(EMOJIS.map(({ emoji, name }) => [emoji, name]))
+
+    let recents = loadRecents()
+    let activeTab = recents.length > 0 ? RECENTS_TAB.id : CATEGORIES[0].id
+
+    /* ---------- Recientes (localStorage) ---------- */
+
+    function loadRecents() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(RECENTS_KEY))
+        // Validamos: en localStorage puede haber cualquier cosa
+        return Array.isArray(saved) ? saved.filter(emoji => EMOJI_NAMES.has(emoji)) : []
+      } catch {
+        return []
+      }
+    }
+
+    function addRecent(emoji) {
+      // Lo ponemos el primero y quitamos duplicados
+      recents = [emoji, ...recents.filter(item => item !== emoji)].slice(0, MAX_RECENTS)
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents))
+    }
+
+    /* ---------- Búsqueda ---------- */
+
+    // "Corazón" y "corazon" deben coincidir: quitamos las tildes
+    // descomponiendo los caracteres (NFD) y borrando los diacríticos
+    const normalize = (text) => text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+    function search(query) {
+      const words = normalize(query).split(/\s+/).filter(Boolean)
+      return EMOJIS.filter(({ name }) => {
+        const target = normalize(name)
+        return words.every(word => target.includes(word))
+      })
+    }
+
+    /* ---------- Render ---------- */
+
+    function renderTabs() {
+      $tabs.innerHTML = [RECENTS_TAB, ...CATEGORIES].map(({ id, name, icon }) => `
+        <button role="tab" data-tab="${id}" title="${name}" aria-label="${name}"
+          aria-selected="${id === activeTab}">${icon}</button>
+      `).join('')
+    }
+
+    function renderGrid() {
+      const query = $search.value.trim()
+      let list
+      let title
+
+      if (query) {
+        list = search(query).map(({ emoji }) => emoji)
+        title = `Resultados para “${query}”`
+      } else if (activeTab === RECENTS_TAB.id) {
+        list = recents
+        title = RECENTS_TAB.name
+      } else {
+        list = EMOJIS.filter(item => item.category === activeTab).map(({ emoji }) => emoji)
+        title = CATEGORIES.find(category => category.id === activeTab).name
+      }
+
+      $title.textContent = title
+      $grid.scrollTop = 0
+
+      if (list.length === 0) {
+        $grid.innerHTML = query
+          ? '<p>No hay emojis con ese nombre 🤷</p>'
+          : '<p>Aún no has usado ningún emoji</p>'
+        return
+      }
+
+      $grid.innerHTML = list.map(emoji => {
+        const name = EMOJI_NAMES.get(emoji)
+        return `<button data-emoji="${emoji}" title="${name}" aria-label="${name}">${emoji}</button>`
+      }).join('')
+    }
+
+    /* ---------- Insertar en el textarea ---------- */
+
+    // El textarea recuerda la posición del cursor (selectionStart/End)
+    // aunque pierda el foco. setRangeText sustituye ese rango por el
+    // emoji y con 'end' deja el cursor justo después.
+    function insertEmoji(emoji) {
+      const { selectionStart, selectionEnd } = $message
+      $message.setRangeText(emoji, selectionStart, selectionEnd, 'end')
+      updateCounter()
+      addRecent(emoji)
+      if (activeTab === RECENTS_TAB.id && !$search.value) renderGrid()
+    }
+
+    // '👍'.length es 2 y '🧑‍💻'.length ¡es 5! Para contar "lo que ve el
+    // usuario" (grafemas) usamos Intl.Segmenter
+    const segmenter = new Intl.Segmenter('es', { granularity: 'grapheme' })
+
+    function updateCounter() {
+      const count = [...segmenter.segment($message.value)].length
+      $counter.textContent = `${count} caracteres`
+    }
+
+    /* ---------- Eventos (con delegación) ---------- */
+
+    // Un único listener para TODOS los emojis del grid, aunque cambien.
+    // closest() encuentra el botón aunque el clic sea en su interior
+    $grid.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-emoji]')
+      if (button) insertEmoji(button.dataset.emoji)
+    })
+
+    $grid.addEventListener('pointerover', (event) => {
+      const button = event.target.closest('button[data-emoji]')
+      if (!button) return
+      const [icon, label] = $preview.children
+      icon.textContent = button.dataset.emoji
+      label.textContent = button.title
+    })
+
+    $tabs.addEventListener('click', (event) => {
+      const tab = event.target.closest('[data-tab]')
+      if (!tab) return
+      activeTab = tab.dataset.tab
+      $search.value = ''
+      renderTabs()
+      renderGrid()
+    })
+
+    $search.addEventListener('input', renderGrid)
+
+    $message.addEventListener('input', updateCounter)
+
+    // El evento toggle nos avisa cuando el popover se abre o se cierra
+    $picker.addEventListener('toggle', (event) => {
+      if (event.newState === 'open') {
+        renderTabs()
+        renderGrid()
+      } else {
+        $search.value = ''
+      }
+    })
+
+    let toastTimeout
+    $('#copy').addEventListener('click', async () => {
+      const $toast = $('#toast')
+      try {
+        await navigator.clipboard.writeText($message.value)
+        $toast.textContent = '¡Texto copiado! 📋'
+      } catch {
+        $toast.textContent = 'No se ha podido copiar'
+      }
+      $toast.classList.add('visible')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => $toast.classList.remove('visible'), 1500)
+    })
+
+    /* ---------- Inicio ---------- */
+
+    // Detección de soporte: si el navegador conoce el atributo popover,
+    // los elementos HTML tienen la propiedad "popover"
+    const supportsPopover = Object.hasOwn(HTMLElement.prototype, 'popover')
+
+    // Dejamos el cursor al final del texto de ejemplo
+    $message.setSelectionRange($message.value.length, $message.value.length)
+    updateCounter()
+
+    if (!supportsPopover) {
+      $('#warning').hidden = false
+    } else {
+      // Solo para la demo: lo abrimos al cargar para que se vea.
+      // Normalmente lo abre el botón con popovertarget, sin JS
+      $picker.showPopover()
+    }
+  </script>
+</body>
+
+</html>

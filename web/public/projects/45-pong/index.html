@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>45 - Pong</title>
+  <style>
+    :root {
+      --phosphor: #d9ffe6;
+      --glow: #3cff8f;
+      --bg: #050807;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      place-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: radial-gradient(circle at 50% 40%, #0d1a13, var(--bg) 70%);
+      color: var(--phosphor);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .hud {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 24px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      opacity: .75;
+    }
+
+    kbd {
+      padding: 1px 6px;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+
+    .screen {
+      position: relative;
+      width: min(100%, calc((100dvh - 80px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      border: 3px solid rgb(217 255 230 / 25%);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgb(60 255 143 / 15%), inset 0 0 80px rgb(0 0 0 / 80%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      /* Imprescindible para que el navegador no haga scroll al arrastrar el dedo */
+      touch-action: none;
+    }
+
+    /* Líneas de escaneo y viñeta para simular un monitor CRT */
+    .screen::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(to bottom, rgb(0 0 0 / 0%) 0 2px, rgb(0 0 0 / 28%) 2px 4px),
+        radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 55%));
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 14px;
+      padding: 16px;
+      text-align: center;
+      background: rgb(0 0 0 / 45%);
+      z-index: 1;
+    }
+
+    .overlay[hidden] {
+      display: none;
+    }
+
+    .overlay h1 {
+      margin: 0;
+      font-size: clamp(40px, 11vw, 120px);
+      letter-spacing: .15em;
+      line-height: 1;
+      text-shadow: 0 0 18px var(--glow), 0 0 4px var(--glow);
+    }
+
+    .overlay h2 {
+      margin: 0;
+      font-size: clamp(22px, 5vw, 48px);
+      letter-spacing: .1em;
+      text-shadow: 0 0 14px var(--glow);
+    }
+
+    .overlay p {
+      margin: 0;
+      font-size: clamp(11px, 1.6vw, 15px);
+      opacity: .8;
+      letter-spacing: 1px;
+    }
+
+    .overlay .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .overlay button {
+      padding: 10px 20px;
+      border: 2px solid var(--phosphor);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--phosphor);
+      font: inherit;
+      font-size: clamp(12px, 1.8vw, 16px);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, color .15s, box-shadow .15s;
+    }
+
+    .overlay button:hover,
+    .overlay button:focus-visible {
+      background: var(--phosphor);
+      color: var(--bg);
+      box-shadow: 0 0 20px var(--glow);
+      outline: none;
+    }
+
+    .blink {
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+
+    /* En pantallas pequeñas la pista es bajita: compactamos los menús */
+    @media (width < 600px) {
+      .overlay {
+        gap: 6px;
+      }
+
+      .overlay h1 {
+        font-size: 30px;
+      }
+
+      .overlay .blink {
+        display: none;
+      }
+
+      .overlay button {
+        padding: 6px 12px;
+      }
+    }
+
+    @keyframes blink {
+      to {
+        visibility: hidden;
+      }
+    }
+  </style>
+
+  <script type="module">
+    // Resolución lógica del juego: el canvas se escala con CSS a cualquier tamaño
+    const WIDTH = 960
+    const HEIGHT = 540
+    const PADDLE_WIDTH = 14
+    const PADDLE_HEIGHT = 96
+    const PADDLE_MARGIN = 30
+    const PADDLE_SPEED = 560 // px por segundo
+    const BALL_SIZE = 14
+    const BALL_START_SPEED = 430
+    const BALL_MAX_SPEED = 1150
+    const SPEED_UP = 1.07 // cada golpe la bola va un 7% más rápida
+    const MAX_BOUNCE_ANGLE = Math.PI / 3 // 60º como máximo
+    const WINNING_SCORE = 7
+    const SERVE_DELAY = 0.9 // segundos antes de sacar
+    const COLOR = '#d9ffe6'
+    const GLOW = '#3cff8f'
+
+    // La IA es "humana": reacciona tarde, apunta con error y es más lenta que tú
+    const AI = {
+      speed: 380,
+      reactionTime: 0.12,
+      maxError: 0.45 // porcentaje del alto de la pala
+    }
+
+    const STATES = {
+      SERVE: 'serve',
+      PLAYING: 'playing',
+      PAUSED: 'paused',
+      GAME_OVER: 'gameover'
+    }
+
+    const MODES = {
+      DEMO: 'demo',
+      ONE_PLAYER: '1p',
+      TWO_PLAYERS: '2p'
+    }
+
+    const CONTROLS = {
+      left: { up: 'KeyW', down: 'KeyS' },
+      right: { up: 'ArrowUp', down: 'ArrowDown' }
+    }
+
+    // Dígitos de 3x5 píxeles para el marcador retro
+    const DIGITS = [
+      '111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001',
+      '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'
+    ]
+
+    const canvas = document.querySelector('canvas')
+    const context = canvas.getContext('2d')
+    const overlay = document.querySelector('#overlay')
+
+    // ¿Por qué un Set y no reaccionar directamente al keydown?
+    // keydown solo se repite para la ÚLTIMA tecla pulsada y además con un retardo
+    // inicial (el "key repeat" del sistema operativo). Si el jugador 1 mantiene W
+    // y el jugador 2 pulsa ↑, el evento de W deja de repetirse y su pala se para.
+    // Guardando qué teclas están pulsadas ahora mismo y leyéndolas en cada frame,
+    // los dos jugadores se mueven a la vez y de forma fluida.
+    const pressedKeys = new Set()
+    // Lo mismo para los dedos en pantallas táctiles: pointerId -> lado de la pala
+    const activePointers = new Map()
+
+    let mode = MODES.DEMO
+    let state = STATES.SERVE
+    let stateBeforePause = STATES.SERVE
+    let serveTimer = SERVE_DELAY
+    let serveDirection = 1
+    let lastTime = performance.now()
+    let audioContext = null
+
+    const paddles = {
+      left: createPaddle('left'),
+      right: createPaddle('right')
+    }
+
+    const ball = { x: 0, y: 0, vx: 0, vy: 0 }
+
+    function createPaddle(side) {
+      return {
+        side,
+        x: side === 'left' ? PADDLE_MARGIN : WIDTH - PADDLE_MARGIN - PADDLE_WIDTH,
+        y: (HEIGHT - PADDLE_HEIGHT) / 2,
+        score: 0,
+        pointerY: null,
+        ai: { target: HEIGHT / 2, timer: 0, error: 0 }
+      }
+    }
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
+    function isAI(paddle) {
+      if (mode === MODES.DEMO) return true
+      return mode === MODES.ONE_PLAYER && paddle.side === 'right'
+    }
+
+    function setupCanvas() {
+      // Pintamos a la resolución real de la pantalla para que se vea nítido en retina
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = WIDTH * dpr
+      canvas.height = HEIGHT * dpr
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    function resetBall() {
+      ball.x = (WIDTH - BALL_SIZE) / 2
+      ball.y = (HEIGHT - BALL_SIZE) / 2
+      ball.vx = 0
+      ball.vy = 0
+      state = STATES.SERVE
+      serveTimer = SERVE_DELAY
+    }
+
+    function launchBall() {
+      // Saque con un ángulo aleatorio suave (entre -30º y 30º)
+      const angle = (Math.random() * 2 - 1) * (Math.PI / 6)
+      ball.vx = Math.cos(angle) * BALL_START_SPEED * serveDirection
+      ball.vy = Math.sin(angle) * BALL_START_SPEED
+      state = STATES.PLAYING
+      randomizeAIError()
+    }
+
+    function startGame(newMode) {
+      mode = newMode
+      paddles.left.score = 0
+      paddles.right.score = 0
+      paddles.left.y = paddles.right.y = (HEIGHT - PADDLE_HEIGHT) / 2
+      serveDirection = Math.random() < 0.5 ? -1 : 1
+      resetBall()
+      renderOverlay()
+    }
+
+    function togglePause() {
+      if (mode === MODES.DEMO || state === STATES.GAME_OVER) return
+      // Recordamos si estábamos sacando o jugando para volver al mismo estado
+      if (state === STATES.PAUSED) {
+        state = stateBeforePause
+      } else {
+        stateBeforePause = state
+        state = STATES.PAUSED
+      }
+      renderOverlay()
+    }
+
+    // ---------- Movimiento de las palas ----------
+
+    function getKeyboardDirection(paddle) {
+      // En modo 1 jugador puedes usar W/S o las flechas indistintamente
+      const controls = mode === MODES.ONE_PLAYER
+        ? [CONTROLS.left, CONTROLS.right]
+        : [CONTROLS[paddle.side]]
+
+      let direction = 0
+      for (const { up, down } of controls) {
+        if (pressedKeys.has(up)) direction -= 1
+        if (pressedKeys.has(down)) direction += 1
+      }
+      return Math.sign(direction)
+    }
+
+    function moveHumanPaddle(paddle, dt) {
+      if (paddle.pointerY !== null) {
+        const center = paddle.y + PADDLE_HEIGHT / 2
+        const maxStep = PADDLE_SPEED * 1.6 * dt
+        paddle.y += clamp(paddle.pointerY - center, -maxStep, maxStep)
+      } else {
+        paddle.y += getKeyboardDirection(paddle) * PADDLE_SPEED * dt
+      }
+    }
+
+    function randomizeAIError() {
+      // Cada vez que alguien golpea, la IA "decide" un punto de la pala donde apuntar.
+      // Ese error hace que a veces llegue justa y, con bolas rápidas, falle
+      for (const paddle of Object.values(paddles)) {
+        paddle.ai.error = (Math.random() * 2 - 1) * PADDLE_HEIGHT * AI.maxError
+      }
+    }
+
+    function moveAIPaddle(paddle, dt) {
+      const { ai } = paddle
+      ai.timer -= dt
+
+      // Tiempo de reacción: solo "mira" la bola cada X segundos, no en cada frame
+      if (ai.timer <= 0) {
+        ai.timer = AI.reactionTime
+        const direction = paddle.side === 'left' ? -1 : 1
+        const isComing = Math.sign(ball.vx) === direction
+        const isInReach = paddle.side === 'left' ? ball.x < WIDTH * 0.7 : ball.x > WIDTH * 0.3
+
+        ai.target = isComing && isInReach
+          ? ball.y + BALL_SIZE / 2 + ai.error
+          : HEIGHT / 2 // si la bola se aleja, vuelve al centro
+      }
+
+      const center = paddle.y + PADDLE_HEIGHT / 2
+      const maxStep = AI.speed * dt
+      const diff = ai.target - center
+      // Pequeña zona muerta para que la pala no tiemble
+      if (Math.abs(diff) > 4) paddle.y += clamp(diff, -maxStep, maxStep)
+    }
+
+    function movePaddles(dt) {
+      for (const paddle of Object.values(paddles)) {
+        if (isAI(paddle)) moveAIPaddle(paddle, dt)
+        else moveHumanPaddle(paddle, dt)
+
+        paddle.y = clamp(paddle.y, 0, HEIGHT - PADDLE_HEIGHT)
+      }
+    }
+
+    // ---------- Bola y colisiones ----------
+
+    function bounceOnWalls() {
+      if (ball.y < 0) {
+        ball.y = 0
+        ball.vy = Math.abs(ball.vy)
+        beep(300)
+      } else if (ball.y + BALL_SIZE > HEIGHT) {
+        ball.y = HEIGHT - BALL_SIZE
+        ball.vy = -Math.abs(ball.vy)
+        beep(300)
+      }
+    }
+
+    function checkPaddleCollision(paddle) {
+      // Colisión AABB: dos rectángulos se tocan si se solapan en X y en Y
+      const overlaps =
+        ball.x < paddle.x + PADDLE_WIDTH &&
+        ball.x + BALL_SIZE > paddle.x &&
+        ball.y < paddle.y + PADDLE_HEIGHT &&
+        ball.y + BALL_SIZE > paddle.y
+
+      if (!overlaps) return
+
+      // Hacia dónde debe salir la bola tras el golpe
+      const direction = paddle.side === 'left' ? 1 : -1
+      // Si ya se aleja de la pala, ignoramos el solape (evita dobles rebotes)
+      if (Math.sign(ball.vx) === direction) return
+
+      // El ángulo depende de DÓNDE golpea la bola: -1 (borde superior),
+      // 0 (centro) o 1 (borde inferior). Así el jugador puede "dirigir" la bola
+      const paddleCenter = paddle.y + PADDLE_HEIGHT / 2
+      const ballCenter = ball.y + BALL_SIZE / 2
+      const relativeHit = clamp((ballCenter - paddleCenter) / ((PADDLE_HEIGHT + BALL_SIZE) / 2), -1, 1)
+      const angle = relativeHit * MAX_BOUNCE_ANGLE
+
+      const speed = Math.min(Math.hypot(ball.vx, ball.vy) * SPEED_UP, BALL_MAX_SPEED)
+      ball.vx = Math.cos(angle) * speed * direction
+      ball.vy = Math.sin(angle) * speed
+
+      // Sacamos la bola de la pala para que no se quede "enganchada"
+      ball.x = direction === 1 ? paddle.x + PADDLE_WIDTH : paddle.x - BALL_SIZE
+
+      randomizeAIError()
+      beep(520)
+    }
+
+    function checkPoint() {
+      let scorer = null
+      if (ball.x + BALL_SIZE < 0) scorer = paddles.right
+      else if (ball.x > WIDTH) scorer = paddles.left
+      if (!scorer) return false
+
+      scorer.score++
+      beep(160, 0.25)
+      // El siguiente saque va hacia quien ha perdido el punto
+      serveDirection = scorer.side === 'left' ? 1 : -1
+
+      if (scorer.score >= WINNING_SCORE) {
+        if (mode === MODES.DEMO) {
+          startGame(MODES.DEMO)
+        } else {
+          state = STATES.GAME_OVER
+          renderOverlay()
+        }
+        return true
+      }
+
+      resetBall()
+      return true
+    }
+
+    function moveBall(dt) {
+      // A mucha velocidad la bola podría "atravesar" la pala entre dos frames
+      // (tunneling). Dividimos el movimiento en pasos más pequeños que la bola
+      const distance = Math.hypot(ball.vx, ball.vy) * dt
+      const steps = Math.max(1, Math.ceil(distance / (BALL_SIZE / 2)))
+      const stepDt = dt / steps
+
+      for (let i = 0; i < steps; i++) {
+        ball.x += ball.vx * stepDt
+        ball.y += ball.vy * stepDt
+        bounceOnWalls()
+        checkPaddleCollision(paddles.left)
+        checkPaddleCollision(paddles.right)
+        if (checkPoint()) return
+      }
+    }
+
+    function update(dt) {
+      if (state === STATES.PAUSED || state === STATES.GAME_OVER) return
+
+      movePaddles(dt)
+
+      if (state === STATES.SERVE) {
+        serveTimer -= dt
+        if (serveTimer <= 0) launchBall()
+        return
+      }
+
+      moveBall(dt)
+    }
+
+    // ---------- Dibujado ----------
+
+    function drawNumber(number, centerX, y, pixel) {
+      const chars = String(number).split('')
+      const charWidth = pixel * 4
+      let x = centerX - (chars.length * charWidth - pixel) / 2
+
+      for (const char of chars) {
+        const bitmap = DIGITS[Number(char)]
+        for (let i = 0; i < bitmap.length; i++) {
+          if (bitmap[i] === '1') {
+            context.fillRect(x + (i % 3) * pixel, y + Math.floor(i / 3) * pixel, pixel, pixel)
+          }
+        }
+        x += charWidth
+      }
+    }
+
+    function draw() {
+      context.fillStyle = '#050807'
+      context.fillRect(0, 0, WIDTH, HEIGHT)
+
+      context.fillStyle = COLOR
+      context.shadowColor = GLOW
+      context.shadowBlur = 14
+
+      // Red central discontinua
+      for (let y = 8; y < HEIGHT; y += 30) {
+        context.globalAlpha = 0.35
+        context.fillRect(WIDTH / 2 - 3, y, 6, 16)
+      }
+      context.globalAlpha = 1
+
+      drawNumber(paddles.left.score, WIDTH / 2 - 90, 32, 12)
+      drawNumber(paddles.right.score, WIDTH / 2 + 90, 32, 12)
+
+      for (const paddle of Object.values(paddles)) {
+        context.fillRect(paddle.x, paddle.y, PADDLE_WIDTH, PADDLE_HEIGHT)
+      }
+
+      // En el saque la bola parpadea
+      const isBlinking = state === STATES.SERVE && Math.floor(serveTimer * 6) % 2 === 0
+      if (!isBlinking) context.fillRect(ball.x, ball.y, BALL_SIZE, BALL_SIZE)
+
+      context.shadowBlur = 0
+    }
+
+    function loop(now) {
+      // Delta time: el juego va igual de rápido a 60 Hz que a 144 Hz.
+      // Lo limitamos para que tras cambiar de pestaña la bola no "salte"
+      const dt = Math.min((now - lastTime) / 1000, 1 / 30)
+      lastTime = now
+
+      update(dt)
+      draw()
+      requestAnimationFrame(loop)
+    }
+
+    // ---------- Interfaz (menús) ----------
+
+    function renderOverlay() {
+      if (mode === MODES.DEMO) {
+        overlay.hidden = false
+        overlay.innerHTML = `
+          <h1>PONG</h1>
+          <p>Primero en llegar a ${WINNING_SCORE} puntos gana</p>
+          <div class="buttons">
+            <button data-mode="${MODES.ONE_PLAYER}">1 jugador <small>[1]</small></button>
+            <button data-mode="${MODES.TWO_PLAYERS}">2 jugadores <small>[2]</small></button>
+          </div>
+          <p class="blink">Elige un modo para empezar</p>
+        `
+        return
+      }
+
+      if (state === STATES.PAUSED) {
+        overlay.hidden = false
+        overlay.innerHTML = `
+          <h2>PAUSA</h2>
+          <p>Pulsa <kbd>P</kbd> para continuar</p>
+          <div class="buttons">
+            <button data-action="resume">Continuar</button>
+            <button data-action="menu">Menú</button>
+          </div>
+        `
+        return
+      }
+
+      if (state === STATES.GAME_OVER) {
+        const winner = paddles.left.score > paddles.right.score ? 'left' : 'right'
+        const title = mode === MODES.ONE_PLAYER
+          ? (winner === 'left' ? '¡HAS GANADO!' : 'GANA LA CPU')
+          : `GANA EL JUGADOR ${winner === 'left' ? 1 : 2}`
+
+        overlay.hidden = false
+        overlay.innerHTML = `
+          <h2>${title}</h2>
+          <p>${paddles.left.score} - ${paddles.right.score}</p>
+          <div class="buttons">
+            <button data-action="restart">Revancha <small>[Espacio]</small></button>
+            <button data-action="menu">Menú <small>[Esc]</small></button>
+          </div>
+        `
+        return
+      }
+
+      overlay.hidden = true
+    }
+
+    overlay.addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      unlockAudio()
+
+      if (button.dataset.mode) startGame(button.dataset.mode)
+      else if (button.dataset.action === 'resume') togglePause()
+      else if (button.dataset.action === 'restart') startGame(mode)
+      else if (button.dataset.action === 'menu') startGame(MODES.DEMO)
+      button.blur()
+    })
+
+    // ---------- Teclado ----------
+
+    const GAME_KEYS = ['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space']
+
+    document.addEventListener('keydown', (event) => {
+      // Evitamos que las flechas o el espacio hagan scroll de la página
+      if (GAME_KEYS.includes(event.code)) event.preventDefault()
+      pressedKeys.add(event.code)
+      unlockAudio()
+
+      // Las acciones de un solo toque ignoran la repetición automática de teclas
+      if (event.repeat) return
+
+      if (event.code === 'KeyP') togglePause()
+      if (mode === MODES.DEMO && event.key === '1') startGame(MODES.ONE_PLAYER)
+      if (mode === MODES.DEMO && event.key === '2') startGame(MODES.TWO_PLAYERS)
+      if (state === STATES.GAME_OVER && (event.code === 'Space' || event.code === 'Enter')) startGame(mode)
+      if (event.code === 'Escape' && mode !== MODES.DEMO) startGame(MODES.DEMO)
+    })
+
+    document.addEventListener('keyup', (event) => {
+      pressedKeys.delete(event.code)
+    })
+
+    // Si la ventana pierde el foco, nunca llegará el keyup: limpiamos y pausamos
+    window.addEventListener('blur', () => {
+      pressedKeys.clear()
+      if (state === STATES.PLAYING || state === STATES.SERVE) togglePause()
+    })
+
+    // ---------- Táctil / ratón: arrastrar para mover la pala ----------
+
+    function getCanvasY(event) {
+      const rect = canvas.getBoundingClientRect()
+      return ((event.clientY - rect.top) / rect.height) * HEIGHT
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect()
+      const x = ((event.clientX - rect.left) / rect.width) * WIDTH
+      // En modo 1 jugador cualquier zona controla tu pala
+      const side = mode === MODES.ONE_PLAYER || x < WIDTH / 2 ? 'left' : 'right'
+      if (isAI(paddles[side])) return
+
+      activePointers.set(event.pointerId, side)
+      paddles[side].pointerY = getCanvasY(event)
+      canvas.setPointerCapture(event.pointerId)
+    })
+
+    canvas.addEventListener('pointermove', (event) => {
+      const side = activePointers.get(event.pointerId)
+      if (side) paddles[side].pointerY = getCanvasY(event)
+    })
+
+    function releasePointer(event) {
+      const side = activePointers.get(event.pointerId)
+      if (!side) return
+      paddles[side].pointerY = null
+      activePointers.delete(event.pointerId)
+    }
+
+    canvas.addEventListener('pointerup', releasePointer)
+    canvas.addEventListener('pointercancel', releasePointer)
+
+    // ---------- Sonido retro con Web Audio ----------
+
+    function unlockAudio() {
+      // Los navegadores solo permiten crear audio tras una interacción del usuario
+      audioContext ??= new AudioContext()
+    }
+
+    function beep(frequency, duration = 0.06) {
+      if (!audioContext || mode === MODES.DEMO) return
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+      oscillator.type = 'square'
+      oscillator.frequency.value = frequency
+      gain.gain.setValueAtTime(0.06, audioContext.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration)
+      oscillator.connect(gain).connect(audioContext.destination)
+      oscillator.start()
+      oscillator.stop(audioContext.currentTime + duration)
+    }
+
+    setupCanvas()
+    startGame(MODES.DEMO)
+    requestAnimationFrame(loop)
+  </script>
+</head>
+
+<body>
+  <div class="hud">
+    <span>Jugador 1: <kbd>W</kbd> <kbd>S</kbd></span>
+    <span>Jugador 2: <kbd>↑</kbd> <kbd>↓</kbd></span>
+    <span>Pausa: <kbd>P</kbd></span>
+    <span>Menú: <kbd>Esc</kbd></span>
+  </div>
+
+  <div class="screen">
+    <canvas width="960" height="540" aria-label="Pista de Pong"></canvas>
+    <div id="overlay" class="overlay"></div>
+  </div>
+</body>
+
+</html>

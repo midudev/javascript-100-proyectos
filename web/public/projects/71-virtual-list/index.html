@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>71 - Lista virtual</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c10;
+      --panel: #12151c;
+      --panel-2: #181c25;
+      --line: #232834;
+      --text: #e7eaf0;
+      --muted: #8a91a0;
+      --accent: #a78bfa;
+      --good: #34d399;
+      --bad: #f87171;
+      --row-height: 64px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(900px 500px at 10% -10%, #231a45 0%, transparent 60%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 16px;
+      height: 100%;
+      padding: 18px 24px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    header p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .stat {
+      min-width: 118px;
+      padding: 8px 14px;
+      border-radius: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .stat span {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .stat strong {
+      font-size: 20px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat.is-live strong {
+      color: var(--good);
+    }
+
+    .stat.is-heavy strong {
+      color: var(--bad);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .card-head h2 {
+      flex: 1 1 100%;
+      margin: 0 0 2px 4px;
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    input {
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+      min-width: 0;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    #search {
+      flex: 1 1 200px;
+    }
+
+    .goto {
+      display: flex;
+      gap: 6px;
+    }
+
+    .goto input {
+      width: 110px;
+    }
+
+    button {
+      font: inherit;
+      font-size: 14px;
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #140d2b;
+      font-weight: 700;
+    }
+
+    .status {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* --- Lista virtual --- */
+    .scroller {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      /* contain le dice al navegador que lo de dentro no afecta al resto de la página */
+      contain: strict;
+    }
+
+    .spacer {
+      position: relative;
+    }
+
+    /* Cada fila del pool se coloca con transform, sin afectar al layout de las demás */
+    .virtual-row {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 64px 40px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      height: var(--row-height);
+      padding: 0 16px;
+      border-bottom: 1px solid #ffffff08;
+    }
+
+    /* .row usa display: grid, que anularía el atributo hidden si no lo forzamos */
+    .row[hidden] {
+      display: none;
+    }
+
+    .row:hover {
+      background: #ffffff06;
+    }
+
+    .row.is-target {
+      background: #a78bfa2b;
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .index {
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: hsl(var(--hue) 60% 30%);
+      color: hsl(var(--hue) 90% 85%);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .who {
+      min-width: 0;
+    }
+
+    .name,
+    .email {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .email {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .meta {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .meta b {
+      display: block;
+      color: var(--text);
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    /* --- Comparativa --- */
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .result {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .result span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .result strong {
+      display: block;
+      margin: 2px 0;
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .result small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .result.virtual strong {
+      color: var(--good);
+    }
+
+    .result.normal strong {
+      color: var(--bad);
+    }
+
+    .normal-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .placeholder {
+      display: grid;
+      place-content: center;
+      gap: 8px;
+      height: 100%;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .placeholder strong {
+      color: var(--text);
+      font-size: 32px;
+    }
+
+    .empty {
+      padding: 40px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 860px) {
+      body {
+        height: auto;
+        overflow: auto;
+      }
+
+      .app {
+        height: auto;
+        padding: 14px;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        height: 70dvh;
+      }
+
+      .row {
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 0 12px;
+      }
+
+      .row .index {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Lista <span>virtual</span></h1>
+        <p id="generated">Generando contactos…</p>
+      </div>
+      <div class="stats">
+        <div class="stat is-live" id="dom-stat"><span>Nodos en el DOM</span><strong id="dom-count">0</strong></div>
+        <div class="stat"><span>Filas pintadas</span><strong id="rendered-count">0</strong></div>
+        <div class="stat"><span>Render virtual</span><strong id="frame-time">0 ms</strong></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="card-head">
+          <h2>100.000 contactos · virtualizados</h2>
+          <input type="search" id="search" placeholder="Buscar por nombre, email o ciudad…" aria-label="Buscar contactos">
+          <form class="goto" id="goto">
+            <input type="number" id="goto-input" min="1" placeholder="Ir al nº…" aria-label="Ir al elemento número">
+            <button type="submit">Ir</button>
+          </form>
+        </div>
+        <div class="status" id="status"></div>
+        <div class="scroller" id="scroller" tabindex="0" aria-label="Lista de contactos">
+          <div class="spacer" id="spacer" role="list"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Comparativa · lista normal</h2>
+          <button type="button" class="primary" id="render-normal">Renderizar 10.000 sin virtualizar</button>
+          <button type="button" id="clear-normal">Vaciar</button>
+        </div>
+        <div class="compare">
+          <div class="result virtual">
+            <span>Virtual (100.000)</span>
+            <strong id="virtual-time">–</strong>
+            <small id="virtual-detail"></small>
+          </div>
+          <div class="result normal">
+            <span>Normal (10.000)</span>
+            <strong id="normal-time">–</strong>
+            <small id="normal-detail">Aún no medido</small>
+          </div>
+        </div>
+        <div class="normal-list" id="normal-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    const TOTAL_CONTACTS = 100_000
+    const NORMAL_COUNT = 10_000
+    const ROW_HEIGHT = 64
+    // Filas extra por arriba y por abajo para que al hacer scroll rápido no se vean huecos
+    const OVERSCAN = 5
+    const FIRST_NAMES = ['Lucía', 'Hugo', 'Martina', 'Mateo', 'Sofía', 'Leo', 'Julia', 'Daniel', 'Valeria', 'Pablo', 'Paula', 'Álvaro', 'Emma', 'Manuel', 'Carla', 'Martín', 'Sara', 'Lucas', 'Olivia', 'Diego', 'Noa', 'Adrián', 'Alba', 'Javier', 'Irene', 'Marcos', 'Elena', 'Sergio', 'Camila', 'Miguel', 'Ximena', 'Santiago', 'Valentina', 'Joaquín', 'Renata', 'Tomás', 'Aitana', 'Bruno', 'Vega', 'Iker']
+    const LAST_NAMES = ['García', 'Rodríguez', 'González', 'Fernández', 'López', 'Martínez', 'Sánchez', 'Pérez', 'Gómez', 'Martín', 'Jiménez', 'Ruiz', 'Hernández', 'Díaz', 'Moreno', 'Muñoz', 'Álvarez', 'Romero', 'Alonso', 'Gutiérrez', 'Navarro', 'Torres', 'Domínguez', 'Vázquez', 'Ramos', 'Gil', 'Ramírez', 'Serrano', 'Blanco', 'Molina', 'Castro', 'Ortiz', 'Rubio', 'Marín', 'Sanz', 'Iglesias', 'Medina', 'Garrido', 'Cortés', 'Castillo']
+    const CITIES = ['Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Bilbao', 'Málaga', 'Zaragoza', 'Palma', 'Granada', 'Vigo', 'Ciudad de México', 'Buenos Aires', 'Bogotá', 'Lima', 'Santiago', 'Montevideo', 'Quito', 'Caracas', 'Guadalajara', 'Medellín']
+    const DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.es', 'proton.me', 'yahoo.es', 'midu.dev']
+
+    const $scroller = document.querySelector('#scroller')
+    const $spacer = document.querySelector('#spacer')
+    const $status = document.querySelector('#status')
+    const $search = document.querySelector('#search')
+    const $gotoInput = document.querySelector('#goto-input')
+    const $domCount = document.querySelector('#dom-count')
+    const $domStat = document.querySelector('#dom-stat')
+    const $renderedCount = document.querySelector('#rendered-count')
+    const $frameTime = document.querySelector('#frame-time')
+    const $normalList = document.querySelector('#normal-list')
+    const numberFormat = new Intl.NumberFormat('es-ES')
+
+    let contacts = []
+    // Índices de los contactos que pasan el filtro (null = todos)
+    let filtered = null
+    let pool = []
+    let dataVersion = 0
+    let targetIndex = -1
+    let renderScheduled = false
+
+    // --- Datos ---
+
+    // Generador pseudoaleatorio con semilla (mulberry32): siempre los mismos contactos
+    function createRandom(seed) {
+      return function random() {
+        seed |= 0
+        seed = (seed + 0x6D2B79F5) | 0
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    function normalize(text) {
+      return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    }
+
+    function generateContacts() {
+      const random = createRandom(2024)
+      const pick = list => list[Math.floor(random() * list.length)]
+      const list = new Array(TOTAL_CONTACTS)
+
+      for (let i = 0; i < TOTAL_CONTACTS; i++) {
+        const first = pick(FIRST_NAMES)
+        const last = `${pick(LAST_NAMES)} ${pick(LAST_NAMES)}`
+        const name = `${first} ${last}`
+        const email = `${normalize(first)}.${normalize(last.split(' ')[0])}${Math.floor(random() * 100)}@${pick(DOMAINS)}`
+        const city = pick(CITIES)
+        const phone = `6${String(Math.floor(random() * 1e8)).padStart(8, '0')}`.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')
+        list[i] = {
+          name,
+          email,
+          city,
+          phone,
+          initials: first[0] + last[0],
+          hue: Math.floor(random() * 360),
+          // Precalculamos el texto de búsqueda para no normalizar en cada tecla
+          search: normalize(`${name} ${email} ${city}`)
+        }
+      }
+      return list
+    }
+
+    function getCount() {
+      return filtered ? filtered.length : contacts.length
+    }
+
+    function getContact(position) {
+      return contacts[filtered ? filtered[position] : position]
+    }
+
+    function getContactNumber(position) {
+      return (filtered ? filtered[position] : position) + 1
+    }
+
+    // --- Filas ---
+
+    function createRowElement() {
+      const row = document.createElement('div')
+      row.className = 'row'
+      row.setAttribute('role', 'listitem')
+      row.innerHTML = `
+        <span class="index"></span>
+        <span class="avatar"></span>
+        <span class="who"><span class="name"></span><span class="email"></span></span>
+        <span class="meta"><b></b><span></span></span>`
+      return {
+        el: row,
+        index: row.querySelector('.index'),
+        avatar: row.querySelector('.avatar'),
+        name: row.querySelector('.name'),
+        email: row.querySelector('.email'),
+        city: row.querySelector('.meta b'),
+        phone: row.querySelector('.meta span')
+      }
+    }
+
+    function fillRow(row, contact, number) {
+      row.index.textContent = `#${numberFormat.format(number)}`
+      row.avatar.textContent = contact.initials
+      row.avatar.style.setProperty('--hue', contact.hue)
+      row.name.textContent = contact.name
+      row.email.textContent = contact.email
+      row.city.textContent = contact.city
+      row.phone.textContent = contact.phone
+    }
+
+    // --- Virtualización ---
+
+    /*
+      LA IDEA: aunque haya 100.000 contactos, en pantalla solo caben unos
+      15. Así que:
+      1. Un "spacer" con la altura TOTAL (n · alturaFila) crea una barra de
+         scroll de verdad, como si todas las filas existieran.
+      2. Con scrollTop / alturaFila sabemos qué fila está arriba del todo.
+      3. Solo creamos las filas visibles (+ overscan) y las colocamos en su
+         sitio con transform: translateY(índice · alturaFila).
+      4. RECICLAJE: tenemos un "pool" fijo de filas. La fila i siempre la
+         pinta el nodo pool[i % tamañoPool]. Al bajar una fila, el nodo que
+         sale por arriba se reutiliza para la que entra por abajo: nunca
+         creamos ni destruimos nodos durante el scroll.
+    */
+    function ensurePool(size) {
+      if (pool.length === size) return
+      for (const row of pool) row.el.remove()
+      pool = Array.from({ length: size }, () => {
+        const row = createRowElement()
+        row.el.classList.add('virtual-row')
+        row.position = -1
+        row.version = -1
+        $spacer.append(row.el)
+        return row
+      })
+    }
+
+    function renderVirtual() {
+      renderScheduled = false
+      const start = performance.now()
+      const count = getCount()
+      const { scrollTop, clientHeight } = $scroller
+
+      const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
+      const last = Math.min(count, Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + OVERSCAN)
+      ensurePool(Math.ceil(clientHeight / ROW_HEIGHT) + 1 + OVERSCAN * 2)
+
+      for (let position = first; position < last; position++) {
+        const row = pool[position % pool.length]
+        // Si el nodo ya muestra esta fila no tocamos el DOM
+        if (row.position !== position || row.version !== dataVersion) {
+          fillRow(row, getContact(position), getContactNumber(position))
+          row.el.style.transform = `translateY(${position * ROW_HEIGHT}px)`
+          row.position = position
+          row.version = dataVersion
+        }
+        row.el.hidden = false
+        row.el.classList.toggle('is-target', position === targetIndex)
+      }
+
+      // Los nodos del pool que no se usan se ocultan (no se destruyen)
+      let rendered = 0
+      for (const row of pool) {
+        const inRange = row.position >= first && row.position < last && row.version === dataVersion
+        if (!inRange) {
+          row.el.hidden = true
+          row.position = -1
+        } else {
+          rendered++
+        }
+      }
+
+      const elapsed = performance.now() - start
+      $renderedCount.textContent = rendered
+      $frameTime.textContent = `${elapsed.toFixed(2)} ms`
+      $status.textContent = count
+        ? `Mostrando ${numberFormat.format(first + 1)}–${numberFormat.format(last)} de ${numberFormat.format(count)}${filtered ? ' resultados' : ' contactos'}`
+        : 'Sin resultados'
+      return elapsed
+    }
+
+    // El evento scroll puede dispararse muchas veces por frame:
+    // agrupamos con requestAnimationFrame y pintamos una sola vez
+    function scheduleRender() {
+      if (renderScheduled) return
+      renderScheduled = true
+      requestAnimationFrame(renderVirtual)
+    }
+
+    function setListHeight() {
+      $spacer.style.height = `${getCount() * ROW_HEIGHT}px`
+    }
+
+    // --- Búsqueda e "ir a" ---
+
+    function applySearch() {
+      const query = normalize($search.value.trim())
+      if (!query) {
+        filtered = null
+      } else {
+        // Cada palabra de la búsqueda tiene que aparecer (en cualquier orden)
+        const terms = query.split(/\s+/)
+        const matches = []
+        for (let i = 0; i < contacts.length; i++) {
+          const text = contacts[i].search
+          if (terms.every(term => text.includes(term))) matches.push(i)
+        }
+        filtered = Int32Array.from(matches)
+      }
+      dataVersion++
+      targetIndex = -1
+      setListHeight()
+      $scroller.scrollTop = 0
+      renderVirtual()
+    }
+
+    function goTo(number) {
+      // "Ir al nº N" se refiere al número de contacto; si hay filtro buscamos su posición
+      const contactIndex = number - 1
+      const position = filtered ? filtered.indexOf(contactIndex) : contactIndex
+      if (position < 0 || position >= getCount()) {
+        $status.textContent = filtered
+          ? `El contacto #${numberFormat.format(number)} no está en los resultados`
+          : `Elige un número entre 1 y ${numberFormat.format(getCount())}`
+        return
+      }
+      targetIndex = position
+      // Centramos la fila: su posición se calcula, no hace falta que exista en el DOM
+      $scroller.scrollTop = position * ROW_HEIGHT - $scroller.clientHeight / 2 + ROW_HEIGHT / 2
+      renderVirtual()
+    }
+
+    // --- Comparativa sin virtualizar ---
+
+    function measureNormalRender() {
+      const $time = document.querySelector('#normal-time')
+      const $detail = document.querySelector('#normal-detail')
+      $time.textContent = '…'
+      $normalList.replaceChildren()
+
+      // Esperamos un frame para que se pinte el "…" antes de bloquear el hilo
+      requestAnimationFrame(() => setTimeout(() => {
+        const start = performance.now()
+        const fragment = document.createDocumentFragment()
+        for (let i = 0; i < NORMAL_COUNT; i++) {
+          const row = createRowElement()
+          fillRow(row, contacts[i], i + 1)
+          fragment.append(row.el)
+        }
+        $normalList.replaceChildren(fragment)
+        const scriptTime = performance.now() - start
+
+        // Leer offsetHeight obliga al navegador a calcular el layout YA (reflow síncrono)
+        void $normalList.offsetHeight
+        const layoutTime = performance.now() - start
+
+        // El pintado ocurre después: lo medimos al llegar al siguiente frame
+        requestAnimationFrame(() => setTimeout(() => {
+          const total = performance.now() - start
+          $time.textContent = `${Math.round(total)} ms`
+          $detail.textContent = `JS ${Math.round(scriptTime)} ms · layout ${Math.round(layoutTime - scriptTime)} ms · pintado ${Math.round(total - layoutTime)} ms`
+          updateDomCount()
+        }))
+      }))
+    }
+
+    function measureVirtualRender() {
+      // Forzamos un render completo desde cero para medir lo que cuesta
+      dataVersion++
+      const start = performance.now()
+      renderVirtual()
+      void $scroller.offsetHeight
+      const total = performance.now() - start
+      document.querySelector('#virtual-time').textContent = `${total.toFixed(1)} ms`
+      document.querySelector('#virtual-detail').textContent = `${pool.length} nodos de fila reciclados`
+    }
+
+    function clearNormal() {
+      $normalList.innerHTML = `
+        <div class="placeholder">
+          <strong>🐢</strong>
+          <p>Pulsa el botón para crear <b>10.000 filas reales</b> en el DOM y medir con <code>performance.now()</code> lo que tarda.<br>Mira cómo se dispara el contador de nodos.</p>
+        </div>`
+      document.querySelector('#normal-time').textContent = '–'
+      document.querySelector('#normal-detail').textContent = 'Aún no medido'
+      updateDomCount()
+    }
+
+    function updateDomCount() {
+      const count = document.getElementsByTagName('*').length
+      $domCount.textContent = numberFormat.format(count)
+      $domStat.classList.toggle('is-live', count < 2000)
+      $domStat.classList.toggle('is-heavy', count >= 2000)
+    }
+
+    // --- Eventos ---
+
+    // passive: true promete que no llamaremos a preventDefault,
+    // así el navegador puede hacer scroll sin esperar a nuestro código
+    $scroller.addEventListener('scroll', scheduleRender, { passive: true })
+    new ResizeObserver(scheduleRender).observe($scroller)
+
+    let searchTimer
+    $search.addEventListener('input', () => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(applySearch, 120)
+    })
+
+    document.querySelector('#goto').addEventListener('submit', (event) => {
+      event.preventDefault()
+      const number = Number($gotoInput.value)
+      if (Number.isInteger(number)) goTo(number)
+    })
+
+    document.querySelector('#render-normal').addEventListener('click', measureNormalRender)
+    document.querySelector('#clear-normal').addEventListener('click', clearNormal)
+    setInterval(updateDomCount, 500)
+
+    // --- Inicio ---
+
+    const generationStart = performance.now()
+    contacts = generateContacts()
+    const generationTime = performance.now() - generationStart
+    document.querySelector('#generated').textContent =
+      `${numberFormat.format(TOTAL_CONTACTS)} contactos generados en ${Math.round(generationTime)} ms · solo se pintan los que ves`
+    $gotoInput.max = TOTAL_CONTACTS
+
+    setListHeight()
+    clearNormal()
+    measureVirtualRender()
+    updateDomCount()
+  </script>
+</body>
+
+</html>

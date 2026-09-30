@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>62 - Código Morse</title>
+  <style>
+    :root {
+      --bg: #0c0e14;
+      --card: #141821;
+      --line: #252b3a;
+      --text: #e9ecf5;
+      --muted: #8a93ab;
+      --amber: #ffb547;
+      --amber-glow: rgba(255, 181, 71, .55);
+      --blue: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(255, 181, 71, .08), transparent 40%),
+        radial-gradient(circle at 100% 100%, rgba(96, 165, 250, .08), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 16px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      white-space: nowrap;
+      color: var(--amber);
+      font-family: ui-monospace, monospace;
+      font-size: 18px;
+      letter-spacing: .15em;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .column {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .row h2 {
+      flex: 1;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      resize: none;
+      font: inherit;
+      font-size: 18px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #0f121a;
+      color: var(--text);
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--amber);
+    }
+
+    #morse {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 20px;
+      letter-spacing: .08em;
+      color: var(--amber);
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .settings label span {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    output {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--amber);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .button {
+      padding: 9px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #1c2130;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .button:hover {
+      border-color: #3a4358;
+    }
+
+    .button.primary {
+      background: var(--amber);
+      border-color: var(--amber);
+      color: #241500;
+    }
+
+    .button:disabled {
+      opacity: .4;
+      cursor: default;
+    }
+
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chip {
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--line);
+      background: #10141d;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .chip:hover {
+      border-color: var(--amber);
+    }
+
+    /* Lámpara y cinta de reproducción */
+    .player {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 14px;
+      background: #0f121a;
+      border: 1px solid var(--line);
+    }
+
+    .lamp {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #4a3a22, #1d1710);
+      border: 3px solid #2d2618;
+      transition: background .03s, box-shadow .03s;
+    }
+
+    .lamp.is-on {
+      background: radial-gradient(circle at 35% 30%, #fff5dc, var(--amber) 60%);
+      box-shadow: 0 0 30px 8px var(--amber-glow), 0 0 80px 20px rgba(255, 181, 71, .25);
+      border-color: #ffd28a;
+    }
+
+    .tape {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scroll-behavior: smooth;
+    }
+
+    .tape .letter {
+      flex-shrink: 0;
+      display: grid;
+      justify-items: center;
+      gap: 2px;
+      min-width: 36px;
+      padding: 6px 6px;
+      border-radius: 8px;
+      background: #171c28;
+      border: 1px solid transparent;
+    }
+
+    .tape .letter strong {
+      font-size: 16px;
+    }
+
+    .tape .letter small {
+      font-family: ui-monospace, monospace;
+      color: var(--muted);
+      letter-spacing: .1em;
+      font-size: 13px;
+    }
+
+    .tape .letter.is-active {
+      border-color: var(--amber);
+      background: #2a2214;
+    }
+
+    .tape .letter .is-active {
+      color: var(--amber);
+    }
+
+    .tape .space {
+      flex-shrink: 0;
+      width: 14px;
+    }
+
+    /* Telégrafo */
+    .telegraph {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .key {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      border: none;
+      background: radial-gradient(circle at 40% 30%, #3b4252, #1a1e29 70%);
+      box-shadow: 0 10px 0 #0a0c12, 0 14px 30px rgba(0, 0, 0, .5), inset 0 2px 0 rgba(255, 255, 255, .1);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      transition: transform .05s, box-shadow .05s;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .key.is-down {
+      transform: translateY(8px);
+      box-shadow: 0 2px 0 #0a0c12, 0 4px 12px rgba(0, 0, 0, .5), 0 0 30px var(--amber-glow);
+      color: var(--amber);
+    }
+
+    .key span {
+      display: block;
+      font-size: 34px;
+      margin-bottom: 4px;
+    }
+
+    .keyed {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .code {
+      font-family: ui-monospace, monospace;
+      font-size: 34px;
+      min-height: 44px;
+      color: var(--amber);
+      letter-spacing: .12em;
+    }
+
+    .hold {
+      height: 6px;
+      border-radius: 6px;
+      background: #0f121a;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hold span {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0;
+      background: var(--blue);
+    }
+
+    .hold span.is-dash {
+      background: var(--amber);
+    }
+
+    .hold::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, .4);
+    }
+
+    .decoded {
+      min-height: 52px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #0f121a;
+      border: 1px solid var(--line);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      overflow-wrap: anywhere;
+    }
+
+    .decoded:empty::before {
+      content: 'Tu mensaje aparecerá aquí…';
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    kbd {
+      font-family: inherit;
+      padding: 1px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: #1c2130;
+      color: var(--text);
+    }
+
+    /* Alfabeto */
+    .alphabet {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+      gap: 6px;
+    }
+
+    .alphabet button {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #10141d;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .alphabet button small {
+      font-family: ui-monospace, monospace;
+      color: var(--amber);
+      font-weight: 400;
+      font-size: 11px;
+    }
+
+    .alphabet button:hover {
+      border-color: var(--amber);
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .app {
+        padding: 14px;
+      }
+
+      .settings {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .telegraph {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .keyed {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header>
+      <h1>Código Morse <span>−− −−− ·−· ··· ·</span></h1>
+      <p>Traduce, escucha y teclea mensajes como un telegrafista</p>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <h2>📡 Traductor</h2>
+        <button class="button primary" id="play">▶ Reproducir</button>
+        <button class="button" id="stop" disabled>■ Parar</button>
+      </div>
+
+      <div class="settings">
+        <label>
+          <span>Velocidad <output id="wpm-value"></output></span>
+          <input type="range" id="wpm" min="5" max="35" value="16">
+        </label>
+        <label>
+          <span>Tono <output id="tone-value"></output></span>
+          <input type="range" id="tone" min="300" max="1000" step="10" value="620">
+        </label>
+        <label class="check"><input type="checkbox" id="vibrate" checked> Vibrar</label>
+      </div>
+
+      <div class="player">
+        <div class="lamp" id="lamp" aria-hidden="true"></div>
+        <div class="tape" id="tape" aria-label="Mensaje en Morse"></div>
+      </div>
+
+      <label>
+        Texto
+        <textarea id="text" rows="2" spellcheck="false">SOS Hola mundo</textarea>
+      </label>
+      <label>
+        Morse (usa · o . para puntos, − o - para rayas y / entre palabras)
+        <textarea id="morse" rows="3" spellcheck="false"></textarea>
+      </label>
+
+      <div class="examples" id="examples">
+        <span class="hint">Prueba:</span>
+        <button class="chip">SOS</button>
+        <button class="chip">Hola mundo</button>
+        <button class="chip">¿Qué tal?</button>
+        <button class="chip">Aprende JavaScript</button>
+        <button class="chip">Ñandú 2026</button>
+      </div>
+    </section>
+
+    <div class="column">
+      <section class="card">
+        <div class="row">
+          <h2>🔑 Telégrafo</h2>
+          <button class="button" id="to-translator">Enviar al traductor</button>
+          <button class="button" id="clear">Borrar</button>
+        </div>
+
+        <div class="telegraph">
+          <button class="key" id="key"><span>⏺</span>Mantén pulsado</button>
+          <div class="keyed">
+            <div class="code" id="code" aria-live="polite"></div>
+            <div class="hold" title="Si pasas de la marca central, es una raya"><span id="hold"></span></div>
+            <div class="decoded" id="decoded" aria-live="polite"></div>
+            <label>
+              <span class="row">Velocidad del telégrafo <output id="key-wpm-value"></output></span>
+              <input type="range" id="key-wpm" min="5" max="25" value="10">
+            </label>
+          </div>
+        </div>
+        <p class="hint">Mantén pulsado el botón o la tecla <kbd>Espacio</kbd>. Pulsación corta = punto, larga = raya. Si
+          esperas, se cierra la letra; si esperas más, empieza otra palabra.</p>
+      </section>
+
+      <section class="card">
+        <h2>🔤 Alfabeto <small class="hint">(pulsa para escuchar)</small></h2>
+        <div class="alphabet" id="alphabet"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module">
+    // ---------- El código Morse en un Map ----------
+    // Un Map es ideal para diccionarios: búsquedas rápidas por clave y
+    // cualquier tipo de clave. Creamos también el Map inverso (código → letra)
+    const MORSE = new Map([
+      ['A', '.-'], ['B', '-...'], ['C', '-.-.'], ['D', '-..'], ['E', '.'], ['F', '..-.'],
+      ['G', '--.'], ['H', '....'], ['I', '..'], ['J', '.---'], ['K', '-.-'], ['L', '.-..'],
+      ['M', '--'], ['N', '-.'], ['Ñ', '--.--'], ['O', '---'], ['P', '.--.'], ['Q', '--.-'],
+      ['R', '.-.'], ['S', '...'], ['T', '-'], ['U', '..-'], ['V', '...-'], ['W', '.--'],
+      ['X', '-..-'], ['Y', '-.--'], ['Z', '--..'],
+      ['0', '-----'], ['1', '.----'], ['2', '..---'], ['3', '...--'], ['4', '....-'],
+      ['5', '.....'], ['6', '-....'], ['7', '--...'], ['8', '---..'], ['9', '----.'],
+      ['.', '.-.-.-'], [',', '--..--'], ['?', '..--..'], ['¿', '..-.-'], ['!', '-.-.--'], ['¡', '--...-'],
+      ['/', '-..-.'], ['(', '-.--.'], [')', '-.--.-'], [':', '---...'], [';', '-.-.-.'],
+      ['=', '-...-'], ['+', '.-.-.'], ['-', '-....-'], ['"', '.-..-.'], ['@', '.--.-.'], ["'", '.----.']
+    ])
+
+    const REVERSE_MORSE = new Map([...MORSE].map(([char, code]) => [code, char]))
+
+    const RAMP = 0.005
+    const VOLUME = 0.25
+
+    const $ = selector => document.querySelector(selector)
+    const textInput = $('#text')
+    const morseInput = $('#morse')
+
+    // ---------- Traducción ----------
+    // Quitamos tildes (á → A) pero conservamos la Ñ, que tiene código propio
+    function normalizeText(text) {
+      return [...text.toUpperCase()]
+        .map(char => char === 'Ñ' ? char : char.normalize('NFD').replace(/[̀-ͯ]/g, ''))
+        .join('')
+    }
+
+    // Aceptamos varios símbolos para punto y raya al escribir Morse a mano
+    function normalizeMorse(morse) {
+      return morse.replace(/[·•∙]/g, '.').replace(/[−–—_]/g, '-')
+    }
+
+    function toDisplay(code) {
+      return code.replaceAll('.', '·').replaceAll('-', '−')
+    }
+
+    // Devuelve las palabras como arrays de { char, code }
+    function textToLetters(text) {
+      return normalizeText(text)
+        .split(/\s+/)
+        .map(word => [...word].filter(char => MORSE.has(char)).map(char => ({ char, code: MORSE.get(char) })))
+        .filter(word => word.length > 0)
+    }
+
+    function textToMorse(text) {
+      return textToLetters(text)
+        .map(word => word.map(({ code }) => toDisplay(code)).join(' '))
+        .join(' / ')
+    }
+
+    function morseToText(morse) {
+      return normalizeMorse(morse)
+        .trim()
+        .split(/\s*\/\s*|\s{3,}/)
+        .map(word => word.split(/\s+/).filter(Boolean).map(code => REVERSE_MORSE.get(code) ?? '�').join(''))
+        .join(' ')
+    }
+
+    textInput.addEventListener('input', () => {
+      morseInput.value = textToMorse(textInput.value)
+      renderTape()
+    })
+
+    morseInput.addEventListener('input', () => {
+      textInput.value = morseToText(morseInput.value)
+      renderTape()
+    })
+
+    // ---------- Cinta de reproducción ----------
+    function renderTape() {
+      const words = textToLetters(textInput.value)
+      let index = 0
+      $('#tape').innerHTML = words.map(word => word.map(({ char, code }) => `
+        <div class="letter" data-index="${index++}">
+          <strong>${char}</strong>
+          <small>${[...code].map(symbol => `<span>${toDisplay(symbol)}</span>`).join('')}</small>
+        </div>
+      `).join('')).join('<div class="space"></div>')
+    }
+
+    function highlight(letterIndex, symbolIndex) {
+      document.querySelectorAll('.tape .is-active').forEach(element => element.classList.remove('is-active'))
+      const letter = $(`.tape [data-index="${letterIndex}"]`)
+      if (!letter) return
+      letter.classList.add('is-active')
+      letter.querySelectorAll('small span')[symbolIndex]?.classList.add('is-active')
+      letter.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+
+    // ---------- Temporización ----------
+    // Todo en Morse se mide en "unidades": punto = 1, raya = 3,
+    // hueco entre símbolos = 1, entre letras = 3 y entre palabras = 7.
+    // Con la palabra de referencia "PARIS" (50 unidades) se obtiene que
+    // una unidad dura 1.2 / WPM segundos (WPM = palabras por minuto)
+    const unitFor = wpm => 1.2 / wpm
+
+    function buildTimeline(words, unit) {
+      const tones = []
+      let time = 0
+      let letterIndex = 0
+
+      words.forEach((word, wordIndex) => {
+        word.forEach(({ code }, charIndex) => {
+          [...code].forEach((symbol, symbolIndex) => {
+            const duration = symbol === '.' ? unit : unit * 3
+            tones.push({ start: time, duration, letterIndex, symbolIndex })
+            time += duration
+            if (symbolIndex < code.length - 1) time += unit
+          })
+          letterIndex++
+          if (charIndex < word.length - 1) time += unit * 3
+        })
+        if (wordIndex < words.length - 1) time += unit * 7
+      })
+
+      return { tones, total: time }
+    }
+
+    // ---------- Web Audio ----------
+    let audioContext = null
+
+    function getAudioContext() {
+      // El navegador solo permite crear/activar audio tras una interacción
+      audioContext ??= new AudioContext()
+      if (audioContext.state === 'suspended') audioContext.resume()
+      return audioContext
+    }
+
+    let playback = null
+
+    function play(words = textToLetters(textInput.value)) {
+      stop()
+      if (words.length === 0) return
+
+      const context = getAudioContext()
+      const unit = unitFor(Number($('#wpm').value))
+      const { tones, total } = buildTimeline(words, unit)
+
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.value = Number($('#tone').value)
+      gain.gain.value = 0
+      oscillator.connect(gain).connect(context.destination)
+
+      // En lugar de encender y apagar el sonido con setTimeout (impreciso),
+      // programamos todos los pitidos por adelantado en el reloj del
+      // AudioContext, que tiene precisión de muestra de audio
+      const startAt = context.currentTime + 0.1
+      for (const { start, duration } of tones) {
+        const on = startAt + start
+        const off = on + duration
+        // Pequeñas rampas para evitar "clics" al abrir y cerrar el sonido
+        gain.gain.setValueAtTime(0, on)
+        gain.gain.linearRampToValueAtTime(VOLUME, on + RAMP)
+        gain.gain.setValueAtTime(VOLUME, off - RAMP)
+        gain.gain.linearRampToValueAtTime(0, off)
+      }
+      oscillator.start(startAt)
+      oscillator.stop(startAt + total + 0.1)
+
+      vibrate(tones)
+
+      playback = { oscillator, gain, tones, startAt, total, frame: 0 }
+      $('#play').disabled = true
+      $('#stop').disabled = false
+      playback.frame = window.requestAnimationFrame(syncLight)
+    }
+
+    // La luz lee el reloj del audio en cada frame y se enciende si en ese
+    // instante está sonando un pitido: así va siempre sincronizada con el sonido
+    function syncLight() {
+      if (!playback) return
+      const elapsed = audioContext.currentTime - playback.startAt
+      const current = playback.tones.find(({ start, duration }) => elapsed >= start && elapsed < start + duration)
+
+      $('#lamp').classList.toggle('is-on', Boolean(current))
+      if (current) highlight(current.letterIndex, current.symbolIndex)
+
+      if (elapsed > playback.total) return stop()
+      playback.frame = window.requestAnimationFrame(syncLight)
+    }
+
+    // navigator.vibrate recibe un patrón [vibra, pausa, vibra, pausa…] en ms
+    function vibrate(tones) {
+      if (!$('#vibrate').checked || !('vibrate' in navigator)) return
+      const pattern = []
+      tones.forEach((tone, index) => {
+        pattern.push(Math.round(tone.duration * 1000))
+        const next = tones[index + 1]
+        if (next) pattern.push(Math.round((next.start - tone.start - tone.duration) * 1000))
+      })
+      navigator.vibrate(pattern)
+    }
+
+    function stop() {
+      if (playback) {
+        const now = audioContext.currentTime
+        playback.gain.gain.cancelScheduledValues(now)
+        playback.gain.gain.setValueAtTime(0, now)
+        try {
+          playback.oscillator.stop()
+        } catch { }
+        window.cancelAnimationFrame(playback.frame)
+        playback = null
+      }
+      if ('vibrate' in navigator) navigator.vibrate(0)
+      $('#lamp').classList.remove('is-on')
+      document.querySelectorAll('.tape .is-active').forEach(element => element.classList.remove('is-active'))
+      $('#play').disabled = false
+      $('#stop').disabled = true
+    }
+
+    $('#examples').addEventListener('click', event => {
+      const chip = event.target.closest('.chip')
+      if (!chip) return
+      textInput.value = chip.textContent
+      textInput.dispatchEvent(new Event('input'))
+      play()
+    })
+
+    $('#play').addEventListener('click', () => play())
+    $('#stop').addEventListener('click', stop)
+
+    // ---------- Telégrafo ----------
+    // Medimos cuánto tiempo se mantiene pulsado: menos de 2 unidades es un
+    // punto, más es una raya. Los silencios deciden cuándo termina la letra
+    // (3 unidades) o la palabra (7 unidades)
+    const telegraph = {
+      downAt: 0,
+      isDown: false,
+      code: '',
+      letterTimeout: null,
+      wordTimeout: null,
+      oscillator: null,
+      gain: null,
+      holdFrame: 0
+    }
+
+    const keyUnit = () => unitFor(Number($('#key-wpm').value)) * 1000
+
+    function startTone() {
+      const context = getAudioContext()
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.frequency.value = Number($('#tone').value)
+      gain.gain.setValueAtTime(0, context.currentTime)
+      gain.gain.linearRampToValueAtTime(VOLUME, context.currentTime + RAMP)
+      oscillator.connect(gain).connect(context.destination)
+      oscillator.start()
+      telegraph.oscillator = oscillator
+      telegraph.gain = gain
+    }
+
+    function stopTone() {
+      if (!telegraph.oscillator) return
+      const now = audioContext.currentTime
+      telegraph.gain.gain.cancelScheduledValues(now)
+      telegraph.gain.gain.setValueAtTime(telegraph.gain.gain.value, now)
+      telegraph.gain.gain.linearRampToValueAtTime(0, now + RAMP)
+      telegraph.oscillator.stop(now + RAMP * 2)
+      telegraph.oscillator = null
+    }
+
+    function updateHoldBar() {
+      if (!telegraph.isDown) return
+      const held = performance.now() - telegraph.downAt
+      const threshold = keyUnit() * 2
+      // La barra se llena hasta la mitad en el umbral punto/raya
+      const progress = Math.min(held / (threshold * 2), 1)
+      const bar = $('#hold')
+      bar.style.width = `${progress * 100}%`
+      bar.classList.toggle('is-dash', held >= threshold)
+      telegraph.holdFrame = window.requestAnimationFrame(updateHoldBar)
+    }
+
+    function keyDown() {
+      if (telegraph.isDown) return
+      stop()
+      telegraph.isDown = true
+      telegraph.downAt = performance.now()
+      clearTimeout(telegraph.letterTimeout)
+      clearTimeout(telegraph.wordTimeout)
+
+      startTone()
+      if ('vibrate' in navigator && $('#vibrate').checked) navigator.vibrate(5000)
+      $('#key').classList.add('is-down')
+      $('#lamp').classList.add('is-on')
+      updateHoldBar()
+    }
+
+    function keyUp() {
+      if (!telegraph.isDown) return
+      telegraph.isDown = false
+      const held = performance.now() - telegraph.downAt
+      const unit = keyUnit()
+
+      stopTone()
+      if ('vibrate' in navigator) navigator.vibrate(0)
+      window.cancelAnimationFrame(telegraph.holdFrame)
+      $('#key').classList.remove('is-down')
+      $('#lamp').classList.remove('is-on')
+
+      telegraph.code += held < unit * 2 ? '.' : '-'
+      $('#code').textContent = toDisplay(telegraph.code)
+
+      telegraph.letterTimeout = setTimeout(commitLetter, unit * 3)
+    }
+
+    function commitLetter() {
+      const decoded = $('#decoded')
+      decoded.textContent += REVERSE_MORSE.get(telegraph.code) ?? '�'
+      telegraph.code = ''
+      $('#code').textContent = ''
+      $('#hold').style.width = '0'
+
+      // Si el silencio llega a 7 unidades, es una palabra nueva
+      telegraph.wordTimeout = setTimeout(() => {
+        if (!decoded.textContent.endsWith(' ')) decoded.textContent += ' '
+      }, keyUnit() * 4)
+    }
+
+    const keyButton = $('#key')
+    keyButton.addEventListener('pointerdown', event => {
+      keyButton.setPointerCapture(event.pointerId)
+      keyDown()
+    })
+    keyButton.addEventListener('pointerup', keyUp)
+    keyButton.addEventListener('pointercancel', keyUp)
+    keyButton.addEventListener('contextmenu', event => event.preventDefault())
+
+    const isTyping = element => element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement
+
+    document.addEventListener('keydown', event => {
+      if (event.code !== 'Space' || isTyping(event.target)) return
+      event.preventDefault()
+      if (!event.repeat) keyDown()
+    })
+
+    document.addEventListener('keyup', event => {
+      if (event.code !== 'Space' || isTyping(event.target)) return
+      event.preventDefault()
+      keyUp()
+    })
+
+    $('#clear').addEventListener('click', () => {
+      clearTimeout(telegraph.letterTimeout)
+      clearTimeout(telegraph.wordTimeout)
+      telegraph.code = ''
+      $('#code').textContent = ''
+      $('#decoded').textContent = ''
+    })
+
+    $('#to-translator').addEventListener('click', () => {
+      const message = $('#decoded').textContent.trim()
+      if (!message) return
+      textInput.value = message
+      textInput.dispatchEvent(new Event('input'))
+    })
+
+    // ---------- Alfabeto ----------
+    $('#alphabet').innerHTML = [...MORSE]
+      .filter(([char]) => /[A-ZÑ0-9]/.test(char))
+      .map(([char, code]) => `<button data-char="${char}">${char}<small>${toDisplay(code)}</small></button>`)
+      .join('')
+
+    $('#alphabet').addEventListener('click', event => {
+      const button = event.target.closest('[data-char]')
+      if (button) play(textToLetters(button.dataset.char))
+    })
+
+    // ---------- Ajustes ----------
+    function renderSettings() {
+      $('#wpm-value').textContent = `${$('#wpm').value} ppm`
+      $('#tone-value').textContent = `${$('#tone').value} Hz`
+      $('#key-wpm-value').textContent = `${$('#key-wpm').value} ppm · punto < ${Math.round(keyUnit() * 2)} ms`
+    }
+
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+      input.addEventListener('input', renderSettings)
+    })
+
+    if (!('vibrate' in navigator)) {
+      $('#vibrate').checked = false
+      $('#vibrate').disabled = true
+    }
+
+    renderSettings()
+    morseInput.value = textToMorse(textInput.value)
+    renderTape()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>83 - Sistema solar</title>
+  <style>
+    :root {
+      --glass: rgba(14, 18, 36, .72);
+      --border: rgba(255, 255, 255, .1);
+      --text: #e9ecf8;
+      --muted: #8f97b8;
+      --accent: #ffcc4d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #03040b;
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 7px 11px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, .14);
+    }
+
+    button[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: rgba(255, 204, 77, .15);
+    }
+
+    .hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 290px;
+      padding: 14px 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .date {
+      font-size: 20px;
+      font-weight: 700;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.01em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .speed {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .speed input {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .speed strong {
+      color: var(--text);
+    }
+
+    .bodies {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+      max-width: 440px;
+    }
+
+    .bodies button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--color);
+      box-shadow: 0 0 8px var(--color);
+    }
+
+    .info {
+      position: fixed;
+      right: 16px;
+      top: 104px;
+      width: 300px;
+      padding: 16px;
+      opacity: 0;
+      translate: 20px 0;
+      visibility: hidden;
+      transition: opacity .25s, translate .25s, visibility .25s;
+    }
+
+    .info.open {
+      opacity: 1;
+      translate: 0 0;
+      visibility: visible;
+    }
+
+    .info header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .info h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .info .type {
+      margin: 2px 0 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .info dl {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 12px;
+      margin: 0 0 12px;
+    }
+
+    .info dt {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .info dd {
+      margin: 2px 0 0;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .info p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #c8cde3;
+    }
+
+    .zoom {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+    }
+
+    .zoom button {
+      min-width: 36px;
+    }
+
+    .tip {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+      text-align: center;
+    }
+
+    @media (width < 760px) {
+      .hud {
+        left: 10px;
+        right: 10px;
+        top: 10px;
+        width: auto;
+      }
+
+      .bodies {
+        top: auto;
+        bottom: 64px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+      }
+
+      .bodies button {
+        flex-shrink: 0;
+      }
+
+      .info {
+        top: auto;
+        bottom: 110px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+      }
+
+      .tip {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const ctx = canvas.getContext('2d')
+
+    const dateLabel = document.querySelector('.date')
+    const pauseButton = document.querySelector('#pause')
+    const reverseButton = document.querySelector('#reverse')
+    const speedInput = document.querySelector('#speed')
+    const speedLabel = document.querySelector('#speed-label')
+    const bodiesList = document.querySelector('.bodies')
+    const info = document.querySelector('.info')
+
+    // CONSTANTES
+    const TAU = Math.PI * 2
+    const DAY_MS = 86_400_000
+    // J2000: 1 de enero de 2000 a mediodía, la fecha de referencia que usan
+    // los astrónomos para las posiciones iniciales de los planetas
+    const J2000 = Date.UTC(2000, 0, 1, 12)
+    const AU_KM = 149.6 // millones de km en una unidad astronómica
+    const MIN_ZOOM = 0.25
+    const MAX_ZOOM = 30
+    const SPEEDS = [
+      { days: 1, label: '1 día / segundo' },
+      { days: 7, label: '1 semana / segundo' },
+      { days: 30, label: '1 mes / segundo' },
+      { days: 91, label: '3 meses / segundo' },
+      { days: 365, label: '1 año / segundo' },
+      { days: 1826, label: '5 años / segundo' }
+    ]
+    const DATE_FORMAT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    // Las DISTANCIAS en pantalla (orbit) están comprimidas para que quepa
+    // todo; los PERIODOS, excentricidades y ángulos son los reales.
+    // perihelion = longitud del perihelio y meanLongitude = longitud media
+    // en J2000 (grados), con ellas los planetas salen en su posición real
+    const SUN = {
+      id: 'sun',
+      name: 'Sol',
+      type: 'Estrella enana amarilla',
+      color: '#ffcc4d',
+      radius: 20,
+      stats: {
+        Diámetro: '1.392.700 km',
+        Temperatura: '5.500 °C (superficie)',
+        Edad: '4.600 millones de años',
+        Masa: '99,86 % del sistema'
+      },
+      fact: 'La luz del Sol tarda unos 8 minutos y 20 segundos en llegar a la Tierra.'
+    }
+
+    const PLANETS = [
+      { id: 'mercury', name: 'Mercurio', type: 'Planeta rocoso', color: '#b5aea6', radius: 3, orbit: 56, au: 0.387, e: 0.2056, period: 87.97, perihelion: 77.46, meanLongitude: 252.25, diameter: 4879, moons: '0', temperature: '167 °C', fact: 'Su órbita es la más excéntrica: su distancia al Sol varía entre 46 y 70 millones de km.' },
+      { id: 'venus', name: 'Venus', type: 'Planeta rocoso', color: '#e8c27a', radius: 5.5, orbit: 84, au: 0.723, e: 0.0068, period: 224.70, perihelion: 131.53, meanLongitude: 181.98, diameter: 12104, moons: '0', temperature: '464 °C', fact: 'Gira al revés que casi todos los planetas: allí el Sol sale por el oeste.' },
+      { id: 'earth', name: 'Tierra', type: 'Planeta rocoso', color: '#4b8fe8', radius: 6, orbit: 112, au: 1, e: 0.0167, period: 365.256, perihelion: 102.94, meanLongitude: 100.46, diameter: 12742, moons: '1', temperature: '15 °C', fact: 'Llega al perihelio (punto más cercano al Sol) a principios de enero, en pleno invierno del hemisferio norte.' },
+      { id: 'mars', name: 'Marte', type: 'Planeta rocoso', color: '#d9623b', radius: 4.2, orbit: 142, au: 1.524, e: 0.0934, period: 686.98, perihelion: 336.04, meanLongitude: 355.45, diameter: 6779, moons: '2', temperature: '−65 °C', fact: 'Tiene el volcán más alto del sistema solar: el monte Olimpo, de unos 22 km.' },
+      { id: 'jupiter', name: 'Júpiter', type: 'Gigante gaseoso', color: '#d8a86b', radius: 13, orbit: 225, au: 5.203, e: 0.0484, period: 4332.59, perihelion: 14.75, meanLongitude: 34.40, diameter: 139820, moons: '95+', temperature: '−110 °C', fact: 'Su Gran Mancha Roja es una tormenta más grande que la Tierra que dura siglos.' },
+      { id: 'saturn', name: 'Saturno', type: 'Gigante gaseoso', color: '#e6cf8f', radius: 11, orbit: 288, au: 9.537, e: 0.0539, period: 10759.22, perihelion: 92.43, meanLongitude: 49.94, diameter: 116460, moons: '270+', temperature: '−140 °C', fact: 'Su densidad es menor que la del agua: flotaría en una bañera gigante.', rings: true },
+      { id: 'uranus', name: 'Urano', type: 'Gigante helado', color: '#8fd9e3', radius: 8, orbit: 348, au: 19.19, e: 0.0473, period: 30688.5, perihelion: 170.96, meanLongitude: 313.23, diameter: 50724, moons: '28+', temperature: '−195 °C', fact: 'Está tan inclinado que gira "tumbado" sobre su órbita.' },
+      { id: 'neptune', name: 'Neptuno', type: 'Gigante helado', color: '#4a6cf0', radius: 8, orbit: 400, au: 30.07, e: 0.0086, period: 60182, perihelion: 44.97, meanLongitude: 304.88, diameter: 49244, moons: '16', temperature: '−200 °C', fact: 'Tiene los vientos más rápidos del sistema solar: más de 2.000 km/h.' }
+    ]
+
+    const MOON = {
+      id: 'moon',
+      name: 'Luna',
+      type: 'Satélite de la Tierra',
+      parent: 'earth',
+      color: '#d6d6d6',
+      radius: 1.8,
+      orbit: 14,
+      period: 27.32,
+      meanLongitude: 218.32,
+      stats: {
+        Diámetro: '3.474 km',
+        'Distancia a la Tierra': '384.400 km',
+        'Periodo orbital': '27,3 días',
+        Temperatura: '−20 °C (media)'
+      },
+      fact: 'Siempre nos muestra la misma cara porque tarda lo mismo en girar sobre sí misma que en orbitar la Tierra.'
+    }
+
+    const BODIES = [SUN, ...PLANETS, MOON]
+
+    // ESTADO
+    let width = 0
+    let height = 0
+    let stars = []
+    let asteroids = []
+    let simDays = (Date.now() - J2000) / DAY_MS // empezamos en la fecha de hoy
+    let paused = false
+    let direction = 1
+    let lastTime = performance.now()
+    let selected = null
+    let follow = null
+    let pointer = null
+    const camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 }
+    const positions = new Map()
+
+    // ---------- Matemáticas de las órbitas ----------
+
+    const toRadians = degrees => degrees * Math.PI / 180
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+    // Ecuación de Kepler: M = E - e·sin(E). No tiene solución directa, así
+    // que la resolvemos con unas iteraciones del método de Newton.
+    // Resultado: el planeta va más rápido cerca del Sol (2ª ley de Kepler)
+    function solveKepler (meanAnomaly, e) {
+      let E = meanAnomaly + e * Math.sin(meanAnomaly)
+      for (let i = 0; i < 6; i++) {
+        E -= (E - e * Math.sin(E) - meanAnomaly) / (1 - e * Math.cos(E))
+      }
+      return E
+    }
+
+    // Punto de la elipse para una "anomalía excéntrica" E. Con cos y sin
+    // obtenemos un punto de la elipse; restando a·e desplazamos la elipse
+    // para que el Sol quede en uno de sus focos (1ª ley de Kepler)
+    function pointOnOrbit (planet, E) {
+      const a = planet.orbit
+      const b = a * Math.sqrt(1 - planet.e ** 2)
+      const x = a * (Math.cos(E) - planet.e)
+      const y = b * Math.sin(E)
+
+      // Rotamos la elipse para orientar su perihelio (matriz de rotación 2D)
+      const angle = toRadians(planet.perihelion)
+      return {
+        x: x * Math.cos(angle) - y * Math.sin(angle),
+        y: x * Math.sin(angle) + y * Math.cos(angle)
+      }
+    }
+
+    function getEccentricAnomaly (planet, days) {
+      // La anomalía media avanza a ritmo constante: una vuelta (TAU) por periodo
+      const meanAnomaly = toRadians(planet.meanLongitude - planet.perihelion) + TAU * days / planet.period
+      const normalized = ((meanAnomaly % TAU) + TAU) % TAU
+      return solveKepler(normalized, planet.e)
+    }
+
+    function getPlanetPosition (planet, days) {
+      const E = getEccentricAnomaly(planet, days)
+      return { ...pointOnOrbit(planet, E), E }
+    }
+
+    // La Luna usa COORDENADAS RELATIVAS: calculamos su posición en un
+    // círculo alrededor de (0, 0) y después le sumamos la posición de la
+    // Tierra. Así la Luna "viaja" con la Tierra sin saber nada del Sol.
+    // Es la misma idea que las jerarquías padre-hijo de los motores 3D
+    function getMoonPosition (days, earth) {
+      const angle = toRadians(MOON.meanLongitude) + TAU * days / MOON.period
+      return {
+        x: earth.x + Math.cos(angle) * MOON.orbit,
+        y: earth.y + Math.sin(angle) * MOON.orbit
+      }
+    }
+
+    function updatePositions () {
+      positions.set('sun', { x: 0, y: 0 })
+      PLANETS.forEach(planet => positions.set(planet.id, getPlanetPosition(planet, simDays)))
+      positions.set('moon', getMoonPosition(simDays, positions.get('earth')))
+    }
+
+    // ---------- Cámara: mundo <-> pantalla ----------
+
+    // En el mundo la Y crece hacia arriba (como en los libros de astronomía)
+    // y en el canvas crece hacia abajo, por eso invertimos el signo
+    function worldToScreen ({ x, y }) {
+      return {
+        x: width / 2 + (x - camera.x) * camera.zoom,
+        y: height / 2 - (y - camera.y) * camera.zoom
+      }
+    }
+
+    function screenToWorld (sx, sy) {
+      return {
+        x: camera.x + (sx - width / 2) / camera.zoom,
+        y: camera.y - (sy - height / 2) / camera.zoom
+      }
+    }
+
+    function fitZoom () {
+      return clamp(Math.min(width, height) / 2 / 420, MIN_ZOOM, MAX_ZOOM)
+    }
+
+    function flyTo (getTarget, zoom) {
+      follow = { getTarget, from: { x: camera.x, y: camera.y }, progress: 0 }
+      if (zoom) camera.targetZoom = zoom
+    }
+
+    function updateCamera (dt) {
+      camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * 6)
+
+      if (!follow) return
+      // Interpolamos desde donde estaba la cámara hasta el objetivo. Como el
+      // objetivo se mueve, al terminar (progress = 1) la cámara queda pegada
+      follow.progress = Math.min(1, follow.progress + dt * 1.6)
+      const ease = 1 - (1 - follow.progress) ** 3
+      const target = follow.getTarget()
+      camera.x = follow.from.x + (target.x - follow.from.x) * ease
+      camera.y = follow.from.y + (target.y - follow.from.y) * ease
+    }
+
+    // ---------- Dibujo ----------
+
+    function resize () {
+      const dpr = window.devicePixelRatio || 1
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      stars = Array.from({ length: Math.round(width * height / 3500) }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        size: Math.random() * 1.3 + 0.2,
+        phase: Math.random() * TAU
+      }))
+    }
+
+    function createAsteroids () {
+      asteroids = Array.from({ length: 450 }, () => {
+        const au = 2.2 + Math.random() * 1.1
+        return {
+          orbit: 164 + (au - 2.2) / 1.1 * 34 + (Math.random() - 0.5) * 6,
+          angle: Math.random() * TAU,
+          period: 365.25 * au ** 1.5 // 3ª ley de Kepler: T² ∝ a³
+        }
+      })
+    }
+
+    function drawStars (time) {
+      for (const star of stars) {
+        const alpha = 0.45 + Math.sin(time / 900 + star.phase) * 0.35
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`
+        ctx.fillRect(star.x, star.y, star.size, star.size)
+      }
+    }
+
+    function drawOrbit (planet) {
+      ctx.beginPath()
+      for (let i = 0; i <= 180; i++) {
+        const point = worldToScreen(pointOnOrbit(planet, i / 180 * TAU))
+        if (i === 0) ctx.moveTo(point.x, point.y)
+        else ctx.lineTo(point.x, point.y)
+      }
+      ctx.strokeStyle = planet === selected ? 'rgba(255, 204, 77, .45)' : 'rgba(150, 170, 255, .13)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    // Estela: recorremos la órbita hacia atrás en el tiempo y pintamos
+    // segmentos cada vez más transparentes
+    function drawTrail (planet) {
+      const SEGMENTS = 40
+      const span = planet.period * 0.14
+      let previous = worldToScreen(positions.get(planet.id))
+
+      ctx.lineWidth = clamp(planet.radius * camera.zoom * 0.4, 1.5, 3)
+      ctx.lineCap = 'butt'
+      for (let i = 1; i <= SEGMENTS; i++) {
+        const days = simDays - direction * span * i / SEGMENTS
+        const point = worldToScreen(getPlanetPosition(planet, days))
+        ctx.globalAlpha = (1 - i / SEGMENTS) * 0.55
+        ctx.strokeStyle = planet.color
+        ctx.beginPath()
+        ctx.moveTo(previous.x, previous.y)
+        ctx.lineTo(point.x, point.y)
+        ctx.stroke()
+        previous = point
+      }
+      ctx.globalAlpha = 1
+    }
+
+    function drawAsteroids () {
+      ctx.fillStyle = 'rgba(190, 180, 160, .5)'
+      for (const rock of asteroids) {
+        const angle = rock.angle + TAU * simDays / rock.period
+        const point = worldToScreen({ x: Math.cos(angle) * rock.orbit, y: Math.sin(angle) * rock.orbit })
+        ctx.fillRect(point.x, point.y, 1.2, 1.2)
+      }
+    }
+
+    function drawSun () {
+      const { x, y } = worldToScreen({ x: 0, y: 0 })
+      const r = SUN.radius * camera.zoom
+
+      const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 4)
+      glow.addColorStop(0, 'rgba(255, 190, 60, .55)')
+      glow.addColorStop(1, 'rgba(255, 120, 20, 0)')
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(x, y, r * 4, 0, TAU)
+      ctx.fill()
+
+      const body = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r)
+      body.addColorStop(0, '#fff6c8')
+      body.addColorStop(0.6, '#ffcc4d')
+      body.addColorStop(1, '#ff9a1f')
+      ctx.fillStyle = body
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, TAU)
+      ctx.fill()
+    }
+
+    function getDrawRadius (body) {
+      return Math.max(body.radius * camera.zoom, 2)
+    }
+
+    function drawBody (body) {
+      const point = worldToScreen(positions.get(body.id))
+      const r = getDrawRadius(body)
+
+      if (body.rings) drawRings(point, r, 0, TAU)
+
+      ctx.fillStyle = body.color
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, r, 0, TAU)
+      ctx.fill()
+
+      // Sombra: la cara opuesta al Sol queda a oscuras (día y noche)
+      const sun = worldToScreen({ x: 0, y: 0 })
+      const distance = Math.hypot(sun.x - point.x, sun.y - point.y) || 1
+      const dx = (sun.x - point.x) / distance
+      const dy = (sun.y - point.y) / distance
+      const shadow = ctx.createLinearGradient(point.x + dx * r, point.y + dy * r, point.x - dx * r, point.y - dy * r)
+      shadow.addColorStop(0.4, 'rgba(0, 0, 0, 0)')
+      shadow.addColorStop(1, 'rgba(0, 0, 10, .8)')
+      ctx.fillStyle = shadow
+      ctx.fill()
+
+      // La mitad delantera de los anillos se pinta por encima del planeta
+      if (body.rings) drawRings(point, r, 0, Math.PI)
+    }
+
+    function drawRings ({ x, y }, r, start, end) {
+      ctx.beginPath()
+      ctx.ellipse(x, y, r * 2, r * 0.65, -0.35, start, end)
+      ctx.strokeStyle = 'rgba(230, 207, 143, .7)'
+      ctx.lineWidth = Math.max(1, r * 0.4)
+      ctx.stroke()
+    }
+
+    function drawLabel (body) {
+      if (camera.zoom < 0.45 && body !== selected) return
+      if (body === MOON && camera.zoom < 2.5) return
+
+      const point = worldToScreen(positions.get(body.id))
+      ctx.font = '600 11px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillStyle = body === selected ? '#ffcc4d' : 'rgba(220, 225, 245, .7)'
+      ctx.fillText(body.name, point.x, point.y + getDrawRadius(body) + 14)
+    }
+
+    function drawSelection (time) {
+      if (!selected) return
+      const point = worldToScreen(positions.get(selected.id))
+      const r = getDrawRadius(selected) + 7
+
+      ctx.save()
+      ctx.strokeStyle = '#ffcc4d'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 4])
+      ctx.lineDashOffset = -time / 60
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, r, 0, TAU)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    function draw (time) {
+      ctx.clearRect(0, 0, width, height)
+      drawStars(time)
+      PLANETS.forEach(drawOrbit)
+      drawAsteroids()
+      PLANETS.forEach(drawTrail)
+      drawSun()
+
+      // Órbita de la Luna alrededor de la Tierra (también relativa)
+      if (camera.zoom > 1.2) {
+        const earth = worldToScreen(positions.get('earth'))
+        ctx.strokeStyle = 'rgba(255, 255, 255, .15)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.arc(earth.x, earth.y, MOON.orbit * camera.zoom, 0, TAU)
+        ctx.stroke()
+      }
+
+      PLANETS.forEach(drawBody)
+      drawBody(MOON)
+      BODIES.forEach(drawLabel)
+      drawSelection(time)
+    }
+
+    // ---------- Panel de información ----------
+
+    function formatPeriod (days) {
+      if (days < 730) return `${Math.round(days)} días`
+      return `${(days / 365.25).toLocaleString('es-ES', { maximumFractionDigits: 1 })} años`
+    }
+
+    function getStats (body) {
+      if (body.stats) return body.stats
+      return {
+        'Distancia media': `${Math.round(body.au * AU_KM).toLocaleString('es-ES')} M km`,
+        'Distancia actual': '',
+        'Periodo orbital': formatPeriod(body.period),
+        Diámetro: `${body.diameter.toLocaleString('es-ES')} km`,
+        Lunas: body.moons,
+        Temperatura: body.temperature
+      }
+    }
+
+    function showInfo (body) {
+      info.classList.toggle('open', Boolean(body))
+      if (!body) return
+
+      info.querySelector('h2').textContent = body.name
+      info.querySelector('h2').style.color = body.color
+      info.querySelector('.type').textContent = body.type
+      info.querySelector('p').textContent = body.fact
+      info.querySelector('dl').replaceChildren(...Object.entries(getStats(body)).map(([label, value]) => {
+        const wrapper = document.createElement('div')
+        wrapper.innerHTML = '<dt></dt><dd></dd>'
+        wrapper.querySelector('dt').textContent = label
+        wrapper.querySelector('dd').textContent = value
+        if (label === 'Distancia actual') wrapper.querySelector('dd').id = 'live-distance'
+        return wrapper
+      }))
+    }
+
+    function updateLiveInfo () {
+      dateLabel.textContent = DATE_FORMAT.format(new Date(J2000 + simDays * DAY_MS))
+
+      const liveDistance = document.querySelector('#live-distance')
+      if (!liveDistance || !selected?.au) return
+      // r = a·(1 − e·cos E): la distancia real cambia a lo largo de la elipse
+      const { E } = positions.get(selected.id)
+      const distance = selected.au * (1 - selected.e * Math.cos(E)) * AU_KM
+      liveDistance.textContent = `${Math.round(distance).toLocaleString('es-ES')} M km`
+    }
+
+    function selectBody (body) {
+      selected = body
+      showInfo(body)
+      bodiesList.querySelectorAll('button').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.id === body?.id))
+      })
+
+      if (!body) return
+      const zoom = body === MOON ? 8 : body === SUN ? fitZoom() : Math.max(camera.targetZoom, 2.2)
+      flyTo(() => positions.get(body.id), zoom)
+    }
+
+    function resetView () {
+      selectBody(null)
+      flyTo(() => ({ x: 0, y: 0 }), fitZoom())
+    }
+
+    function renderBodyButtons () {
+      bodiesList.replaceChildren(...BODIES.map(body => {
+        const button = document.createElement('button')
+        button.dataset.id = body.id
+        button.setAttribute('aria-pressed', 'false')
+        button.innerHTML = `<span class="dot" style="--color: ${body.color}"></span>${body.name}`
+        button.addEventListener('click', () => selectBody(body))
+        return button
+      }))
+    }
+
+    // ---------- Interacción ----------
+
+    function hitTest (sx, sy) {
+      // La Luna primero porque es pequeña y está encima de la Tierra
+      for (const body of [MOON, ...PLANETS.toReversed(), SUN]) {
+        const point = worldToScreen(positions.get(body.id))
+        const tolerance = Math.max(getDrawRadius(body) + 6, 12)
+        if (Math.hypot(point.x - sx, point.y - sy) <= tolerance) return body
+      }
+      return null
+    }
+
+    function handlePointerDown (event) {
+      pointer = { x: event.clientX, y: event.clientY, moved: false }
+      canvas.setPointerCapture(event.pointerId)
+    }
+
+    function handlePointerMove (event) {
+      if (!pointer) {
+        canvas.style.cursor = hitTest(event.clientX, event.clientY) ? 'pointer' : ''
+        return
+      }
+
+      const dx = event.clientX - pointer.x
+      const dy = event.clientY - pointer.y
+      if (!pointer.moved && Math.hypot(dx, dy) < 4) return
+
+      // Arrastrar = mover la cámara (y dejar de seguir al planeta)
+      pointer.moved = true
+      follow = null
+      canvas.classList.add('dragging')
+      camera.x -= dx / camera.zoom
+      camera.y += dy / camera.zoom
+      pointer.x = event.clientX
+      pointer.y = event.clientY
+    }
+
+    function handlePointerUp (event) {
+      if (pointer && !pointer.moved) {
+        const body = hitTest(event.clientX, event.clientY)
+        if (body) selectBody(body)
+      }
+      pointer = null
+      canvas.classList.remove('dragging')
+    }
+
+    function zoomAt (factor, sx = width / 2, sy = height / 2) {
+      // Si seguimos a un planeta hacemos zoom sobre el centro de la pantalla
+      if (follow) {
+        camera.targetZoom = clamp(camera.targetZoom * factor, MIN_ZOOM, MAX_ZOOM)
+        return
+      }
+      // Zoom hacia el cursor: el punto del mundo que está bajo el ratón
+      // debe seguir bajo el ratón después de cambiar el zoom
+      const before = screenToWorld(sx, sy)
+      camera.zoom = camera.targetZoom = clamp(camera.zoom * factor, MIN_ZOOM, MAX_ZOOM)
+      const after = screenToWorld(sx, sy)
+      camera.x += before.x - after.x
+      camera.y += before.y - after.y
+    }
+
+    function handleWheel (event) {
+      event.preventDefault()
+      zoomAt(Math.exp(-event.deltaY * 0.0015), event.clientX, event.clientY)
+    }
+
+    function setSpeed () {
+      speedLabel.textContent = SPEEDS[speedInput.value].label
+    }
+
+    function togglePause () {
+      paused = !paused
+      pauseButton.textContent = paused ? '▶️' : '⏸️'
+      pauseButton.setAttribute('aria-label', paused ? 'Reanudar' : 'Pausar')
+    }
+
+    function toggleDirection () {
+      direction *= -1
+      reverseButton.setAttribute('aria-pressed', String(direction < 0))
+    }
+
+    function handleKeydown (event) {
+      if (event.target.matches('input')) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        togglePause()
+      } else if (event.key === 'Escape') {
+        resetView()
+      } else if (event.key === '+') {
+        zoomAt(1.25)
+      } else if (event.key === '-') {
+        zoomAt(0.8)
+      }
+    }
+
+    // ---------- Bucle principal ----------
+
+    function loop (time) {
+      const dt = Math.min((time - lastTime) / 1000, 0.1)
+      lastTime = time
+
+      if (!paused) simDays += dt * SPEEDS[speedInput.value].days * direction
+
+      updatePositions()
+      updateCamera(dt)
+      draw(time)
+      updateLiveInfo()
+
+      requestAnimationFrame(loop)
+    }
+
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointermove', handlePointerMove)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerUp)
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    window.addEventListener('resize', resize)
+    window.addEventListener('keydown', handleKeydown)
+    pauseButton.addEventListener('click', togglePause)
+    reverseButton.addEventListener('click', toggleDirection)
+    speedInput.addEventListener('input', setSpeed)
+    document.querySelector('#reset').addEventListener('click', resetView)
+    document.querySelector('#zoom-in').addEventListener('click', () => zoomAt(1.4))
+    document.querySelector('#zoom-out').addEventListener('click', () => zoomAt(1 / 1.4))
+    document.querySelector('#close-info').addEventListener('click', resetView)
+
+    resize()
+    createAsteroids()
+    renderBodyButtons()
+    setSpeed()
+    camera.zoom = camera.targetZoom = fitZoom()
+    requestAnimationFrame(loop)
+  </script>
+</head>
+
+<body>
+  <canvas aria-label="Simulación del sistema solar"></canvas>
+
+  <section class="hud glass">
+    <h1>☀️ Sistema solar</h1>
+    <div>
+      <small class="label">Fecha simulada</small>
+      <div class="date"></div>
+    </div>
+    <label class="speed">
+      <span>Velocidad: <strong id="speed-label"></strong></span>
+      <input id="speed" type="range" min="0" max="5" value="2" step="1">
+    </label>
+    <div class="controls">
+      <button id="pause" aria-label="Pausar">⏸️</button>
+      <button id="reverse" aria-pressed="false" title="Invertir el tiempo">⏪ Atrás</button>
+      <button id="reset" title="Ver todo el sistema (Esc)">🔭 Ver todo</button>
+    </div>
+  </section>
+
+  <nav class="bodies" aria-label="Cuerpos celestes"></nav>
+
+  <article class="info glass">
+    <header>
+      <h2></h2>
+      <button id="close-info" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="type"></div>
+    <dl></dl>
+    <p></p>
+  </article>
+
+  <p class="tip">Rueda para hacer zoom · arrastra para moverte · click en un planeta para seguirlo</p>
+
+  <div class="zoom glass">
+    <button id="zoom-out" aria-label="Alejar">−</button>
+    <button id="zoom-in" aria-label="Acercar">＋</button>
+  </div>
+</body>
+
+</html>

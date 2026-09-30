@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>94 - Analizador de texto</title>
+  <style>
+    :root {
+      --bg: #f3f1ec;
+      --card: #fffdf9;
+      --text: #1f1d1a;
+      --muted: #807a70;
+      --line: #e8e3d9;
+      --accent: #0f766e;
+      --accent-soft: #d6efe9;
+      --warm: #c2410c;
+      --bar: linear-gradient(90deg, #14b8a6, #0f766e);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 18px;
+      height: 100dvh;
+      padding: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+    }
+
+    /* ---------- Editor ---------- */
+    .editor {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .editor header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tools button {
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      background: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .tools button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      min-height: 280px;
+      padding: 18px;
+      border: 0;
+      background: transparent;
+      font-size: 1.02rem;
+      line-height: 1.65;
+      resize: none;
+      outline: none;
+    }
+
+    /* ---------- Estadísticas ---------- */
+    .stats {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .numbers {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px 14px;
+    }
+
+    .stat dt {
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .stat dd {
+      margin: 4px 0 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .stat.highlight {
+      border-color: transparent;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .stat.highlight dt {
+      color: rgb(255 255 255 / 75%);
+    }
+
+    .stat.warning dd {
+      color: var(--warm);
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: #f0ece3;
+      font-size: 0.85em;
+    }
+
+    .highlight code {
+      background: rgb(255 255 255 / 20%);
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .panel {
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .side-panels {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Gráfico de barras de palabras frecuentes */
+    .bars {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 96px 1fr 58px;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .bar-word {
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      display: block;
+      height: 12px;
+      border-radius: 99px;
+      background: #eee9df;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--bar);
+      transition: width 0.3s ease-out;
+    }
+
+    .bar-count {
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* Legibilidad */
+    .score {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .score strong {
+      font-size: 2.4rem;
+      letter-spacing: -0.03em;
+    }
+
+    .score span {
+      font-weight: 600;
+    }
+
+    .gauge {
+      position: relative;
+      height: 10px;
+      margin: 10px 0 8px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #dc2626, #f59e0b 45%, #22c55e 75%, #0ea5e9);
+    }
+
+    .gauge-marker {
+      position: absolute;
+      top: -4px;
+      width: 6px;
+      height: 18px;
+      margin-left: -3px;
+      border: 2px solid #fff;
+      border-radius: 4px;
+      background: var(--text);
+      transition: left 0.3s ease-out;
+    }
+
+    .detail {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    /* Grafemas vs .length */
+    .graphemes {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    .graphemes th {
+      color: var(--muted);
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .graphemes th:first-child,
+    .graphemes td:first-child {
+      text-align: left;
+    }
+
+    .graphemes td {
+      padding: 3px 0;
+      border-top: 1px solid var(--line);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .graphemes td:first-child {
+      font-size: 1.2rem;
+    }
+
+    @media (width < 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100dvh;
+        padding: 12px;
+      }
+
+      .editor {
+        height: 55dvh;
+      }
+
+      .numbers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .panels {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="card editor">
+      <header>
+        <h1>Analizador de <span>texto</span></h1>
+        <div class="tools">
+          <button id="sample-button">Texto de ejemplo</button>
+          <button id="clear-button">Limpiar</button>
+        </div>
+      </header>
+      <textarea id="text" aria-label="Texto a analizar" placeholder="Escribe o pega aquí tu texto…"></textarea>
+    </section>
+
+    <section class="stats" aria-live="polite">
+      <dl class="numbers">
+        <div class="card stat highlight">
+          <dt>Palabras</dt>
+          <dd id="words">0</dd>
+        </div>
+        <div class="card stat">
+          <dt>Caracteres (grafemas)</dt>
+          <dd id="graphemes">0</dd>
+        </div>
+        <div class="card stat" id="length-card">
+          <dt><code>text.length</code></dt>
+          <dd id="length">0</dd>
+        </div>
+        <div class="card stat">
+          <dt>Sin espacios</dt>
+          <dd id="no-spaces">0</dd>
+        </div>
+        <div class="card stat">
+          <dt>Frases</dt>
+          <dd id="sentences">0</dd>
+        </div>
+        <div class="card stat">
+          <dt>Párrafos</dt>
+          <dd id="paragraphs">0</dd>
+        </div>
+        <div class="card stat">
+          <dt>📖 Lectura</dt>
+          <dd id="reading-time">0 s</dd>
+        </div>
+        <div class="card stat">
+          <dt>🎙️ En voz alta</dt>
+          <dd id="speaking-time">0 s</dd>
+        </div>
+      </dl>
+
+      <div class="panels">
+        <article class="card panel">
+          <h2>Palabras más frecuentes</h2>
+          <ol class="bars" id="top-words"></ol>
+        </article>
+
+        <div class="side-panels">
+          <article class="card panel">
+            <h2>Legibilidad · Fernández Huerta</h2>
+            <div class="score"><strong id="readability-score">–</strong><span id="readability-label"></span></div>
+            <div class="gauge"><span class="gauge-marker" id="gauge-marker" style="left: 50%"></span></div>
+            <p class="detail" id="readability-detail"></p>
+          </article>
+
+          <article class="card panel">
+            <h2>¿Por qué <code>.length</code> miente?</h2>
+            <p class="detail" id="length-explanation"></p>
+            <table class="graphemes" id="grapheme-table"></table>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const LOCALE = 'es'
+    const READING_WPM = 200 // palabras por minuto leyendo en silencio
+    const SPEAKING_WPM = 140 // palabras por minuto hablando en voz alta
+    const TOP_WORDS = 12
+    const MAX_GRAPHEME_ROWS = 4
+
+    const SAMPLE_TEXT = `JavaScript nació en 1995 y se escribió en solo diez días. Brendan Eich lo creó para dar vida a las páginas del navegador Netscape. ¿Quién iba a imaginar que el lenguaje acabaría en todas partes? 🚀
+
+Hoy JavaScript se ejecuta en navegadores, servidores, móviles e incluso en microcontroladores. Es el lenguaje más usado del mundo según muchas encuestas y su comunidad no para de crecer. 👩‍💻👨‍💻
+
+Aprender JavaScript es como aprender a cocinar: al principio sigues recetas, luego improvisas y, con el tiempo, creas tus propios platos. Cada proyecto te enseña algo nuevo sobre el lenguaje, sobre el navegador y sobre ti mismo. 🇪🇸🇲🇽🇦🇷
+
+Este analizador cuenta palabras, frases y párrafos del texto. También calcula el tiempo de lectura y la legibilidad. ¡Prueba a pegar tu propio texto y mira cómo cambian los números! 👍🏽✨`
+
+    // Palabras muy comunes que no aportan significado (las ignoramos en la frecuencia)
+    const STOPWORDS = new Set(`
+      a al algo algunas algunos ante antes como con contra cual cuando de del desde donde durante e el él ella ellas
+      ellos en entre era eres es esa esas ese eso esos esta está están estar estas este esto estos estoy fue ha han
+      has hasta hay he hemos la las le les lo los me mi mí mis mucho muchos muy más nada ni no nos nosotros o os otra
+      otras otro otros para pero poco por porque que qué quien quienes se sea ser si sí sin sobre son soy su sus
+      también tan tanto te tener ti tiene tienen todo todos tu tú tus un una uno unos y ya yo cada así aunque solo
+      sólo bien vez veces hace puede pueden mismo misma según incluso luego
+    `.trim().split(/\s+/))
+
+    // Intl.Segmenter divide el texto como lo haría una persona, respetando las reglas Unicode
+    const graphemeSegmenter = new Intl.Segmenter(LOCALE, { granularity: 'grapheme' })
+    const wordSegmenter = new Intl.Segmenter(LOCALE, { granularity: 'word' })
+    const sentenceSegmenter = new Intl.Segmenter(LOCALE, { granularity: 'sentence' })
+    const numberFormatter = new Intl.NumberFormat(LOCALE)
+    const decimalFormatter = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 })
+
+    const STRONG_VOWELS = 'aeoáéó'
+    const ACCENTED_WEAK_VOWELS = 'íú'
+
+    const textarea = $('#text')
+    let frameRequested = false
+
+    // ---------- Análisis ----------
+
+    function countSyllables(word) {
+      const normalized = word
+        .toLocaleLowerCase(LOCALE)
+        .replace(/(?<=[qg])u(?=[eéií])/g, '') // la "u" de que, qui, gue, gui no se pronuncia
+        .replace(/y$/, 'i') // la "y" final suena como vocal: hoy, muy, rey
+
+      // Grupos de vocales seguidas: cada grupo es, en principio, una sílaba (diptongo)
+      const groups = normalized.match(/[aeiouáéíóúü]+/g) ?? []
+      let syllables = 0
+
+      for (const group of groups) {
+        syllables++
+        for (let i = 1; i < group.length; i++) {
+          const previous = group[i - 1]
+          const current = group[i]
+          // Hiato: dos vocales fuertes juntas (po-e-ta) o una débil con tilde (dí-a, ba-úl)
+          const isHiatus = (STRONG_VOWELS.includes(previous) && STRONG_VOWELS.includes(current)) ||
+            ACCENTED_WEAK_VOWELS.includes(previous) || ACCENTED_WEAK_VOWELS.includes(current)
+          if (isHiatus) syllables++
+        }
+      }
+      return Math.max(1, syllables)
+    }
+
+    function getWordFrequencies(words) {
+      // Un Map es ideal para contar: claves de cualquier tipo, orden de inserción y .get/.set rápidos
+      const frequencies = new Map()
+      for (const word of words) {
+        const normalized = word.toLocaleLowerCase(LOCALE)
+        // \p{L} = cualquier letra de cualquier alfabeto: descartamos números como "1995"
+        if (normalized.length < 3 || STOPWORDS.has(normalized) || !/^\p{L}+$/u.test(normalized)) continue
+        frequencies.set(normalized, (frequencies.get(normalized) ?? 0) + 1)
+      }
+      return [...frequencies.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], LOCALE))
+    }
+
+    function getReadability(words, sentenceCount) {
+      if (words.length === 0 || sentenceCount === 0) return null
+
+      const syllables = words.reduce((total, word) => total + countSyllables(word), 0)
+      const syllablesPer100Words = (syllables / words.length) * 100
+      const wordsPerSentence = words.length / sentenceCount
+
+      // Fernández Huerta (1959), la adaptación al español del índice de Flesch:
+      //   L = 206,84 − 0,60·P − 1,02·F
+      // P = sílabas por cada 100 palabras y F = palabras por frase.
+      // (En muchas webs aparece F como "frases cada 100 palabras", pero eso invertiría
+      // el efecto: las frases largas deben hacer el texto MÁS difícil, como en Flesch)
+      const score = 206.84 - 0.6 * syllablesPer100Words - 1.02 * wordsPerSentence
+      return {
+        score: Math.min(100, Math.max(0, score)),
+        syllablesPerWord: syllables / words.length,
+        wordsPerSentence
+      }
+    }
+
+    function getReadabilityLabel(score) {
+      if (score >= 90) return 'Muy fácil'
+      if (score >= 80) return 'Fácil'
+      if (score >= 70) return 'Bastante fácil'
+      if (score >= 60) return 'Normal'
+      if (score >= 50) return 'Bastante difícil'
+      if (score >= 30) return 'Difícil'
+      return 'Muy difícil'
+    }
+
+    function analyze(text) {
+      // .length cuenta unidades UTF-16, NO lo que una persona ve como un carácter.
+      // 👍🏽 son 4 unidades, 👩‍💻 son 5 y la bandera 🇪🇸 son 4. Un grafema es lo que ves.
+      const graphemes = Array.from(graphemeSegmenter.segment(text), ({ segment }) => segment)
+
+      // isWordLike descarta espacios, signos de puntuación y emojis
+      const words = Array.from(wordSegmenter.segment(text))
+        .filter(({ isWordLike }) => isWordLike)
+        .map(({ segment }) => segment)
+
+      // Una "frase" debe tener al menos una letra o número (evitamos contar líneas de solo emojis)
+      const sentences = Array.from(sentenceSegmenter.segment(text), ({ segment }) => segment)
+        .filter(sentence => /[\p{L}\p{N}]/u.test(sentence))
+
+      const paragraphs = text.split(/\n+/).filter(paragraph => /[\p{L}\p{N}]/u.test(paragraph))
+
+      return {
+        text,
+        graphemes,
+        words,
+        sentences,
+        paragraphs,
+        noSpaces: graphemes.filter(grapheme => !/^\s+$/u.test(grapheme)).length,
+        frequencies: getWordFrequencies(words),
+        readability: getReadability(words, sentences.length),
+        // Grafemas que ocupan más de una unidad UTF-16 (emojis, banderas, tildes combinadas...)
+        multiUnit: [...new Set(graphemes.filter(grapheme => grapheme.length > 1))]
+      }
+    }
+
+    // ---------- Render ----------
+
+    function formatDuration(words, wordsPerMinute) {
+      const totalSeconds = Math.round((words / wordsPerMinute) * 60)
+      if (totalSeconds < 60) return `${totalSeconds} s`
+      const minutes = Math.floor(totalSeconds / 60)
+      const seconds = totalSeconds % 60
+      return seconds === 0 ? `${minutes} min` : `${minutes} min ${seconds} s`
+    }
+
+    function escapeHTML(text) {
+      return text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    function setText(selector, value) {
+      $(selector).textContent = value
+    }
+
+    function renderTopWords({ frequencies, words }) {
+      const list = $('#top-words')
+      const top = frequencies.slice(0, TOP_WORDS)
+      if (top.length === 0) {
+        list.innerHTML = '<li class="empty">Escribe algo para ver las palabras clave</li>'
+        return
+      }
+
+      const max = top[0][1]
+      list.innerHTML = top.map(([word, count]) => {
+        // Densidad de palabra clave: qué porcentaje del total de palabras es esta
+        const density = (count / words.length) * 100
+        return `
+          <li class="bar-row" title="${count} veces · ${decimalFormatter.format(density)} % de densidad">
+            <span class="bar-word">${escapeHTML(word)}</span>
+            <span class="bar-track"><span class="bar-fill" style="width: ${(count / max) * 100}%"></span></span>
+            <span class="bar-count">${count} · ${decimalFormatter.format(density)}%</span>
+          </li>
+        `
+      }).join('')
+    }
+
+    function renderReadability({ readability }) {
+      if (!readability) {
+        setText('#readability-score', '–')
+        setText('#readability-label', '')
+        setText('#readability-detail', 'Necesito al menos una frase para calcularla.')
+        return
+      }
+
+      const { score, syllablesPerWord, wordsPerSentence } = readability
+      setText('#readability-score', Math.round(score))
+      setText('#readability-label', getReadabilityLabel(score))
+      $('#gauge-marker').style.left = `${score}%`
+      setText('#readability-detail',
+        `${decimalFormatter.format(syllablesPerWord)} sílabas por palabra · ${decimalFormatter.format(wordsPerSentence)} palabras por frase. Cuanto más alto, más fácil de leer.`)
+    }
+
+    function renderGraphemes({ text, graphemes, multiUnit }) {
+      const difference = text.length - graphemes.length
+      $('#length-card').classList.toggle('warning', difference > 0)
+
+      setText('#length-explanation', difference > 0
+        ? `.length cuenta ${numberFormatter.format(difference)} caracteres de más: algunos grafemas ocupan varias unidades UTF-16.`
+        : 'Ahora mismo coinciden. Prueba a escribir un emoji como 👩‍👩‍👧 o una bandera 🇯🇵.')
+
+      if (multiUnit.length === 0) {
+        $('#grapheme-table').innerHTML = ''
+        return
+      }
+
+      const rows = multiUnit.slice(0, MAX_GRAPHEME_ROWS).map(grapheme => `
+        <tr>
+          <td>${escapeHTML(grapheme)}</td>
+          <td>1</td>
+          <td>${[...grapheme].length}</td>
+          <td>${grapheme.length}</td>
+        </tr>
+      `).join('')
+
+      // [...str] recorre por code points (no por unidades UTF-16), pero tampoco basta:
+      // un emoji con tono de piel o unido con ZWJ son varios code points y un solo grafema
+      $('#grapheme-table').innerHTML = `
+        <thead><tr><th>Grafema</th><th>Ves</th><th>[...str]</th><th>.length</th></tr></thead>
+        <tbody>${rows}</tbody>
+      `
+    }
+
+    function render() {
+      frameRequested = false
+      const analysis = analyze(textarea.value)
+      const wordCount = analysis.words.length
+
+      setText('#words', numberFormatter.format(wordCount))
+      setText('#graphemes', numberFormatter.format(analysis.graphemes.length))
+      setText('#length', numberFormatter.format(analysis.text.length))
+      setText('#no-spaces', numberFormatter.format(analysis.noSpaces))
+      setText('#sentences', numberFormatter.format(analysis.sentences.length))
+      setText('#paragraphs', numberFormatter.format(analysis.paragraphs.length))
+      setText('#reading-time', formatDuration(wordCount, READING_WPM))
+      setText('#speaking-time', formatDuration(wordCount, SPEAKING_WPM))
+
+      renderTopWords(analysis)
+      renderReadability(analysis)
+      renderGraphemes(analysis)
+    }
+
+    function scheduleRender() {
+      // Agrupamos las pulsaciones en un solo análisis por frame, aunque escribas muy rápido
+      if (frameRequested) return
+      frameRequested = true
+      requestAnimationFrame(render)
+    }
+
+    textarea.addEventListener('input', scheduleRender)
+
+    $('#sample-button').addEventListener('click', () => {
+      textarea.value = SAMPLE_TEXT
+      render()
+      textarea.focus()
+    })
+
+    $('#clear-button').addEventListener('click', () => {
+      textarea.value = ''
+      render()
+      textarea.focus()
+    })
+
+    textarea.value = SAMPLE_TEXT
+    render()
+  </script>
+</body>
+
+</html>

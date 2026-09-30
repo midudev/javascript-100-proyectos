@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>44 - Perfil de GitHub</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --card-hover: #1c2330;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2f81f7;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(900px 400px at 85% -10%, rgb(47 129 247 / 18%), transparent 60%),
+        radial-gradient(700px 400px at -10% 110%, rgb(63 185 80 / 10%), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 20px;
+      padding: 16px clamp(16px, 4vw, 40px);
+      border-bottom: 1px solid var(--border);
+      background: rgb(13 17 23 / 70%);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .brand svg {
+      width: 30px;
+      height: 30px;
+    }
+
+    form {
+      flex: 1;
+      display: flex;
+      min-width: 240px;
+      max-width: 520px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      overflow: hidden;
+    }
+
+    form:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgb(47 129 247 / 30%);
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 14px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+
+    form button {
+      padding: 0 18px;
+      border: 0;
+      background: var(--accent);
+      color: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    form button:disabled {
+      opacity: .6;
+      cursor: progress;
+    }
+
+    .rate {
+      margin-left: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 190px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .rate-bar {
+      height: 6px;
+      border-radius: 99px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .rate-bar span {
+      display: block;
+      height: 100%;
+      width: 100%;
+      background: var(--green);
+      transition: width .4s, background .4s;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 12px clamp(16px, 4vw, 40px) 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .suggestions button {
+      padding: 4px 12px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .suggestions button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    main {
+      flex: 1;
+      padding: 20px clamp(16px, 4vw, 40px) 32px;
+    }
+
+    .profile-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      animation: fade-in .4s ease;
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 20px;
+    }
+
+    .profile img {
+      width: 100%;
+      max-width: 220px;
+      aspect-ratio: 1;
+      display: block;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--border);
+    }
+
+    .profile h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .profile .login {
+      color: var(--muted);
+      font-size: 18px;
+      text-decoration: none;
+    }
+
+    .profile .login:hover {
+      color: var(--accent);
+    }
+
+    .profile .bio {
+      margin: 12px 0;
+      line-height: 1.45;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .stats strong {
+      display: block;
+      font-size: 20px;
+    }
+
+    .stats span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .meta {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .content {
+      display: grid;
+      gap: 20px;
+      align-content: start;
+      min-width: 0;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .lang-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 99px;
+      overflow: hidden;
+      background: var(--border);
+    }
+
+    .lang-bar span {
+      height: 100%;
+    }
+
+    .lang-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 13px;
+    }
+
+    .lang-legend i,
+    .repo-lang i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 6px;
+      border-radius: 50%;
+    }
+
+    .lang-legend small {
+      color: var(--muted);
+    }
+
+    .repos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .repo {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      text-decoration: none;
+      transition: border-color .2s, background .2s, transform .2s;
+    }
+
+    .repo:hover {
+      border-color: var(--accent);
+      background: var(--card-hover);
+      transform: translateY(-2px);
+    }
+
+    .repo h3 {
+      margin: 0;
+      font-size: 15px;
+      color: var(--accent);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .repo p {
+      flex: 1;
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .repo footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .muted {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .status {
+      max-width: 520px;
+      margin: 8vh auto 0;
+      text-align: center;
+      animation: fade-in .3s ease;
+    }
+
+    .status .icon {
+      font-size: 56px;
+    }
+
+    .status h2 {
+      font-size: 22px;
+      margin: 12px 0 8px;
+    }
+
+    .status p {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .status code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .status.error h2 {
+      color: var(--red);
+    }
+
+    .status.warning h2 {
+      color: var(--yellow);
+    }
+
+    .skeleton {
+      border-radius: 12px;
+      background: linear-gradient(90deg, var(--card) 25%, var(--card-hover) 50%, var(--card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+
+    @keyframes shimmer {
+      to {
+        background-position: -200% 0;
+      }
+    }
+
+    @media (width < 760px) {
+      .profile-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .profile img {
+        max-width: 140px;
+      }
+
+      .rate {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const API_URL = 'https://api.github.com'
+    const DEFAULT_USER = 'midudev'
+    const MAX_REPOS = 6
+    const MAX_LANGUAGES = 6
+    // Los nombres de usuario de GitHub: letras, números y guiones sueltos (máx. 39 caracteres)
+    const USERNAME_REGEX = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i
+
+    const LANGUAGE_COLORS = {
+      JavaScript: '#f1e05a',
+      TypeScript: '#3178c6',
+      HTML: '#e34c26',
+      CSS: '#663399',
+      Python: '#3572a5',
+      Java: '#b07219',
+      Go: '#00add8',
+      Rust: '#dea584',
+      C: '#555555',
+      'C++': '#f34b7d',
+      'C#': '#178600',
+      PHP: '#4f5d95',
+      Ruby: '#701516',
+      Shell: '#89e051',
+      Swift: '#f05138',
+      Kotlin: '#a97bff',
+      Vue: '#41b883',
+      Astro: '#ff5a03',
+      Svelte: '#ff3e00',
+      Dart: '#00b4ab',
+      Otros: '#6e7681'
+    }
+
+    // Intl nos da formatos localizados sin librerías externas
+    const dateFormatter = new Intl.DateTimeFormat('es', { dateStyle: 'long' })
+    const timeFormatter = new Intl.DateTimeFormat('es', { timeStyle: 'short' })
+    const numberFormatter = new Intl.NumberFormat('es', { notation: 'compact' })
+    const relativeFormatter = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const form = $('#search-form')
+    const input = $('#username')
+    const submitButton = form.querySelector('button')
+    const result = $('#result')
+    const rateText = $('#rate-text')
+    const rateFill = $('#rate-fill')
+
+    // Guardamos en memoria las búsquedas ya hechas para no gastar peticiones
+    // (sin autenticación, GitHub solo permite 60 peticiones por hora y por IP)
+    const cache = new Map()
+    let currentController = null
+
+    // Error propio para poder distinguir los distintos fallos al pintar la interfaz
+    class GitHubError extends Error {
+      constructor(type, { status, rateLimit } = {}) {
+        super(type)
+        this.name = 'GitHubError'
+        this.type = type
+        this.status = status
+        this.rateLimit = rateLimit
+      }
+    }
+
+    // Las cabeceras x-ratelimit-* nos dicen cuántas peticiones nos quedan.
+    // GitHub las expone por CORS (access-control-expose-headers), por eso podemos leerlas.
+    function readRateLimit(response) {
+      const { headers } = response
+      if (!headers.has('x-ratelimit-limit')) return null
+
+      return {
+        limit: Number(headers.get('x-ratelimit-limit')),
+        remaining: Number(headers.get('x-ratelimit-remaining')),
+        // x-ratelimit-reset es un timestamp UNIX en SEGUNDOS, Date trabaja en milisegundos
+        reset: new Date(Number(headers.get('x-ratelimit-reset')) * 1000)
+      }
+    }
+
+    async function fetchJSON(path, signal) {
+      // IMPORTANTE: fetch solo rechaza la promesa con errores de RED
+      // (sin conexión, DNS, CORS...). Un 404 o un 500 son respuestas "válidas"
+      // para fetch, así que siempre hay que comprobar response.ok (status 200-299)
+      const response = await fetch(`${API_URL}${path}`, { signal })
+      const rateLimit = readRateLimit(response)
+      if (rateLimit) renderRateLimit(rateLimit)
+
+      if (response.ok) return response.json()
+
+      if (response.status === 404) {
+        throw new GitHubError('not-found', { status: 404 })
+      }
+
+      // Un 403 (o 429) puede ser por límite de peticiones... o por otra cosa.
+      // La cabecera x-ratelimit-remaining a 0 es la que nos confirma el motivo
+      const isRateLimited = [403, 429].includes(response.status) && rateLimit?.remaining === 0
+      if (isRateLimited) {
+        throw new GitHubError('rate-limit', { status: response.status, rateLimit })
+      }
+
+      throw new GitHubError('http', { status: response.status })
+    }
+
+    async function getProfile(username, signal) {
+      const key = username.toLowerCase()
+      if (cache.has(key)) return cache.get(key)
+
+      // Primero el usuario: si no existe, no gastamos otra petición en sus repos
+      const user = await fetchJSON(`/users/${encodeURIComponent(username)}`, signal)
+      const repos = await fetchJSON(`/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=100`, signal)
+
+      const data = { user, repos }
+      cache.set(key, data)
+      return data
+    }
+
+    // Cuenta cuántos repos hay de cada lenguaje usando reduce
+    function countLanguages(repos) {
+      const counts = repos.reduce((acc, repo) => {
+        if (!repo.language) return acc
+        acc[repo.language] = (acc[repo.language] ?? 0) + 1
+        return acc
+      }, {})
+
+      const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a)
+      const total = sorted.reduce((sum, [, count]) => sum + count, 0)
+
+      // Agrupamos los lenguajes menos usados en "Otros" para no saturar la barra
+      const top = sorted.slice(0, MAX_LANGUAGES)
+      const rest = sorted.slice(MAX_LANGUAGES).reduce((sum, [, count]) => sum + count, 0)
+      if (rest > 0) top.push(['Otros', rest])
+
+      return top.map(([name, count]) => ({
+        name,
+        count,
+        percent: (count / total) * 100
+      }))
+    }
+
+    function getTopRepos(repos) {
+      return repos
+        .filter((repo) => !repo.fork)
+        .toSorted((a, b) => b.stargazers_count - a.stargazers_count || b.forks_count - a.forks_count)
+        .slice(0, MAX_REPOS)
+    }
+
+    function getLanguageColor(name) {
+      if (LANGUAGE_COLORS[name]) return LANGUAGE_COLORS[name]
+      // Color estable a partir del nombre para lenguajes que no tenemos en la lista
+      const hue = [...name].reduce((acc, char) => acc + char.charCodeAt(0) * 31, 0) % 360
+      return `hsl(${hue} 60% 55%)`
+    }
+
+    function formatRelative(date) {
+      const seconds = (new Date(date) - Date.now()) / 1000
+      const UNITS = [
+        ['year', 31536000], ['month', 2592000], ['week', 604800],
+        ['day', 86400], ['hour', 3600], ['minute', 60]
+      ]
+
+      for (const [unit, amount] of UNITS) {
+        if (Math.abs(seconds) >= amount) {
+          return relativeFormatter.format(Math.round(seconds / amount), unit)
+        }
+      }
+      return relativeFormatter.format(Math.round(seconds), 'second')
+    }
+
+    // Escapamos el texto que viene de la API antes de meterlo en innerHTML (evita XSS)
+    function escapeHTML(text = '') {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+    }
+
+    function safeURL(url) {
+      if (!url) return null
+      const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`
+      try {
+        return new URL(withProtocol).href
+      } catch {
+        return null
+      }
+    }
+
+    function renderRateLimit({ limit, remaining, reset }) {
+      const percent = limit ? (remaining / limit) * 100 : 0
+      rateFill.style.width = `${percent}%`
+      rateFill.style.background = percent > 30 ? 'var(--green)' : percent > 10 ? 'var(--yellow)' : 'var(--red)'
+      rateText.textContent = `API: ${remaining}/${limit} peticiones · reinicio ${timeFormatter.format(reset)}`
+    }
+
+    function renderLoading() {
+      result.innerHTML = `
+        <div class="profile-layout" aria-busy="true">
+          <div class="skeleton" style="height: 460px"></div>
+          <div class="content">
+            <div class="skeleton" style="height: 96px"></div>
+            <div class="repos">
+              ${'<div class="skeleton" style="height: 110px"></div>'.repeat(MAX_REPOS)}
+            </div>
+          </div>
+        </div>
+      `
+    }
+
+    function renderStatus({ type = '', icon, title, message }) {
+      result.innerHTML = `
+        <section class="status ${type}" role="alert">
+          <div class="icon">${icon}</div>
+          <h2>${title}</h2>
+          <p>${message}</p>
+        </section>
+      `
+    }
+
+    function renderError(error, username) {
+      if (error.type === 'not-found') {
+        renderStatus({
+          type: 'warning',
+          icon: '🔍',
+          title: 'Usuario no encontrado (404)',
+          message: `No existe ningún usuario llamado <code>${escapeHTML(username)}</code> en GitHub. Revisa que esté bien escrito.`
+        })
+        return
+      }
+
+      if (error.type === 'rate-limit') {
+        const { reset, limit } = error.rateLimit
+        renderStatus({
+          type: 'error',
+          icon: '⏳',
+          title: 'Límite de peticiones alcanzado (403)',
+          message: `La API pública de GitHub permite ${limit} peticiones por hora sin autenticación.
+            Podrás volver a buscar a las <strong>${timeFormatter.format(reset)}</strong>
+            (${formatRelative(reset)}).`
+        })
+        return
+      }
+
+      if (error.type === 'http') {
+        renderStatus({
+          type: 'error',
+          icon: '⚠️',
+          title: `Error HTTP ${error.status}`,
+          message: 'GitHub ha respondido con un error inesperado. Inténtalo de nuevo en unos segundos.'
+        })
+        return
+      }
+
+      // Si llegamos aquí, fetch rechazó la promesa: es un error de red
+      renderStatus({
+        type: 'error',
+        icon: '📡',
+        title: 'Error de red',
+        message: 'No hemos podido conectar con GitHub. Comprueba tu conexión a internet.'
+      })
+    }
+
+    function renderProfile({ user, repos }) {
+      const languages = countLanguages(repos)
+      const topRepos = getTopRepos(repos)
+      const blog = safeURL(user.blog)
+
+      const metaItems = [
+        user.company && `🏢 ${escapeHTML(user.company)}`,
+        user.location && `📍 ${escapeHTML(user.location)}`,
+        blog && `🔗 <a href="${escapeHTML(blog)}" target="_blank" rel="noopener">${escapeHTML(user.blog)}</a>`,
+        `📅 En GitHub desde el ${dateFormatter.format(new Date(user.created_at))}`
+      ].filter(Boolean)
+
+      const languagesHTML = languages.length === 0
+        ? '<p class="meta">Este usuario no tiene repositorios con lenguaje detectado.</p>'
+        : `
+          <div class="lang-bar">
+            ${languages.map(({ name, percent }) => `<span style="width: ${percent}%; background: ${getLanguageColor(name)}" title="${escapeHTML(name)}"></span>`).join('')}
+          </div>
+          <ul class="lang-legend">
+            ${languages.map(({ name, percent, count }) => `
+              <li><i style="background: ${getLanguageColor(name)}"></i>${escapeHTML(name)} <small>${percent.toFixed(1)}% · ${count}</small></li>
+            `).join('')}
+          </ul>
+        `
+
+      const reposHTML = topRepos.length === 0
+        ? '<p class="meta">No hay repositorios públicos propios.</p>'
+        : topRepos.map((repo) => `
+          <a class="repo" href="${escapeHTML(repo.html_url)}" target="_blank" rel="noopener">
+            <h3>${escapeHTML(repo.name)}</h3>
+            <p>${escapeHTML(repo.description ?? 'Sin descripción')}</p>
+            <footer>
+              ${repo.language ? `<span class="repo-lang"><i style="background: ${getLanguageColor(repo.language)}"></i>${escapeHTML(repo.language)}</span>` : ''}
+              <span>⭐ ${numberFormatter.format(repo.stargazers_count)}</span>
+              <span>🍴 ${numberFormatter.format(repo.forks_count)}</span>
+              <span>${formatRelative(repo.pushed_at ?? repo.updated_at)}</span>
+            </footer>
+          </a>
+        `).join('')
+
+      result.innerHTML = `
+        <div class="profile-layout">
+          <aside class="card profile">
+            <img src="${escapeHTML(user.avatar_url)}" alt="Avatar de ${escapeHTML(user.login)}" width="220" height="220">
+            <h1>${escapeHTML(user.name ?? user.login)}</h1>
+            <a class="login" href="${escapeHTML(user.html_url)}" target="_blank" rel="noopener">@${escapeHTML(user.login)}</a>
+            ${user.bio ? `<p class="bio">${escapeHTML(user.bio)}</p>` : ''}
+            <div class="stats">
+              <div><strong>${numberFormatter.format(user.followers)}</strong><span>seguidores</span></div>
+              <div><strong>${numberFormatter.format(user.following)}</strong><span>siguiendo</span></div>
+              <div><strong>${numberFormatter.format(user.public_repos)}</strong><span>repos</span></div>
+            </div>
+            <ul class="meta">${metaItems.map((item) => `<li>${item}</li>`).join('')}</ul>
+          </aside>
+
+          <div class="content">
+            <section class="card">
+              <h2>Lenguajes más usados <small class="muted">(en sus últimos ${repos.length} repos)</small></h2>
+              ${languagesHTML}
+            </section>
+            <section>
+              <h2>⭐ Repositorios más populares</h2>
+              <div class="repos">${reposHTML}</div>
+            </section>
+          </div>
+        </div>
+      `
+    }
+
+    async function search(rawUsername) {
+      const username = rawUsername.trim().replace(/^@/, '')
+      if (!username) return
+
+      if (!USERNAME_REGEX.test(username)) {
+        renderStatus({
+          type: 'warning',
+          icon: '✏️',
+          title: 'Nombre de usuario no válido',
+          message: 'Solo puede tener letras, números y guiones (sin empezar ni acabar en guion) y máximo 39 caracteres.'
+        })
+        return
+      }
+
+      // Si el usuario busca otra cosa antes de que termine la búsqueda anterior,
+      // la cancelamos para que una respuesta lenta no pise a la nueva
+      currentController?.abort()
+      const controller = new AbortController()
+      currentController = controller
+
+      input.value = username
+      submitButton.disabled = true
+      if (!cache.has(username.toLowerCase())) renderLoading()
+
+      try {
+        const data = await getProfile(username, controller.signal)
+        renderProfile(data)
+        document.title = `44 - ${data.user.login} en GitHub`
+      } catch (error) {
+        if (error.name === 'AbortError') return
+        renderError(error, username)
+      } finally {
+        if (currentController === controller) submitButton.disabled = false
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      search(input.value)
+    })
+
+    $('.suggestions').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-user]')
+      if (button) search(button.dataset.user)
+    })
+
+    search(DEFAULT_USER)
+  </script>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <circle cx="10" cy="8" r="4" />
+        <path d="M3 20c0-3.5 3-6 7-6 1.4 0 2.6.3 3.6.8" />
+        <circle cx="17.5" cy="16.5" r="3" stroke="#2f81f7" />
+        <path d="m19.7 18.7 2.3 2.3" stroke="#2f81f7" />
+      </svg>
+      Perfil de GitHub
+    </div>
+
+    <form id="search-form" role="search">
+      <input id="username" name="username" type="search" placeholder="Busca un usuario de GitHub..." autocomplete="off"
+        spellcheck="false" aria-label="Nombre de usuario de GitHub">
+      <button type="submit">Buscar</button>
+    </form>
+
+    <div class="rate" aria-live="polite">
+      <span id="rate-text">API: comprobando límite de peticiones...</span>
+      <div class="rate-bar"><span id="rate-fill"></span></div>
+    </div>
+  </header>
+
+  <nav class="suggestions" aria-label="Usuarios de ejemplo">
+    Prueba con:
+    <button data-user="midudev">midudev</button>
+    <button data-user="torvalds">torvalds</button>
+    <button data-user="gaearon">gaearon</button>
+    <button data-user="sindresorhus">sindresorhus</button>
+    <button data-user="usuario-que-no-existe-404">un usuario que no existe</button>
+  </nav>
+
+  <main id="result"></main>
+</body>
+
+</html>

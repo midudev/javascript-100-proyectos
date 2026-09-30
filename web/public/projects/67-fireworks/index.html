@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>67 - Fuegos artificiales</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --glass: #0d1024b3;
+      --line: #ffffff1f;
+      --text: #f1f3ff;
+      --muted: #a3a9c9;
+      --accent: #ff5fa2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background:
+        radial-gradient(1px 1px at 12% 18%, #fff9 50%, transparent),
+        radial-gradient(1px 1px at 34% 8%, #fff7 50%, transparent),
+        radial-gradient(1.5px 1.5px at 58% 14%, #fff8 50%, transparent),
+        radial-gradient(1px 1px at 72% 30%, #fff6 50%, transparent),
+        radial-gradient(1px 1px at 88% 12%, #fff9 50%, transparent),
+        radial-gradient(1.5px 1.5px at 22% 42%, #fff5 50%, transparent),
+        radial-gradient(1px 1px at 94% 46%, #fff6 50%, transparent),
+        radial-gradient(1px 1px at 46% 36%, #fff5 50%, transparent),
+        linear-gradient(#04051a, #140b2e 70%, #2a1340);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: none;
+      /*
+        El canvas tiene fondo negro y se mezcla con 'screen' sobre el cielo
+        de CSS: el negro no aporta nada y solo se ven las luces.
+      */
+      mix-blend-mode: screen;
+    }
+
+    .skyline {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 18vh;
+      min-height: 90px;
+      pointer-events: none;
+    }
+
+    .hud {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      translate: -50% 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 16px;
+      width: max-content;
+      max-width: calc(100% - 32px);
+      padding: 10px 14px;
+      background: var(--glass);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+
+    .types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    button {
+      font: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+
+    button:hover {
+      background: #ffffff14;
+    }
+
+    button[aria-pressed="true"] {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .switch input {
+      accent-color: var(--accent);
+    }
+
+    .counter {
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      min-width: 150px;
+    }
+
+    .counter strong {
+      color: var(--text);
+    }
+
+    .hint {
+      position: fixed;
+      top: 86px;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      pointer-events: none;
+      transition: opacity 1s;
+      text-shadow: 0 1px 4px #000;
+    }
+
+    .hint.is-hidden {
+      opacity: 0;
+    }
+
+    @media (max-width: 720px) {
+      .hud {
+        top: 8px;
+        gap: 6px 10px;
+      }
+
+      .hint {
+        top: auto;
+        bottom: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <svg class="skyline" viewBox="0 0 1200 160" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#03040d"
+      d="M0 160V96h40V70h30v26h20V40h46v56h24V84h36V58h18V30h40v66h22V76h40v84zM330 160V88h28V50h50v38h20V64h36v96zM460 160V36h24V20h30v16h24v124zM530 160V80h44V56h34v24h26V94h40V66h50v94zM720 160V46h30V26h44v20h30v114zM820 160V90h40V72h36v18h26V56h48v104zM960 160V70h34V44h40v26h24v90zM1050 160V92h36V64h46v28h24V52h44v108z" />
+    <g fill="#ffd57a" opacity=".55">
+      <rect x="96" y="52" width="6" height="8" />
+      <rect x="112" y="68" width="6" height="8" />
+      <rect x="220" y="44" width="6" height="8" />
+      <rect x="372" y="62" width="6" height="8" />
+      <rect x="492" y="50" width="6" height="8" />
+      <rect x="506" y="80" width="6" height="8" />
+      <rect x="742" y="60" width="6" height="8" />
+      <rect x="770" y="90" width="6" height="8" />
+      <rect x="880" y="100" width="6" height="8" />
+      <rect x="986" y="84" width="6" height="8" />
+      <rect x="1106" y="80" width="6" height="8" />
+      <rect x="1150" y="66" width="6" height="8" />
+    </g>
+  </svg>
+
+  <div class="hud">
+    <h1>🎆 Fuegos artificiales</h1>
+    <div class="types" id="types" role="group" aria-label="Tipo de explosión">
+      <button type="button" data-type="random">🎲 Aleatorio</button>
+      <button type="button" data-type="peony">⚪ Círculo</button>
+      <button type="button" data-type="heart">❤️ Corazón</button>
+      <button type="button" data-type="ring">⭕ Anillo</button>
+      <button type="button" data-type="palm">🌴 Palmera</button>
+    </div>
+    <label class="switch"><input type="checkbox" id="auto" checked> Automático</label>
+    <span class="counter" id="counter"></span>
+  </div>
+  <p class="hint" id="hint">Haz click en el cielo para lanzar un cohete</p>
+
+  <script type="module">
+    const MAX_PARTICLES = 8000
+    // Valores pensados para 60 fps; con delta time los escalamos
+    const GRAVITY = 0.045
+    const FRICTION = 0.982
+    const TYPES = ['peony', 'heart', 'ring', 'palm']
+    const AUTO_MIN_MS = 500
+    const AUTO_MAX_MS = 1300
+    // Cacheamos los colores: así no creamos un string nuevo por partícula y frame
+    const COLORS = Array.from({ length: 360 }, (_, hue) => `hsl(${hue} 100% 62%)`)
+    const LIGHT_COLORS = Array.from({ length: 360 }, (_, hue) => `hsl(${hue} 100% 86%)`)
+
+    const canvas = document.querySelector('#canvas')
+    const ctx = canvas.getContext('2d')
+    const $counter = document.querySelector('#counter')
+    const $auto = document.querySelector('#auto')
+    const $hint = document.querySelector('#hint')
+
+    let width = 0
+    let height = 0
+    let selectedType = 'random'
+    let rockets = []
+    let lastTime = performance.now()
+    let nextAutoLaunch = 0
+
+    /*
+      POOL DE OBJETOS
+      Una explosión crea cientos de partículas que viven 1-2 segundos.
+      Si hiciéramos `new Particle()` cada vez, el recolector de basura
+      (GC) tendría que liberar miles de objetos por segundo y eso provoca
+      pequeños tirones. En su lugar creamos TODAS las partículas al
+      principio y las reciclamos: `free` es una pila de partículas libres
+      y `active` la lista de las que se están dibujando.
+    */
+    const pool = Array.from({ length: MAX_PARTICLES }, createParticle)
+    const free = [...pool]
+    const active = []
+
+    function createParticle() {
+      return {
+        x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0,
+        life: 0, decay: 0, hue: 0, size: 1,
+        gravity: 1, friction: FRICTION, sparkle: false, emitter: false
+      }
+    }
+
+    function acquire() {
+      const particle = free.pop()
+      // Si el pool se agota simplemente no creamos más (mejor que bloquear)
+      if (!particle) return null
+      active.push(particle)
+      return particle
+    }
+
+    function release(index) {
+      // Borrado O(1): movemos la última al hueco en lugar de usar splice
+      const particle = active[index]
+      active[index] = active[active.length - 1]
+      active.pop()
+      free.push(particle)
+    }
+
+    function spawn(x, y, vx, vy, options = {}) {
+      const p = acquire()
+      if (!p) return null
+      p.x = p.prevX = x
+      p.y = p.prevY = y
+      p.vx = vx
+      p.vy = vy
+      p.life = 1
+      p.decay = options.decay ?? 0.012 + Math.random() * 0.012
+      p.hue = Math.round(((options.hue ?? 0) % 360 + 360) % 360)
+      p.size = options.size ?? 2
+      p.gravity = options.gravity ?? 1
+      p.friction = options.friction ?? FRICTION
+      p.sparkle = options.sparkle ?? Math.random() < 0.3
+      p.emitter = options.emitter ?? false
+      return p
+    }
+
+    // --- Tipos de explosión ---
+
+    function randomBetween(min, max) {
+      return min + Math.random() * (max - min)
+    }
+
+    function explodePeony(x, y, hue) {
+      const count = 160
+      for (let i = 0; i < count; i++) {
+        // Velocidad radial: un ángulo y una rapidez → componentes x/y con cos/sin
+        const angle = Math.random() * Math.PI * 2
+        // sqrt reparte las partículas uniformemente por el área del círculo
+        const speed = Math.sqrt(Math.random()) * 6.5
+        spawn(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, { hue: hue + randomBetween(-15, 15) })
+      }
+    }
+
+    function explodeHeart(x, y, hue) {
+      const count = 120
+      const scale = randomBetween(0.32, 0.4)
+      for (let i = 0; i < count; i++) {
+        // Curva paramétrica del corazón: x = 16·sin³t, y = 13cos t − 5cos 2t − 2cos 3t − cos 4t
+        const t = (i / count) * Math.PI * 2
+        const hx = 16 * Math.sin(t) ** 3
+        const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+        // El eje Y del canvas va hacia abajo: invertimos hy
+        spawn(x, y, hx * scale, -hy * scale, { hue: hue + randomBetween(-8, 8), gravity: 0.35, decay: 0.011, sparkle: false })
+      }
+      explodeGlitter(x, y, hue, 30)
+    }
+
+    function explodeRing(x, y, hue) {
+      const count = 90
+      const speed = randomBetween(5, 6.5)
+      // Achatamos y giramos el círculo para simular un anillo visto en 3D
+      const tilt = randomBetween(0.25, 0.6)
+      const rotation = Math.random() * Math.PI
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2
+        const rx = Math.cos(angle) * speed
+        const ry = Math.sin(angle) * speed * tilt
+        const vx = rx * Math.cos(rotation) - ry * Math.sin(rotation)
+        const vy = rx * Math.sin(rotation) + ry * Math.cos(rotation)
+        spawn(x, y, vx, vy, { hue, gravity: 0.6, decay: 0.014, size: 2.5 })
+      }
+      explodeGlitter(x, y, hue + 180, 40)
+    }
+
+    function explodePalm(x, y, hue) {
+      const branches = Math.round(randomBetween(9, 13))
+      for (let i = 0; i < branches; i++) {
+        // Ramas pesadas, sesgadas hacia arriba, que van soltando chispas
+        const angle = -Math.PI / 2 + ((i / (branches - 1)) - 0.5) * Math.PI * 1.5
+        const speed = randomBetween(5, 7)
+        spawn(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, {
+          hue: 42, size: 3.2, gravity: 1.6, friction: 0.975, decay: 0.009, emitter: true, sparkle: false
+        })
+      }
+      explodeGlitter(x, y, hue, 25)
+    }
+
+    function explodeGlitter(x, y, hue, count) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2
+        const speed = Math.random() * 2.5
+        spawn(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, { hue, size: 1.5, decay: 0.02, sparkle: true })
+      }
+    }
+
+    const EXPLOSIONS = {
+      peony: explodePeony,
+      heart: explodeHeart,
+      ring: explodeRing,
+      palm: explodePalm
+    }
+
+    function explode(x, y, type, hue) {
+      const finalType = type === 'random' ? TYPES[Math.floor(Math.random() * TYPES.length)] : type
+      const finalHue = finalType === 'heart' ? randomBetween(330, 360) : hue
+      EXPLOSIONS[finalType](x, y, finalHue)
+      // Destello blanco inicial
+      ctx.globalCompositeOperation = 'lighter'
+      const flash = ctx.createRadialGradient(x, y, 0, x, y, 80)
+      flash.addColorStop(0, 'rgba(255, 240, 220, 0.5)')
+      flash.addColorStop(1, 'rgba(255, 240, 220, 0)')
+      ctx.fillStyle = flash
+      ctx.fillRect(x - 80, y - 80, 160, 160)
+    }
+
+    // --- Cohetes ---
+
+    function launch(targetX, targetY, type = selectedType) {
+      const startX = Math.min(width - 20, Math.max(20, targetX + randomBetween(-0.15, 0.15) * width))
+      const dx = targetX - startX
+      const dy = targetY - height
+      const distance = Math.hypot(dx, dy)
+      rockets.push({
+        x: startX,
+        y: height,
+        // Dirección normalizada hacia el objetivo
+        dirX: dx / distance,
+        dirY: dy / distance,
+        speed: 3,
+        traveled: 0,
+        distance,
+        targetX,
+        targetY,
+        hue: Math.floor(Math.random() * 360),
+        type
+      })
+    }
+
+    function updateRockets(dt) {
+      for (let i = rockets.length - 1; i >= 0; i--) {
+        const rocket = rockets[i]
+        const prevX = rocket.x
+        const prevY = rocket.y
+
+        // Acelera un poco en cada frame, como un cohete de verdad
+        rocket.speed = Math.min(rocket.speed * (1 + 0.035 * dt), 14)
+        const step = rocket.speed * dt
+        rocket.x += rocket.dirX * step
+        rocket.y += rocket.dirY * step
+        rocket.traveled += step
+
+        // Estela de chispas (también salen del pool)
+        spawn(rocket.x, rocket.y, randomBetween(-0.4, 0.4), randomBetween(0.5, 1.5), {
+          hue: 35, size: 1.4, decay: 0.05, gravity: 0.3, sparkle: false
+        })
+
+        ctx.strokeStyle = LIGHT_COLORS[40]
+        ctx.lineWidth = 2.5
+        ctx.globalAlpha = 1
+        ctx.beginPath()
+        ctx.moveTo(prevX, prevY)
+        ctx.lineTo(rocket.x, rocket.y)
+        ctx.stroke()
+
+        if (rocket.traveled >= rocket.distance) {
+          explode(rocket.targetX, rocket.targetY, rocket.type, rocket.hue)
+          rockets.splice(i, 1)
+        }
+      }
+    }
+
+    // --- Partículas ---
+
+    function updateParticles(dt) {
+      // Recorremos al revés para poder eliminar sin saltarnos ninguna
+      for (let i = active.length - 1; i >= 0; i--) {
+        const p = active[i]
+        p.prevX = p.x
+        p.prevY = p.y
+
+        // Física básica: la fricción frena, la gravedad tira hacia abajo
+        const friction = p.friction ** dt
+        p.vx *= friction
+        p.vy *= friction
+        p.vy += GRAVITY * p.gravity * dt
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        p.life -= p.decay * dt
+
+        if (p.emitter && Math.random() < 0.6) {
+          spawn(p.x, p.y, randomBetween(-0.3, 0.3), randomBetween(-0.2, 0.4), {
+            hue: 38, size: 1.3, decay: 0.03, gravity: 0.5, sparkle: true
+          })
+        }
+
+        if (p.life <= 0 || p.y > height + 20) {
+          release(i)
+          continue
+        }
+
+        // Las partículas "sparkle" parpadean al final de su vida
+        const flicker = p.sparkle && p.life < 0.5 && Math.random() < 0.4
+        ctx.globalAlpha = flicker ? 0.15 : Math.min(1, p.life * 1.4)
+        ctx.strokeStyle = flicker ? LIGHT_COLORS[p.hue] : COLORS[p.hue]
+        ctx.lineWidth = p.size * (0.5 + p.life * 0.5)
+        ctx.beginPath()
+        ctx.moveTo(p.prevX, p.prevY)
+        ctx.lineTo(p.x, p.y)
+        ctx.stroke()
+      }
+    }
+
+    // --- Bucle principal ---
+
+    function drawBackground() {
+      /*
+        En lugar de borrar el canvas, pintamos encima un fondo
+        semitransparente: lo que había se va oscureciendo poco a poco y
+        deja una estela detrás de cada partícula.
+      */
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 1
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+      ctx.fillRect(0, 0, width, height)
+
+      // Truco: con 8 bits por canal, multiplicar por 0.8 nunca llega a 0
+      // (2 · 0.8 redondea otra vez a 2) y quedan "fantasmas" de las estelas.
+      // 'color-burn' con un gris casi blanco manda esos valores mínimos a negro.
+      ctx.globalCompositeOperation = 'color-burn'
+      ctx.fillStyle = '#fcfcfc'
+      ctx.fillRect(0, 0, width, height)
+    }
+
+    function loop(now) {
+      // Delta time normalizado a 60 fps (1 = un frame de 16,6 ms).
+      // Lo limitamos para que al volver de otra pestaña no haya saltos.
+      const dt = Math.min((now - lastTime) / (1000 / 60), 3)
+      lastTime = now
+
+      drawBackground()
+
+      /*
+        'lighter' SUMA los colores de lo que se dibuja con lo que ya hay.
+        Donde se solapan muchas partículas el color se acerca al blanco,
+        creando un brillo natural sin necesidad de filtros ni sombras.
+      */
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.lineCap = 'round'
+      updateRockets(dt)
+      updateParticles(dt)
+
+      if ($auto.checked && now >= nextAutoLaunch) {
+        launchRandom()
+        nextAutoLaunch = now + randomBetween(AUTO_MIN_MS, AUTO_MAX_MS)
+      }
+
+      requestAnimationFrame(loop)
+    }
+
+    function launchRandom() {
+      launch(randomBetween(0.15, 0.85) * width, randomBetween(0.15, 0.45) * height)
+    }
+
+    function updateCounter() {
+      $counter.innerHTML = `Partículas: <strong>${active.length}</strong> / ${MAX_PARTICLES} · libres: ${free.length}`
+    }
+
+    function resize() {
+      // Ajustamos el tamaño real del canvas a la densidad de píxeles de la pantalla
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = Math.round(width * dpr)
+      canvas.height = Math.round(height * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, width, height)
+    }
+
+    // --- Eventos ---
+
+    canvas.addEventListener('pointerdown', (event) => {
+      launch(event.clientX, event.clientY)
+      $hint.classList.add('is-hidden')
+    })
+
+    document.querySelector('#types').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      selectedType = button.dataset.type
+      document.querySelectorAll('#types button').forEach(b => b.setAttribute('aria-pressed', b === button))
+    })
+
+    window.addEventListener('resize', resize)
+    setInterval(updateCounter, 200)
+
+    resize()
+    document.querySelector('[data-type="random"]').setAttribute('aria-pressed', 'true')
+
+    // Empezamos con algunas explosiones para que el cielo no esté vacío
+    explode(width * 0.28, height * 0.32, 'peony', 200)
+    explode(width * 0.52, height * 0.24, 'heart', 340)
+    explode(width * 0.76, height * 0.36, 'ring', 50)
+    launch(width * 0.4, height * 0.3, 'palm')
+    nextAutoLaunch = performance.now() + 600
+    requestAnimationFrame(loop)
+  </script>
+</body>
+
+</html>

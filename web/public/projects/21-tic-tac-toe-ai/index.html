@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>21 - Tres en raya imbatible</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --x: #4f46e5;
+      --o: #e11d48;
+      --win: #fef08a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 10% 10%, #e0e7ff, transparent 40%),
+        radial-gradient(circle at 90% 90%, #ffe4e6, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: auto 350px;
+      align-items: center;
+      gap: 40px;
+      padding: 16px;
+    }
+
+    /* --- Tablero --- */
+    .board-wrapper {
+      position: relative;
+      width: min(88vw, calc(100dvh - 60px), 480px);
+      aspect-ratio: 1;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 0;
+      padding: 18%;
+      border: 0;
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px -12px rgba(15, 23, 42, 0.2);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.3s;
+    }
+
+    .cell:not(:disabled):hover {
+      transform: translateY(-2px);
+    }
+
+    .cell:disabled {
+      cursor: default;
+    }
+
+    .cell.is-winner {
+      background: var(--win);
+    }
+
+    .cell svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Animación de "dibujado": el trazo empieza oculto (dashoffset = longitud) y se va mostrando */
+    .cell path,
+    .cell circle {
+      fill: none;
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+    }
+
+    .cell.is-new path,
+    .cell.is-new circle {
+      stroke-dashoffset: 100;
+      animation: draw 0.35s ease-out forwards;
+    }
+
+    .cell .mark-x {
+      stroke: var(--x);
+    }
+
+    .cell .mark-o {
+      stroke: var(--o);
+    }
+
+    @keyframes draw {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .hint {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      translate: -50% 0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .hint.win {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .hint.draw {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .hint.lose {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .strike {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .strike line {
+      stroke: var(--text);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 400;
+      stroke-dashoffset: 400;
+      animation: strike 0.5s 0.2s ease-out forwards;
+      opacity: 0.75;
+    }
+
+    @keyframes strike {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    /* --- Panel --- */
+    .panel {
+      display: grid;
+      gap: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    h1 small {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0;
+      color: var(--muted);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field>span {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: flex;
+      padding: 4px;
+      border-radius: 12px;
+      background: #e2e8f0;
+    }
+
+    .segmented button {
+      flex: 1;
+      padding: 8px 6px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed='true'] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+    }
+
+    .scores {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .score {
+      padding: 10px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .score small {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .score strong {
+      font-size: 1.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score.x strong {
+      color: var(--x);
+    }
+
+    .score.o strong {
+      color: var(--o);
+    }
+
+    .status {
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--text);
+      color: white;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .actions button {
+      flex: 1;
+      padding: 11px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .actions .primary {
+      border-color: var(--x);
+      background: var(--x);
+      color: white;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--x);
+    }
+
+    .stats {
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+      min-height: 2.8em;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        gap: 20px;
+      }
+
+      .board-wrapper {
+        width: min(calc(100vw - 32px), 420px);
+      }
+
+      .panel {
+        width: min(calc(100vw - 32px), 420px);
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $board = document.querySelector('.board')
+    const $strike = document.querySelector('.strike')
+    const $status = document.querySelector('.status')
+    const $modeButtons = document.querySelectorAll('[data-mode]')
+    const $starterButtons = document.querySelectorAll('[data-starter]')
+    const $scoreX = document.querySelector('#score-x')
+    const $scoreO = document.querySelector('#score-o')
+    const $scoreDraw = document.querySelector('#score-draw')
+    const $labelX = document.querySelector('#label-x')
+    const $labelO = document.querySelector('#label-o')
+    const $hints = document.querySelector('#hints')
+    const $stats = document.querySelector('.stats')
+
+    // CONSTANTES
+    const HUMAN = 'X'
+    const AI = 'O'
+    const WIN_SCORE = 10
+    const EASY_RANDOMNESS = 0.5 // en modo fácil, la mitad de las jugadas son al azar
+    const AI_DELAY = 450 // ms para que parezca que "piensa"
+    const SCORES_KEY = 'tic-tac-toe-scores'
+
+    const LINES = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // filas
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columnas
+      [0, 4, 8], [2, 4, 6] // diagonales
+    ]
+
+    const MARKS = {
+      X: '<svg viewBox="0 0 100 100"><path class="mark-x" pathLength="100" d="M15 15 L85 85 M85 15 L15 85" /></svg>',
+      O: '<svg viewBox="0 0 100 100"><circle class="mark-o" pathLength="100" cx="50" cy="50" r="36" /></svg>'
+    }
+
+    // ESTADO
+    let board = Array(9).fill(null)
+    let currentPlayer = HUMAN
+    let mode = 'hard' // 'hard' | 'easy' | 'pvp'
+    let starter = 'first' // 'first' (tú / X) | 'second' (IA / O)
+    let isGameOver = false
+    let aiTimeoutId = null
+    let nodesVisited = 0
+    let lastMove = null // solo animamos la última ficha colocada
+    let scores = loadScores()
+
+    // LÓGICA DEL JUEGO
+    function getWinner(cells) {
+      for (const line of LINES) {
+        const [a, b, c] = line
+        if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+          return { player: cells[a], line }
+        }
+      }
+      return null
+    }
+
+    function getEmptyCells(cells) {
+      return cells.flatMap((cell, index) => (cell === null ? [index] : []))
+    }
+
+    function getOpponent(player) {
+      return player === 'X' ? 'O' : 'X'
+    }
+
+    // MINIMAX
+    // Imagina el árbol de TODAS las partidas posibles a partir de ahora.
+    // Minimax lo recorre de forma recursiva suponiendo que ambos jugadores
+    // juegan perfecto:
+    //   - En los turnos de `me` elegimos el hijo con la puntuación MÁXIMA.
+    //   - En los turnos del rival suponemos que elegirá la MÍNIMA (lo peor para nosotros).
+    // Las hojas del árbol (partidas terminadas) valen:
+    //   +10 si gana `me`, -10 si pierde, 0 si hay empate.
+    // Restamos la profundidad para preferir ganar ANTES y, si no hay más
+    // remedio, perder lo más TARDE posible (dando más opciones a que el rival se equivoque).
+    //
+    // PODA ALFA-BETA: alfa es lo mejor que `me` ya tiene asegurado y beta lo
+    // mejor que tiene asegurado el rival. Si en una rama beta <= alfa, esa rama
+    // nunca se elegirá, así que dejamos de explorarla. Mismo resultado, muchos
+    // menos nodos visitados.
+    function minimax(cells, turn, me, depth, alpha, beta) {
+      nodesVisited++
+
+      const winner = getWinner(cells)
+      if (winner) return winner.player === me ? WIN_SCORE - depth : depth - WIN_SCORE
+
+      const emptyCells = getEmptyCells(cells)
+      if (emptyCells.length === 0) return 0
+
+      const isMaximizing = turn === me
+      let best = isMaximizing ? -Infinity : Infinity
+
+      for (const index of emptyCells) {
+        cells[index] = turn // probamos la jugada...
+        const score = minimax(cells, getOpponent(turn), me, depth + 1, alpha, beta)
+        cells[index] = null // ...y la deshacemos (backtracking)
+
+        if (isMaximizing) {
+          best = Math.max(best, score)
+          alpha = Math.max(alpha, score)
+        } else {
+          best = Math.min(best, score)
+          beta = Math.min(beta, score)
+        }
+
+        if (beta <= alpha) break // poda
+      }
+
+      return best
+    }
+
+    // Evalúa cada casilla libre desde el punto de vista de `player`
+    function evaluateMoves(cells, player) {
+      const copy = [...cells]
+      return getEmptyCells(copy).map((index) => {
+        copy[index] = player
+        const score = minimax(copy, getOpponent(player), player, 1, -Infinity, Infinity)
+        copy[index] = null
+        return { index, score }
+      })
+    }
+
+    function getBestMove(cells, player) {
+      const moves = evaluateMoves(cells, player)
+      const bestScore = Math.max(...moves.map(({ score }) => score))
+      // Si hay varias jugadas igual de buenas, elegimos una al azar para que no sea monótono
+      const bestMoves = moves.filter(({ score }) => score === bestScore)
+      return bestMoves[Math.floor(Math.random() * bestMoves.length)].index
+    }
+
+    function getAiMove() {
+      const emptyCells = getEmptyCells(board)
+      if (mode === 'easy' && Math.random() < EASY_RANDOMNESS) {
+        return emptyCells[Math.floor(Math.random() * emptyCells.length)]
+      }
+      return getBestMove(board, AI)
+    }
+
+    // FLUJO DE LA PARTIDA
+    function newGame() {
+      clearTimeout(aiTimeoutId)
+      board = Array(9).fill(null)
+      lastMove = null
+      isGameOver = false
+      $strike.replaceChildren()
+      currentPlayer = starter === 'first' ? HUMAN : AI
+      render()
+
+      if (isAiTurn()) scheduleAiMove()
+    }
+
+    function isAiTurn() {
+      return mode !== 'pvp' && currentPlayer === AI && !isGameOver
+    }
+
+    function play(index) {
+      if (isGameOver || board[index] !== null) return
+
+      board[index] = currentPlayer
+      lastMove = index
+      const winner = getWinner(board)
+
+      if (winner || getEmptyCells(board).length === 0) {
+        endGame(winner)
+        return
+      }
+
+      currentPlayer = getOpponent(currentPlayer)
+      render()
+
+      if (isAiTurn()) scheduleAiMove()
+    }
+
+    function scheduleAiMove() {
+      aiTimeoutId = setTimeout(() => {
+        nodesVisited = 0
+        const start = performance.now()
+        const move = getAiMove()
+        const elapsed = performance.now() - start
+
+        $stats.textContent = nodesVisited > 0
+          ? `🧠 La IA ha analizado ${nodesVisited.toLocaleString('es')} posiciones en ${elapsed.toFixed(1)} ms (con poda alfa-beta).`
+          : '🎲 La IA ha jugado al azar esta vez.'
+
+        play(move)
+      }, AI_DELAY)
+    }
+
+    function endGame(winner) {
+      isGameOver = true
+      const result = winner ? winner.player : 'draw'
+      scores[mode][result]++
+      saveScores()
+      render(winner)
+      if (winner) drawStrike(winner.line)
+    }
+
+    // RENDER
+    function render(winner = null) {
+      const hints = getHints()
+
+      $board.replaceChildren(...board.map((cell, index) => {
+        const $cell = document.createElement('button')
+        $cell.className = 'cell'
+        $cell.dataset.index = index
+        $cell.disabled = cell !== null || isGameOver || isAiTurn()
+        $cell.setAttribute('aria-label', cell ? `Casilla ${index + 1}: ${cell}` : `Casilla ${index + 1} vacía`)
+        if (cell) $cell.innerHTML = MARKS[cell]
+        if (index === lastMove) $cell.classList.add('is-new')
+        if (winner?.line.includes(index)) $cell.classList.add('is-winner')
+
+        const hint = hints.get(index)
+        if (hint) {
+          const $hint = document.createElement('span')
+          $hint.className = `hint ${hint.type}`
+          $hint.textContent = hint.label
+          $cell.append($hint)
+        }
+
+        return $cell
+      }))
+
+      renderStatus(winner)
+      renderScores()
+    }
+
+    function getHints() {
+      const hints = new Map()
+      if (!$hints.checked || isGameOver || isAiTurn()) return hints
+
+      // Pedimos a minimax que evalúe cada casilla para el jugador que tiene el turno
+      for (const { index, score } of evaluateMoves(board, currentPlayer)) {
+        if (score > 0) hints.set(index, { type: 'win', label: 'Ganas' })
+        else if (score < 0) hints.set(index, { type: 'lose', label: 'Pierdes' })
+        else hints.set(index, { type: 'draw', label: 'Empate' })
+      }
+      return hints
+    }
+
+    function renderStatus(winner) {
+      const isPvp = mode === 'pvp'
+
+      if (isGameOver) {
+        if (!winner) $status.textContent = '🤝 ¡Empate!'
+        else if (isPvp) $status.textContent = `🏆 ¡Gana ${winner.player}!`
+        else $status.textContent = winner.player === HUMAN ? '🎉 ¡Has ganado!' : '🤖 Gana la IA'
+        return
+      }
+
+      if (isPvp) $status.textContent = `Turno de ${currentPlayer}`
+      else $status.textContent = currentPlayer === HUMAN ? 'Tu turno (X)' : '🤔 La IA está pensando…'
+    }
+
+    function renderScores() {
+      const current = scores[mode]
+      const isPvp = mode === 'pvp'
+
+      $scoreX.textContent = current.X
+      $scoreO.textContent = current.O
+      $scoreDraw.textContent = current.draw
+      $labelX.textContent = isPvp ? 'Jugador X' : 'Tú (X)'
+      $labelO.textContent = isPvp ? 'Jugador O' : 'IA (O)'
+
+      $starterButtons[0].textContent = isPvp ? 'X' : 'Tú'
+      $starterButtons[1].textContent = isPvp ? 'O' : 'IA'
+    }
+
+    function drawStrike(line) {
+      const first = line[0]
+      const last = line[2]
+
+      // Centro de cada casilla en un sistema de coordenadas de 0 a 300
+      const center = (index) => ({ x: (index % 3) * 100 + 50, y: Math.floor(index / 3) * 100 + 50 })
+      const from = center(first)
+      const to = center(last)
+
+      // Alargamos un poco la línea por ambos extremos
+      const dx = (to.x - from.x) * 0.15
+      const dy = (to.y - from.y) * 0.15
+
+      $strike.innerHTML = `<line x1="${from.x - dx}" y1="${from.y - dy}" x2="${to.x + dx}" y2="${to.y + dy}" />`
+    }
+
+    // MARCADOR (sessionStorage: dura mientras la pestaña esté abierta)
+    function loadScores() {
+      const empty = () => ({ X: 0, O: 0, draw: 0 })
+      const fallback = { hard: empty(), easy: empty(), pvp: empty() }
+      try {
+        return { ...fallback, ...JSON.parse(sessionStorage.getItem(SCORES_KEY)) }
+      } catch {
+        return fallback
+      }
+    }
+
+    function saveScores() {
+      try {
+        sessionStorage.setItem(SCORES_KEY, JSON.stringify(scores))
+      } catch {
+        // almacenamiento no disponible
+      }
+    }
+
+    function resetScores() {
+      scores[mode] = { X: 0, O: 0, draw: 0 }
+      saveScores()
+      renderScores()
+    }
+
+    // EVENTOS
+    $board.addEventListener('click', (event) => {
+      const $cell = event.target.closest('.cell')
+      if (!$cell || $cell.disabled) return
+      play(Number($cell.dataset.index))
+    })
+
+    function setupSegmented($buttons, onChange) {
+      $buttons.forEach(($button) => {
+        $button.addEventListener('click', () => {
+          $buttons.forEach(($b) => $b.setAttribute('aria-pressed', String($b === $button)))
+          onChange($button)
+          newGame()
+        })
+      })
+    }
+
+    setupSegmented($modeButtons, ($button) => { mode = $button.dataset.mode })
+    setupSegmented($starterButtons, ($button) => { starter = $button.dataset.starter })
+
+    $hints.addEventListener('change', () => {
+      if (!isGameOver) render()
+    })
+
+    document.querySelector('#new-game').addEventListener('click', newGame)
+    document.querySelector('#reset-scores').addEventListener('click', resetScores)
+
+    newGame()
+  </script>
+</head>
+
+<body>
+  <main>
+    <div class="board-wrapper">
+      <div class="board" aria-label="Tablero"></div>
+      <svg class="strike" viewBox="0 0 300 300" aria-hidden="true"></svg>
+    </div>
+
+    <aside class="panel">
+      <h1>Tres en raya imbatible<small>Una IA con minimax que nunca pierde</small></h1>
+
+      <div class="field">
+        <span>Modo</span>
+        <div class="segmented">
+          <button data-mode="hard" aria-pressed="true">🤖 Imbatible</button>
+          <button data-mode="easy" aria-pressed="false">🙂 Fácil</button>
+          <button data-mode="pvp" aria-pressed="false">👥 2 jugadores</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>Empieza</span>
+        <div class="segmented">
+          <button data-starter="first" aria-pressed="true">Tú</button>
+          <button data-starter="second" aria-pressed="false">IA</button>
+        </div>
+      </div>
+
+      <div class="scores">
+        <div class="score x"><small id="label-x">Tú (X)</small><strong id="score-x">0</strong></div>
+        <div class="score"><small>Empates</small><strong id="score-draw">0</strong></div>
+        <div class="score o"><small id="label-o">IA (O)</small><strong id="score-o">0</strong></div>
+      </div>
+
+      <p class="status" aria-live="polite"></p>
+
+      <div class="actions">
+        <button id="new-game" class="primary">Nueva partida</button>
+        <button id="reset-scores">Borrar marcador</button>
+      </div>
+
+      <label class="toggle"><input id="hints" type="checkbox" checked> Mostrar lo que calcula minimax en cada casilla</label>
+      <p class="stats">Con juego perfecto por ambas partes, el tres en raya siempre acaba en empate.</p>
+    </aside>
+  </main>
+</body>
+
+</html>

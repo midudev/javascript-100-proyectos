@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>72 - Carrusel</title>
+  <style>
+    :root {
+      --bg: #f3f1ec;
+      --ink: #1d1b18;
+      --muted: #6f6a60;
+      --line: #e1ddd3;
+      --accent: #e8590c;
+      --duration: 5s;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 20px 16px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .page {
+      width: min(1100px, 100%, calc((100dvh - 190px) * 16 / 9));
+      min-width: min(100%, 320px);
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px 16px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* --- Carrusel --- */
+    .carousel {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      background: #d9d4c9;
+      box-shadow: 0 30px 60px -30px #0006;
+    }
+
+    /*
+      Todo el carrusel es SCROLL NATIVO: funciona con el dedo, el trackpad,
+      la rueda y el teclado sin una sola línea de JS para arrastrar.
+      - scroll-snap-type: x mandatory → al soltar, siempre se ajusta a una diapositiva
+      - scroll-snap-align: start → el punto de anclaje es el borde izquierdo
+      - scroll-snap-stop: always → un gesto rápido no se salta diapositivas
+    */
+    .track {
+      position: relative;
+      display: flex;
+      aspect-ratio: 16 / 9;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      outline: none;
+    }
+
+    .track::-webkit-scrollbar {
+      display: none;
+    }
+
+    .track:focus-visible {
+      box-shadow: inset 0 0 0 4px var(--accent);
+    }
+
+    .slide {
+      position: relative;
+      flex: 0 0 100%;
+      margin: 0;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+
+    .slide img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .slide figcaption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 60px 32px 26px;
+      color: #fff;
+      background: linear-gradient(transparent, #000a);
+      text-align: right;
+    }
+
+    .slide h2 {
+      margin: 0;
+      font-size: clamp(22px, 3.2vw, 38px);
+      letter-spacing: -0.02em;
+      text-shadow: 0 2px 12px #0006;
+    }
+
+    .slide p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      opacity: .85;
+    }
+
+    .arrow {
+      position: absolute;
+      top: 50%;
+      translate: 0 -50%;
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 50%;
+      background: #ffffffd9;
+      color: var(--ink);
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px #0003;
+      backdrop-filter: blur(6px);
+      transition: transform .15s, background .15s;
+    }
+
+    .arrow:hover {
+      background: #fff;
+      transform: scale(1.08);
+    }
+
+    .arrow:focus-visible,
+    .controls button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .prev {
+      left: 16px;
+    }
+
+    .next {
+      right: 16px;
+    }
+
+    .progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: #ffffff40;
+    }
+
+    .progress div {
+      height: 100%;
+      background: #fff;
+      transform-origin: left;
+      transform: scaleX(0);
+    }
+
+    /* --- Controles inferiores --- */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .counter {
+      font-size: 14px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .counter strong {
+      color: var(--ink);
+    }
+
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dots button {
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: #c9c3b6;
+      cursor: pointer;
+      transition: width .3s, background .3s;
+    }
+
+    .dots button[aria-current="true"] {
+      width: 32px;
+      background: var(--accent);
+    }
+
+    .autoplay {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .autoplay button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .arrow {
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+      }
+
+      .slide figcaption {
+        padding: 40px 18px 16px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr auto;
+      }
+
+      .dots {
+        grid-column: 1 / -1;
+        justify-content: center;
+        order: -1;
+      }
+
+      #pause-reason {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header>
+      <h1>Carrusel</h1>
+      <p>Desliza, usa las flechas o el teclado · se pausa al pasar el ratón</p>
+    </header>
+
+    <section class="carousel" id="carousel" aria-roledescription="carrusel" aria-label="Fotos de paisajes">
+      <div class="track" id="track" tabindex="0" aria-label="Diapositivas (usa las flechas del teclado)"></div>
+      <div class="progress" aria-hidden="true">
+        <div id="progress"></div>
+      </div>
+      <button class="arrow prev" id="prev" type="button" aria-label="Diapositiva anterior">←</button>
+      <button class="arrow next" id="next" type="button" aria-label="Diapositiva siguiente">→</button>
+    </section>
+
+    <div class="controls">
+      <div class="counter" id="counter"></div>
+      <div class="dots" id="dots" role="group" aria-label="Elegir diapositiva"></div>
+      <div class="autoplay">
+        <span id="pause-reason"></span>
+        <button type="button" id="toggle-autoplay"></button>
+      </div>
+    </div>
+
+    <!-- Región "viva": los lectores de pantalla anuncian la diapositiva actual -->
+    <p class="visually-hidden" id="live" aria-live="polite" aria-atomic="true"></p>
+  </main>
+
+  <script type="module">
+    const AUTOPLAY_MS = 5000
+    // Semillas fijas de picsum.photos: la misma semilla siempre devuelve la misma foto
+    const SLIDES = [
+      { seed: 'lago', title: 'Laguna en el altiplano', author: 'Paula Porto' },
+      { seed: 'montana', title: 'Cañón de arenisca', author: 'Sebastian Boguszewicz' },
+      { seed: 'costa', title: 'Niebla entre colinas', author: 'Francesco Gallarotti' },
+      { seed: 'cascada', title: 'Colina de cipreses', author: 'Anton Sulsky' },
+      { seed: 'bosque', title: 'Estelas de estrellas', author: 'Anna Anikina' },
+      { seed: 'desierto', title: 'La Vía Láctea', author: 'Guillaume' },
+      { seed: 'aurora', title: 'Ciudad bajo la lluvia', author: 'Thanun Buranapong' },
+      { seed: 'valle', title: 'Tejados al atardecer', author: 'Igor Ovsyannykov' }
+    ]
+    const PAUSE_LABELS = {
+      user: 'Pausado',
+      hover: 'Pausado: ratón encima',
+      focus: 'Pausado: tiene el foco',
+      hidden: 'Pausado: pestaña oculta',
+      motion: 'Pausado: reducir movimiento'
+    }
+
+    const $carousel = document.querySelector('#carousel')
+    const $track = document.querySelector('#track')
+    const $dots = document.querySelector('#dots')
+    const $counter = document.querySelector('#counter')
+    const $progress = document.querySelector('#progress')
+    const $toggle = document.querySelector('#toggle-autoplay')
+    const $pauseReason = document.querySelector('#pause-reason')
+    const $live = document.querySelector('#live')
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
+
+    let current = 0
+    let pendingTarget = null
+    let slides = []
+    let dots = []
+    // El autoplay se detiene si hay CUALQUIER motivo de pausa activo
+    const pauseReasons = new Set()
+    let elapsed = 0
+    let lastFrame = performance.now()
+
+    // --- Render ---
+
+    function renderSlides() {
+      slides = SLIDES.map((slide, index) => {
+        const figure = document.createElement('figure')
+        figure.className = 'slide'
+        figure.setAttribute('role', 'group')
+        figure.setAttribute('aria-roledescription', 'diapositiva')
+        figure.setAttribute('aria-label', `${index + 1} de ${SLIDES.length}: ${slide.title}`)
+        figure.dataset.index = index
+
+        const img = document.createElement('img')
+        img.src = `https://picsum.photos/seed/${slide.seed}/1600/900`
+        img.alt = slide.title
+        img.width = 1600
+        img.height = 900
+        img.draggable = false
+        // Solo la primera foto se descarga ya; el resto cuando se acerquen
+        img.loading = index === 0 ? 'eager' : 'lazy'
+        if (index === 0) img.fetchPriority = 'high'
+
+        const caption = document.createElement('figcaption')
+        caption.innerHTML = '<h2></h2><p></p>'
+        caption.querySelector('h2').textContent = slide.title
+        caption.querySelector('p').textContent = `Foto de ${slide.author} · Lorem Picsum`
+
+        figure.append(img, caption)
+        return figure
+      })
+      $track.replaceChildren(...slides)
+
+      dots = SLIDES.map((slide, index) => {
+        const dot = document.createElement('button')
+        dot.type = 'button'
+        dot.setAttribute('aria-label', `Ir a la diapositiva ${index + 1}: ${slide.title}`)
+        dot.addEventListener('click', () => goTo(index))
+        return dot
+      })
+      $dots.replaceChildren(...dots)
+    }
+
+    function updateIndicators() {
+      dots.forEach((dot, index) => dot.setAttribute('aria-current', index === current))
+      $counter.innerHTML = `<strong>${current + 1}</strong> / ${SLIDES.length}`
+      // Mientras rota solo no anunciamos cada cambio (sería muy molesto)
+      if (!isPlaying()) $live.textContent = `Diapositiva ${current + 1} de ${SLIDES.length}: ${SLIDES[current].title}`
+    }
+
+    // --- Navegación ---
+
+    function getScrollBehavior() {
+      return reducedMotion.matches ? 'auto' : 'smooth'
+    }
+
+    function goTo(index) {
+      const target = (index + slides.length) % slides.length
+      pendingTarget = target
+      /*
+        Desplazamiento suave programático. Usamos scrollTo sobre el track con
+        el offsetLeft de la diapositiva (relativo al track, que tiene
+        position: relative). scrollIntoView también serviría, pero puede
+        mover además la página (o la página que contiene el iframe).
+      */
+      $track.scrollTo({ left: slides[target].offsetLeft, behavior: getScrollBehavior() })
+      elapsed = 0
+    }
+
+    // Si hay un desplazamiento en curso partimos de su destino: así dos
+    // clicks rápidos avanzan dos diapositivas. En los extremos damos la vuelta.
+    function next() {
+      goTo((pendingTarget ?? current) + 1)
+    }
+
+    function prev() {
+      goTo((pendingTarget ?? current) - 1)
+    }
+
+    /*
+      ¿Qué diapositiva se ve? En vez de calcularlo en cada evento scroll,
+      un IntersectionObserver nos avisa cuando una diapositiva ocupa al
+      menos el 60% del track. Es más eficiente (lo calcula el navegador)
+      y funciona igual con dedo, rueda, flechas o teclado.
+    */
+    function observeSlides() {
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const index = Number(entry.target.dataset.index)
+          if (index === pendingTarget) pendingTarget = null
+          if (index === current) continue
+          current = index
+          elapsed = 0
+          updateIndicators()
+        }
+      }, { root: $track, threshold: 0.6 })
+
+      slides.forEach(slide => observer.observe(slide))
+    }
+
+    // --- Autoplay ---
+
+    function isPlaying() {
+      return pauseReasons.size === 0
+    }
+
+    function setPaused(reason, paused) {
+      if (paused) pauseReasons.add(reason)
+      else pauseReasons.delete(reason)
+      updateAutoplayUI()
+    }
+
+    function updateAutoplayUI() {
+      const playing = isPlaying()
+      const userStopped = pauseReasons.has('user') || pauseReasons.has('motion')
+      $toggle.textContent = userStopped ? '▶ Reproducir' : '⏸ Pausar'
+      $toggle.setAttribute('aria-label', userStopped ? 'Iniciar la rotación automática' : 'Detener la rotación automática')
+      const [firstReason] = pauseReasons
+      $pauseReason.textContent = playing ? 'Reproducción automática' : PAUSE_LABELS[firstReason]
+      $live.setAttribute('aria-live', playing ? 'off' : 'polite')
+    }
+
+    // Un bucle con requestAnimationFrame acumula el tiempo SOLO mientras
+    // no hay pausas: al reanudar, continúa donde se quedó
+    function tick(now) {
+      const delta = now - lastFrame
+      lastFrame = now
+
+      if (isPlaying()) {
+        elapsed += delta
+        if (elapsed >= AUTOPLAY_MS) next()
+      }
+      $progress.style.transform = `scaleX(${Math.min(elapsed / AUTOPLAY_MS, 1)})`
+      requestAnimationFrame(tick)
+    }
+
+    // --- Eventos ---
+
+    document.querySelector('#next').addEventListener('click', next)
+    document.querySelector('#prev').addEventListener('click', prev)
+
+    $track.addEventListener('keydown', (event) => {
+      const actions = {
+        ArrowRight: next,
+        ArrowLeft: prev,
+        Home: () => goTo(0),
+        End: () => goTo(slides.length - 1)
+      }
+      const action = actions[event.key]
+      if (!action) return
+      // Evitamos el scroll por defecto del teclado para usar nuestra navegación
+      event.preventDefault()
+      action()
+    })
+
+    // Cuando el scroll termina (también si el usuario lo interrumpe con el dedo)
+    // olvidamos el destino pendiente
+    $track.addEventListener('scrollend', () => {
+      pendingTarget = null
+    })
+
+    // Pausas automáticas: ratón encima, foco dentro y pestaña oculta
+    $carousel.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse') setPaused('hover', true)
+    })
+    $carousel.addEventListener('pointerleave', () => setPaused('hover', false))
+    $carousel.addEventListener('focusin', () => setPaused('focus', true))
+    $carousel.addEventListener('focusout', (event) => {
+      if (!$carousel.contains(event.relatedTarget)) setPaused('focus', false)
+    })
+
+    // Page Visibility API: no tiene sentido avanzar si nadie está mirando
+    document.addEventListener('visibilitychange', () => {
+      setPaused('hidden', document.visibilityState === 'hidden')
+    })
+
+    $toggle.addEventListener('click', () => {
+      const stopped = pauseReasons.has('user') || pauseReasons.has('motion')
+      // Pulsar el botón es una decisión explícita: anula también la preferencia de movimiento
+      pauseReasons.delete('motion')
+      setPaused('user', !stopped)
+      elapsed = 0
+    })
+
+    reducedMotion.addEventListener('change', () => setPaused('motion', reducedMotion.matches))
+
+    // --- Inicio ---
+
+    renderSlides()
+    observeSlides()
+    // Con "reducir movimiento" activado no arrancamos la rotación automática
+    if (reducedMotion.matches) pauseReasons.add('motion')
+    if (document.visibilityState === 'hidden') pauseReasons.add('hidden')
+    updateIndicators()
+    updateAutoplayUI()
+    requestAnimationFrame(tick)
+  </script>
+</body>
+
+</html>

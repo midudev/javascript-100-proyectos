@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>34 - Flappy Bird</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    body {
+      background: #4ec0ca;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .score {
+      position: fixed;
+      top: 6%;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      font-size: clamp(48px, 9vh, 80px);
+      font-weight: 900;
+      color: #fff;
+      -webkit-text-stroke: 3px #3b2a1a;
+      paint-order: stroke fill;
+      text-shadow: 0 4px 0 #3b2a1a;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      translate: -50% -58%;
+      width: min(340px, 88vw);
+      padding: 24px;
+      text-align: center;
+      background: #ded895;
+      border: 4px solid #543847;
+      border-radius: 18px;
+      box-shadow: 0 6px 0 #543847, 0 20px 40px rgb(0 0 0 / .25);
+      color: #543847;
+      transition: opacity .25s, scale .25s, visibility .25s;
+    }
+
+    .panel[hidden] {
+      display: block;
+      visibility: hidden;
+      opacity: 0;
+      scale: .9;
+      pointer-events: none;
+    }
+
+    .panel h1 {
+      margin: 0 0 8px;
+      font-size: clamp(34px, 6vw, 46px);
+      font-weight: 900;
+      color: #fff;
+      -webkit-text-stroke: 3px #543847;
+      paint-order: stroke fill;
+      letter-spacing: 1px;
+    }
+
+    .panel p {
+      margin: 6px 0;
+      font-weight: 600;
+    }
+
+    .hint {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px !important;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    kbd {
+      padding: 2px 8px;
+      border: 2px solid #543847;
+      border-bottom-width: 4px;
+      border-radius: 6px;
+      background: #fff;
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin: 16px 0;
+    }
+
+    .stats > div:not(.medal) {
+      display: grid;
+      gap: 2px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stats strong {
+      font-size: 32px;
+      color: #fff;
+      -webkit-text-stroke: 2px #543847;
+      paint-order: stroke fill;
+    }
+
+    .medal {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: grid;
+      place-content: center;
+      font-size: 32px;
+      background: #c9c07a;
+      border: 3px solid #543847;
+    }
+
+    button {
+      padding: 12px 28px;
+      font: inherit;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fff;
+      background: #e86101;
+      border: 3px solid #543847;
+      border-radius: 12px;
+      box-shadow: 0 4px 0 #543847;
+      cursor: pointer;
+    }
+
+    button:active {
+      translate: 0 3px;
+      box-shadow: 0 1px 0 #543847;
+    }
+
+    .new-record {
+      color: #e86101;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: .5;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas></canvas>
+  <p class="score" id="score" hidden>0</p>
+
+  <section class="panel" id="start-panel">
+    <h1>Flappy Bird</h1>
+    <p>Esquiva las tuberías sin tocar el suelo</p>
+    <p class="hint"><kbd>Espacio</kbd> o toca la pantalla</p>
+    <p>Récord: <strong id="start-best">0</strong></p>
+  </section>
+
+  <section class="panel" id="over-panel" hidden>
+    <h1>Game Over</h1>
+    <div class="stats">
+      <div class="medal" id="medal">🥚</div>
+      <div>Puntos <strong id="final-score">0</strong></div>
+      <div>Récord <strong id="final-best">0</strong></div>
+    </div>
+    <p class="new-record" id="new-record" hidden>¡Nuevo récord! 🎉</p>
+    <button id="restart">Jugar de nuevo</button>
+  </section>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const ctx = canvas.getContext('2d')
+
+    const $score = document.querySelector('#score')
+    const $startPanel = document.querySelector('#start-panel')
+    const $overPanel = document.querySelector('#over-panel')
+    const $startBest = document.querySelector('#start-best')
+    const $finalScore = document.querySelector('#final-score')
+    const $finalBest = document.querySelector('#final-best')
+    const $newRecord = document.querySelector('#new-record')
+    const $medal = document.querySelector('#medal')
+    const $restart = document.querySelector('#restart')
+
+    // El mundo del juego mide siempre WORLD_HEIGHT unidades de alto.
+    // Escalamos el canvas para que ocupe la pantalla y el ancho del mundo
+    // depende de la proporción de la ventana (en móvil se ve menos mundo).
+    const WORLD_HEIGHT = 640
+    const GROUND_HEIGHT = 90
+
+    // Física expresada en unidades por SEGUNDO (no por frame)
+    const GRAVITY = 1700 // aceleración: unidades/s²
+    const FLAP_VELOCITY = -480 // velocidad instantánea al aletear: unidades/s
+    const MAX_FALL_SPEED = 900
+    const SCROLL_SPEED = 170
+
+    const BIRD_RADIUS = 17
+    const PIPE_WIDTH = 72
+    const PIPE_GAP = 160
+    const PIPE_SPACING = 240
+    const MAX_DELTA = 1 / 30
+
+    const STATES = {
+      READY: 'ready',
+      PLAYING: 'playing',
+      DYING: 'dying',
+      OVER: 'over'
+    }
+
+    const BEST_KEY = 'flappy-bird-best'
+
+    let scale = 1
+    let worldWidth = 0
+    let state = STATES.READY
+    let bird, pipes, score, best, groundOffset, cloudOffset, hillsOffset, flash, overAt
+    let lastTime = 0
+
+    function readBest() {
+      try {
+        return Number(localStorage.getItem(BEST_KEY)) || 0
+      } catch {
+        return 0
+      }
+    }
+
+    function saveBest(value) {
+      try {
+        localStorage.setItem(BEST_KEY, value)
+      } catch {}
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = Math.round(window.innerWidth * dpr)
+      canvas.height = Math.round(window.innerHeight * dpr)
+      scale = window.innerHeight / WORLD_HEIGHT
+      worldWidth = window.innerWidth / scale
+      // Todo lo que dibujemos a partir de aquí usa unidades del mundo
+      ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0)
+      if (bird) bird.x = getBirdX()
+    }
+
+    function getBirdX() {
+      return Math.min(worldWidth * 0.3, 340)
+    }
+
+    function randomGapY() {
+      const min = 110 + PIPE_GAP / 2
+      const max = WORLD_HEIGHT - GROUND_HEIGHT - 70 - PIPE_GAP / 2
+      return min + Math.random() * (max - min)
+    }
+
+    function reset() {
+      bird = { x: getBirdX(), y: WORLD_HEIGHT * 0.42, vy: 0, angle: 0 }
+      score = 0
+      best = readBest()
+      flash = 0
+      groundOffset = groundOffset ?? 0
+      cloudOffset = cloudOffset ?? 0
+      hillsOffset = hillsOffset ?? 0
+      // Colocamos ya algunas tuberías para que la pantalla de inicio no esté vacía
+      pipes = []
+      for (let x = bird.x + 380; x < worldWidth + PIPE_SPACING; x += PIPE_SPACING) {
+        pipes.push({ x, gapY: randomGapY(), scored: false })
+      }
+      if (pipes.length === 0) pipes.push({ x: bird.x + 380, gapY: randomGapY(), scored: false })
+
+      state = STATES.READY
+      $score.textContent = '0'
+      $score.hidden = true
+      $startBest.textContent = best
+      $startPanel.hidden = false
+      $overPanel.hidden = true
+    }
+
+    function flap() {
+      if (state === STATES.READY) {
+        state = STATES.PLAYING
+        $startPanel.hidden = true
+        $score.hidden = false
+      }
+      if (state === STATES.PLAYING) {
+        // Aletear no suma velocidad: la sustituye. Así el salto siempre es igual
+        bird.vy = FLAP_VELOCITY
+      } else if (state === STATES.OVER && performance.now() - overAt > 600) {
+        reset()
+      }
+    }
+
+    // AABB (Axis-Aligned Bounding Box): dos rectángulos alineados con los ejes
+    // se solapan si y solo si se solapan a la vez en el eje X y en el eje Y
+    function intersects(a, b) {
+      return a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y
+    }
+
+    function getBirdBox() {
+      // La caja es algo más pequeña que el dibujo para que el juego sea justo
+      const size = BIRD_RADIUS * 1.6
+      return { x: bird.x - size / 2, y: bird.y - size / 2, w: size, h: size }
+    }
+
+    function getPipeBoxes(pipe) {
+      const top = pipe.gapY - PIPE_GAP / 2
+      const bottom = pipe.gapY + PIPE_GAP / 2
+      return [
+        { x: pipe.x, y: -1000, w: PIPE_WIDTH, h: top + 1000 },
+        { x: pipe.x, y: bottom, w: PIPE_WIDTH, h: WORLD_HEIGHT - bottom }
+      ]
+    }
+
+    function die() {
+      state = STATES.DYING
+      flash = 1
+    }
+
+    function gameOver() {
+      state = STATES.OVER
+      overAt = performance.now()
+      const isRecord = score > best
+      if (isRecord) {
+        best = score
+        saveBest(best)
+      }
+      $finalScore.textContent = score
+      $finalBest.textContent = best
+      $newRecord.hidden = !isRecord
+      $medal.textContent = score >= 40 ? '🥇' : score >= 20 ? '🥈' : score >= 10 ? '🥉' : '🐣'
+      $overPanel.hidden = false
+      $score.hidden = true
+    }
+
+    function updateBird(dt) {
+      // Integración de Euler: la gravedad cambia la velocidad
+      // y la velocidad cambia la posición, ambas escaladas por dt
+      bird.vy = Math.min(bird.vy + GRAVITY * dt, MAX_FALL_SPEED)
+      bird.y += bird.vy * dt
+
+      // Techo: no dejamos que el pájaro se escape por arriba
+      if (bird.y < BIRD_RADIUS) {
+        bird.y = BIRD_RADIUS
+        bird.vy = 0
+      }
+
+      // Rotación según la velocidad: mira hacia arriba al subir
+      // y cae en picado cuando la velocidad de caída es grande
+      const target = Math.max(-0.45, Math.min(Math.PI / 2, bird.vy / 550))
+      bird.angle += (target - bird.angle) * Math.min(1, dt * 12)
+
+      const groundY = WORLD_HEIGHT - GROUND_HEIGHT
+      if (bird.y + BIRD_RADIUS >= groundY) {
+        bird.y = groundY - BIRD_RADIUS
+        if (state === STATES.PLAYING) die()
+        gameOver()
+      }
+    }
+
+    function updatePipes(dt) {
+      for (const pipe of pipes) pipe.x -= SCROLL_SPEED * dt
+
+      // Quitamos las que salen por la izquierda y creamos nuevas por la derecha
+      pipes = pipes.filter(pipe => pipe.x + PIPE_WIDTH > -10)
+      const last = pipes.at(-1)
+      if (!last || last.x < worldWidth + 20 - PIPE_SPACING) {
+        pipes.push({ x: (last?.x ?? worldWidth) + PIPE_SPACING, gapY: randomGapY(), scored: false })
+      }
+
+      const birdBox = getBirdBox()
+      for (const pipe of pipes) {
+        if (!pipe.scored && pipe.x + PIPE_WIDTH < bird.x) {
+          pipe.scored = true
+          score++
+          $score.textContent = score
+        }
+        if (getPipeBoxes(pipe).some(box => intersects(birdBox, box))) {
+          die()
+          return
+        }
+      }
+    }
+
+    function updateScenery(dt) {
+      // Parallax: cada capa se mueve a una velocidad distinta.
+      // Cuanto más lejos está una capa, más despacio se desplaza
+      groundOffset = (groundOffset + SCROLL_SPEED * dt) % 24
+      hillsOffset += SCROLL_SPEED * 0.35 * dt
+      cloudOffset += SCROLL_SPEED * 0.12 * dt
+    }
+
+    function update(dt, time) {
+      flash = Math.max(0, flash - dt * 3)
+
+      if (state === STATES.READY) {
+        // Flotando suavemente mientras esperamos al jugador
+        bird.y = WORLD_HEIGHT * 0.42 + Math.sin(time / 300) * 8
+        bird.angle = 0
+        // Solo se mueven las nubes: el suelo y las tuberías esperan al jugador
+        cloudOffset += SCROLL_SPEED * 0.12 * dt
+      } else if (state === STATES.PLAYING) {
+        updateScenery(dt)
+        updatePipes(dt)
+        updateBird(dt)
+      } else if (state === STATES.DYING) {
+        updateBird(dt)
+      }
+    }
+
+    function drawSky() {
+      const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT)
+      gradient.addColorStop(0, '#4ec0ca')
+      gradient.addColorStop(1, '#b8ecf0')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, worldWidth, WORLD_HEIGHT)
+    }
+
+    function drawClouds() {
+      ctx.fillStyle = 'rgb(255 255 255 / .85)'
+      const period = 320
+      const start = -(cloudOffset % period) - period
+      for (let x = start; x < worldWidth + period; x += period) {
+        const index = Math.round((x + cloudOffset) / period)
+        const y = 90 + (index % 3) * 45
+        ctx.beginPath()
+        ctx.arc(x, y, 28, 0, Math.PI * 2)
+        ctx.arc(x + 32, y - 14, 34, 0, Math.PI * 2)
+        ctx.arc(x + 68, y, 26, 0, Math.PI * 2)
+        ctx.rect(x, y, 68, 26)
+        ctx.fill()
+      }
+    }
+
+    function drawHills() {
+      const baseY = WORLD_HEIGHT - GROUND_HEIGHT
+      const layers = [
+        { color: '#9be29b', height: 110, width: 260, speed: 0.6 },
+        { color: '#6fcf6a', height: 70, width: 180, speed: 1 }
+      ]
+      for (const { color, height, width, speed } of layers) {
+        const offset = (hillsOffset * speed) % width
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(-offset - width, baseY)
+        for (let x = -offset - width; x < worldWidth + width; x += width) {
+          ctx.quadraticCurveTo(x + width / 2, baseY - height * 2, x + width, baseY)
+        }
+        ctx.lineTo(worldWidth, baseY)
+        ctx.fill()
+      }
+    }
+
+    function drawPipe(pipe) {
+      const top = pipe.gapY - PIPE_GAP / 2
+      const bottom = pipe.gapY + PIPE_GAP / 2
+      const groundY = WORLD_HEIGHT - GROUND_HEIGHT
+      const lip = 26
+
+      const gradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + PIPE_WIDTH, 0)
+      gradient.addColorStop(0, '#9ce659')
+      gradient.addColorStop(0.35, '#73bf2e')
+      gradient.addColorStop(1, '#4f8a1d')
+
+      ctx.fillStyle = gradient
+      ctx.strokeStyle = '#2f4f14'
+      ctx.lineWidth = 3
+
+      // Cuerpo superior e inferior
+      ctx.fillRect(pipe.x + 4, 0, PIPE_WIDTH - 8, top - lip)
+      ctx.strokeRect(pipe.x + 4, -4, PIPE_WIDTH - 8, top - lip + 4)
+      ctx.fillRect(pipe.x + 4, bottom + lip, PIPE_WIDTH - 8, groundY - bottom - lip)
+      ctx.strokeRect(pipe.x + 4, bottom + lip, PIPE_WIDTH - 8, groundY - bottom - lip + 4)
+
+      // Bocas de las tuberías
+      ctx.fillRect(pipe.x, top - lip, PIPE_WIDTH, lip)
+      ctx.strokeRect(pipe.x, top - lip, PIPE_WIDTH, lip)
+      ctx.fillRect(pipe.x, bottom, PIPE_WIDTH, lip)
+      ctx.strokeRect(pipe.x, bottom, PIPE_WIDTH, lip)
+    }
+
+    function drawGround() {
+      const y = WORLD_HEIGHT - GROUND_HEIGHT
+      ctx.fillStyle = '#ded895'
+      ctx.fillRect(0, y, worldWidth, GROUND_HEIGHT)
+
+      // Franja de césped con rayas diagonales que se desplazan
+      ctx.fillStyle = '#9be15d'
+      ctx.fillRect(0, y, worldWidth, 18)
+      ctx.fillStyle = '#73bf2e'
+      for (let x = -groundOffset - 24; x < worldWidth + 24; x += 24) {
+        ctx.beginPath()
+        ctx.moveTo(x, y + 18)
+        ctx.lineTo(x + 12, y)
+        ctx.lineTo(x + 24, y)
+        ctx.lineTo(x + 12, y + 18)
+        ctx.fill()
+      }
+      ctx.fillStyle = '#543847'
+      ctx.fillRect(0, y - 2, worldWidth, 3)
+      ctx.fillStyle = '#cfc783'
+      ctx.fillRect(0, y + 18, worldWidth, 5)
+    }
+
+    function drawBird(time) {
+      ctx.save()
+      ctx.translate(bird.x, bird.y)
+      ctx.rotate(bird.angle)
+
+      // Cuerpo
+      ctx.fillStyle = '#f8d33a'
+      ctx.strokeStyle = '#543847'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.ellipse(0, 0, BIRD_RADIUS + 3, BIRD_RADIUS, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+
+      // Ala: oscila rápido mientras vuela
+      const wing = state === STATES.DYING || state === STATES.OVER ? 0 : Math.sin(time / 60) * 6
+      ctx.fillStyle = '#fff4c2'
+      ctx.beginPath()
+      ctx.ellipse(-7, 3 + wing * 0.5, 10, 6 + wing * 0.4, -0.3, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+
+      // Ojo
+      ctx.fillStyle = '#fff'
+      ctx.beginPath()
+      ctx.arc(8, -7, 7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = '#222'
+      ctx.beginPath()
+      ctx.arc(10, -7, 3, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Pico
+      ctx.fillStyle = '#f36b22'
+      ctx.beginPath()
+      ctx.moveTo(12, 1)
+      ctx.lineTo(28, 5)
+      ctx.lineTo(12, 10)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+
+      ctx.restore()
+    }
+
+    function draw(time) {
+      drawSky()
+      drawClouds()
+      drawHills()
+      pipes.forEach(drawPipe)
+      drawGround()
+      drawBird(time)
+
+      if (flash > 0) {
+        ctx.fillStyle = `rgb(255 255 255 / ${flash})`
+        ctx.fillRect(0, 0, worldWidth, WORLD_HEIGHT)
+      }
+    }
+
+    // requestAnimationFrame se ejecuta al ritmo de refresco de la pantalla:
+    // 60 veces por segundo en un monitor de 60 Hz pero 120 o 144 en otros.
+    // Si moviéramos el pájaro X píxeles por frame, el juego iría el doble de
+    // rápido en una pantalla de 120 Hz. Por eso multiplicamos todo por el
+    // delta time (segundos transcurridos desde el frame anterior).
+    function loop(time) {
+      // Limitamos dt: si la pestaña estuvo oculta, dt sería enorme y el
+      // pájaro atravesaría las tuberías de un salto
+      const dt = Math.min((time - lastTime) / 1000, MAX_DELTA)
+      lastTime = time
+
+      update(dt, time)
+      draw(time)
+      requestAnimationFrame(loop)
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Space' || event.code === 'ArrowUp' || event.code === 'KeyW') {
+        event.preventDefault()
+        if (!event.repeat) flap()
+      }
+    })
+
+    canvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault()
+      flap()
+    })
+    $startPanel.addEventListener('pointerdown', flap)
+
+    $restart.addEventListener('click', (event) => {
+      event.stopPropagation()
+      // Quitamos el foco: si no, la barra espaciadora volvería a "pulsar" el botón
+      $restart.blur()
+      if (state === STATES.OVER) reset()
+    })
+
+    window.addEventListener('resize', resize)
+
+    resize()
+    reset()
+    requestAnimationFrame((time) => {
+      lastTime = time
+      loop(time)
+    })
+  </script>
+</body>
+
+</html>

@@ -1,7 +1,12 @@
 ---
-const { info } = Astro.props
+import { REPO_URL } from "../consts"
+
+const { info, prev, next } = Astro.props
 const { theme = {} } = info
 const { isDark = false } = theme
+
+const button =
+  "inline-flex flex-1 items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2"
 ---
 
 <div class="hidden sm:block absolute left-4 bottom-4 px-8 py-1 rounded-lg">
@@ -47,6 +52,101 @@ const { isDark = false } = theme
   >
     #{info.number} - {info.title}
   </h1>
+  <details class="group relative mt-1 animate-fade-in animate-delay-500">
+    <summary
+      class:list={[
+        "inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden",
+        isDark ? "text-white/90 focus-visible:outline-white" : "text-black/90 focus-visible:outline-black",
+      ]}
+    >
+      <span
+        class="inline-block transition group-open:rotate-90 motion-reduce:transition-none"
+        aria-hidden="true">▸</span
+      >
+      Sobre el proyecto
+    </summary>
+    <div
+      class:list={[
+        "absolute bottom-0 left-full ml-2 w-80 rounded-xl p-4 text-left shadow-xl ring-1 backdrop-blur-md",
+        isDark
+          ? "bg-neutral-900/90 text-white ring-white/10"
+          : "bg-white/90 text-slate-900 ring-black/10",
+      ]}
+    >
+      <p class:list={["text-sm text-pretty", isDark ? "text-white/80" : "text-slate-700"]}>
+        {info.description}
+      </p>
+      <h2 class="mt-3 text-xs font-semibold">Qué vas a aprender</h2>
+      <ul class="mt-1.5 flex flex-wrap gap-1.5">
+        {
+          info.learnings.map((learning: string) => (
+            <li
+              class:list={[
+                "rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+                isDark
+                  ? "bg-white/5 text-white/80 ring-white/15"
+                  : "bg-gray-50 text-gray-600 ring-gray-200",
+              ]}
+            >
+              {learning}
+            </li>
+          ))
+        }
+      </ul>
+      <div class="mt-4 flex gap-2">
+        <a
+          href={`${REPO_URL}/tree/main/${info.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class:list={[button, "bg-yellow-300 text-black hover:bg-yellow-400 focus-visible:outline-yellow-300"]}
+        >
+          Ver código
+        </a>
+        {
+          info.youtube && (
+            <a
+              href={info.youtube}
+              target="_blank"
+              rel="noopener noreferrer"
+              class:list={[
+                button,
+                "ring-1",
+                isDark
+                  ? "ring-white/20 hover:bg-white/10 focus-visible:outline-white"
+                  : "ring-black/15 hover:bg-black/5 focus-visible:outline-black",
+              ]}
+            >
+              Ver vídeo
+            </a>
+          )
+        }
+      </div>
+      {
+        (prev || next) && (
+          <nav
+            aria-label="Otros proyectos"
+            class:list={[
+              "mt-4 flex justify-between gap-3 border-t pt-3 text-xs",
+              isDark ? "border-white/10 text-white/70" : "border-black/10 text-slate-600",
+            ]}
+          >
+            {prev ? (
+              <a class="hover:underline" href={`/${prev.slug}`}>
+                ← #{prev.number} {prev.title}
+              </a>
+            ) : (
+              <span />
+            )}
+            {next && (
+              <a class="text-right hover:underline" href={`/${next.slug}`}>
+                #{next.number} {next.title} →
+              </a>
+            )}
+          </nav>
+        )
+      }
+    </div>
+  </details>
   <a
     class:list={[
       "text-xs animate-fade-in animate-delay-800 hover:underline",

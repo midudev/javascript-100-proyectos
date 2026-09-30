@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>22 - Editor de Markdown</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --surface: #11141b;
+      --surface-2: #171b24;
+      --border: #232836;
+      --text: #e6e8ee;
+      --muted: #8b93a7;
+      --accent: #7dd3fc;
+      --code-bg: #0a0c10;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 14px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stats strong {
+      color: var(--text);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .actions button {
+      height: 32px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .actions button:hover {
+      border-color: var(--accent);
+    }
+
+    .actions label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .actions input {
+      accent-color: var(--accent);
+    }
+
+    #save-status {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* --- Paneles --- */
+    .panes {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .pane+.pane {
+      border-left: 1px solid var(--border);
+    }
+
+    .pane-title {
+      padding: 8px 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      padding: 20px;
+      border: 0;
+      outline: none;
+      resize: none;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.92rem;
+      line-height: 1.7;
+      tab-size: 2;
+    }
+
+    /* --- Vista previa --- */
+    .preview {
+      flex: 1;
+      overflow: auto;
+      padding: 20px 28px 60px;
+      background: var(--surface);
+      line-height: 1.7;
+      overflow-wrap: break-word;
+    }
+
+    .preview> :first-child {
+      margin-top: 0;
+    }
+
+    .preview h1,
+    .preview h2,
+    .preview h3,
+    .preview h4,
+    .preview h5,
+    .preview h6 {
+      margin: 1.4em 0 0.5em;
+      line-height: 1.25;
+    }
+
+    .preview h1 {
+      font-size: 2em;
+    }
+
+    .preview h2 {
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.45em;
+    }
+
+    .preview a {
+      color: var(--accent);
+    }
+
+    .preview code {
+      padding: 0.15em 0.4em;
+      border-radius: 6px;
+      background: var(--surface-2);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      color: #fda4af;
+    }
+
+    .preview pre {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--code-bg);
+      overflow: auto;
+    }
+
+    .preview pre code {
+      padding: 0;
+      background: none;
+      color: #c7d2fe;
+    }
+
+    .preview blockquote {
+      margin: 1em 0;
+      padding: 4px 16px;
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      background: var(--surface-2);
+      color: #cbd5e1;
+    }
+
+    .preview hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 2em 0;
+    }
+
+    .preview img {
+      max-width: 100%;
+      border-radius: 10px;
+    }
+
+    .preview li.task {
+      list-style: none;
+      margin-left: -1.3em;
+    }
+
+    .preview li.task input {
+      accent-color: var(--accent);
+      margin-right: 4px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 64px;
+      right: 16px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 600;
+      opacity: 0;
+      translate: 0 -10px;
+      transition: opacity 0.2s, translate 0.2s;
+      pointer-events: none;
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      translate: 0 0;
+    }
+
+    @media (max-width: 760px) {
+      .panes {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .pane+.pane {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .actions {
+        margin-left: 0;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $editor = document.querySelector('textarea')
+    const $preview = document.querySelector('.preview')
+    const $words = document.querySelector('#words')
+    const $chars = document.querySelector('#chars')
+    const $reading = document.querySelector('#reading')
+    const $saveStatus = document.querySelector('#save-status')
+    const $sync = document.querySelector('#sync')
+    const $toast = document.querySelector('.toast')
+
+    // CONSTANTES
+    const STORAGE_KEY = 'markdown-editor-content'
+    const SAVE_DELAY = 400
+    const WORDS_PER_MINUTE = 200
+    const SAMPLE = $editor.defaultValue // el ejemplo está escrito dentro del <textarea>
+
+    // Expresiones regulares para reconocer cada tipo de bloque (línea a línea)
+    const BLOCK = {
+      blank: /^\s*$/,
+      fenceStart: /^\s*```\s*([\w+-]*)\s*$/,
+      fenceEnd: /^\s*```\s*$/,
+      heading: /^\s{0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/,
+      hr: /^\s{0,3}([-*_])(\s*\1){2,}\s*$/,
+      quote: /^\s*>\s?(.*)$/,
+      ul: /^(\s*)[-*+]\s+(.*)$/,
+      ol: /^(\s*)(\d{1,9})[.)]\s+(.*)$/,
+      task: /^\[([ xX])\]\s+(.*)$/
+    }
+
+    // (url "título"): la URL admite un nivel de paréntesis, como en
+    // https://es.wikipedia.org/wiki/Markdown_(lenguaje). El título ya viene escapado (&quot;)
+    const URL_PATTERN = String.raw`\(((?:[^()\s]|\([^()\s]*\))+)(?:\s+&quot;(.*?)&quot;)?\)`
+
+    // SEGURIDAD
+    // Lo PRIMERO que hacemos con el texto del usuario es escaparlo. Si no,
+    // alguien podría escribir <img src=x onerror="..."> o <script> y ejecutar
+    // código en la página al asignarlo con innerHTML (ataque XSS).
+    // Por eso este parser NO permite HTML en crudo: todo < se convierte en &lt;
+    function escapeHtml(text) {
+      return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+    }
+
+    // Escapar no basta en los enlaces: [clic](javascript:alert(1)) no tiene
+    // ningún carácter peligroso pero ejecuta código al pulsarlo.
+    // Solo dejamos pasar http(s), mailto y rutas relativas
+    function sanitizeUrl(url) {
+      // Los navegadores ignoran caracteres de control en las URLs ("java\x01script:")
+      const clean = url.replace(/[\u0000-\u001F\u007F]/g, '')
+
+      if (/^(https?:|mailto:)/i.test(clean)) return clean
+      if (/^[a-z][a-z\d+.-]*:/i.test(clean)) return '#' // cualquier otro protocolo: fuera
+      return clean // ruta relativa o ancla
+    }
+
+    // PARSER DE ELEMENTOS EN LÍNEA
+    function parseInline(text) {
+      // El código, los enlaces y las imágenes se convierten primero y se
+      // "aparcan" en `tokens`, dejando un marcador. Así las reglas de
+      // negrita/cursiva no tocan el interior de un `código` ni de una URL
+      const tokens = []
+      const protect = (html) => `\u0000${tokens.push(html) - 1}\u0000`
+
+      let html = escapeHtml(text)
+
+      // `código en línea`
+      html = html.replace(/`([^`]+)`/g, (_, code) => protect(`<code>${code}</code>`))
+
+      // ![texto alternativo](url "título opcional") → va antes que los enlaces
+      html = html.replace(new RegExp(`!\\[([^\\]]*)\\]${URL_PATTERN}`, 'g'), (_, alt, url, title) =>
+        protect(`<img src="${sanitizeUrl(url)}" alt="${alt}"${title ? ` title="${title}"` : ''} loading="lazy">`)
+      )
+
+      // [texto](url "título opcional")
+      html = html.replace(new RegExp(`\\[([^\\]]+)\\]${URL_PATTERN}`, 'g'), (_, label, url, title) =>
+        protect(`<a href="${sanitizeUrl(url)}"${title ? ` title="${title}"` : ''} target="_blank" rel="noopener noreferrer">${parseEmphasis(label)}</a>`)
+      )
+
+      html = parseEmphasis(html)
+
+      // Sustituimos los marcadores por su HTML (pueden estar anidados, de ahí la recursión)
+      const restore = (value) => value.replace(/\u0000(\d+)\u0000/g, (_, index) => restore(tokens[index]))
+      return restore(html)
+    }
+
+    // (?=\S) y (?<=\S) obligan a que no haya espacios pegados a los asteriscos,
+    // así "2 * 3 * 4" no se convierte en cursiva
+    function parseEmphasis(html) {
+      return html
+        .replace(/\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(?=\S)(.+?)(?<=\S)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(?=\S)(.+?)(?<=\S)__/g, '<strong>$1</strong>')
+        .replace(/\*(?=\S)(.+?)(?<=\S)\*/g, '<em>$1</em>')
+        .replace(/(^|[^\w])_(?=\S)(.+?)(?<=\S)_(?!\w)/g, '$1<em>$2</em>') // evita nombres_con_guiones
+        .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, '<del>$1</del>')
+    }
+
+    // PARSER DE BLOQUES
+    // Recorremos las líneas una a una. Según cómo empieza cada línea sabemos
+    // qué bloque abre (título, lista, cita...) y consumimos todas las líneas
+    // que le pertenecen antes de pasar al siguiente
+    function parseMarkdown(markdown) {
+      const lines = markdown
+        .replace(/\r\n?/g, '\n')
+        .replace(/\u0000/g, '') // reservado para nuestros marcadores internos
+        .split('\n')
+
+      return parseBlocks(lines)
+    }
+
+    function startsBlock(line) {
+      return BLOCK.fenceStart.test(line) || BLOCK.heading.test(line) || BLOCK.hr.test(line) ||
+        BLOCK.quote.test(line) || BLOCK.ul.test(line) || BLOCK.ol.test(line)
+    }
+
+    function parseBlocks(lines) {
+      const html = []
+      let i = 0
+
+      while (i < lines.length) {
+        const line = lines[i]
+
+        if (BLOCK.blank.test(line)) {
+          i++
+          continue
+        }
+
+        // Bloque de código: todo lo que haya hasta el cierre se muestra tal cual
+        const fence = line.match(BLOCK.fenceStart)
+        if (fence) {
+          const code = []
+          i++
+          while (i < lines.length && !BLOCK.fenceEnd.test(lines[i])) {
+            code.push(lines[i])
+            i++
+          }
+          i++ // saltamos el ``` de cierre (si falta, el bloque llega hasta el final)
+
+          const language = fence[1] ? ` class="language-${escapeHtml(fence[1])}"` : ''
+          html.push(`<pre><code${language}>${escapeHtml(code.join('\n'))}</code></pre>`)
+          continue
+        }
+
+        const heading = line.match(BLOCK.heading)
+        if (heading) {
+          const level = heading[1].length
+          html.push(`<h${level}>${parseInline(heading[2])}</h${level}>`)
+          i++
+          continue
+        }
+
+        // El separador se comprueba antes que las listas: "- - -" también parece un elemento de lista
+        if (BLOCK.hr.test(line)) {
+          html.push('<hr>')
+          i++
+          continue
+        }
+
+        if (BLOCK.quote.test(line)) {
+          const quoted = []
+          while (i < lines.length && BLOCK.quote.test(lines[i])) {
+            quoted.push(lines[i].match(BLOCK.quote)[1])
+            i++
+          }
+          // Dentro de una cita puede haber más Markdown: lo parseamos de forma recursiva
+          html.push(`<blockquote>${parseBlocks(quoted)}</blockquote>`)
+          continue
+        }
+
+        if (BLOCK.ul.test(line) || BLOCK.ol.test(line)) {
+          const list = parseList(lines, i)
+          html.push(list.html)
+          i = list.nextIndex
+          continue
+        }
+
+        // Párrafo: líneas seguidas hasta una en blanco o el comienzo de otro bloque.
+        // Una línea que acaba en dos espacios fuerza un salto de línea (<br>)
+        const paragraph = []
+        while (i < lines.length && !BLOCK.blank.test(lines[i]) && (paragraph.length === 0 || !startsBlock(lines[i]))) {
+          paragraph.push(lines[i])
+          i++
+        }
+
+        const content = paragraph.map((text, index) => {
+          const hardBreak = / {2,}$/.test(text) && index < paragraph.length - 1
+          return parseInline(text.trim()) + (hardBreak ? '<br>' : '')
+        })
+        html.push(`<p>${content.join('\n')}</p>`)
+      }
+
+      return html.join('\n')
+    }
+
+    function getIndent(line) {
+      return line.match(/^\s*/)[0].replaceAll('\t', '    ').length
+    }
+
+    function dedent(lines) {
+      const indents = lines.filter((line) => !BLOCK.blank.test(line)).map(getIndent)
+      const minIndent = Math.min(...indents)
+      return lines.map((line) => line.replaceAll('\t', '    ').slice(minIndent))
+    }
+
+    // Listas: los elementos al mismo nivel de sangría son hermanos y las
+    // líneas con más sangría pertenecen al último elemento (sublistas).
+    // Esas líneas hijas se vuelven a pasar por parseBlocks: recursión otra vez
+    function parseList(lines, start) {
+      const isOrdered = BLOCK.ol.test(lines[start])
+      const pattern = isOrdered ? BLOCK.ol : BLOCK.ul
+      const baseIndent = getIndent(lines[start])
+      const items = []
+      let i = start
+
+      while (i < lines.length) {
+        const line = lines[i]
+
+        if (BLOCK.blank.test(line)) {
+          // Una línea en blanco solo continúa la lista si lo que sigue pertenece a ella
+          const next = lines[i + 1]
+          const continues = next !== undefined && !BLOCK.blank.test(next) &&
+            (getIndent(next) >= baseIndent + 2 || pattern.test(next))
+          if (!continues) break
+          i++
+          continue
+        }
+
+        const indent = getIndent(line)
+        const match = line.match(pattern)
+
+        if (match && indent < baseIndent + 2) {
+          items.push({ text: match.at(-1), children: [] })
+        } else if (indent >= baseIndent + 2 && items.length > 0) {
+          items.at(-1).children.push(line)
+        } else {
+          break
+        }
+        i++
+      }
+
+      const tag = isOrdered ? 'ol' : 'ul'
+      const firstNumber = isOrdered ? Number(lines[start].match(BLOCK.ol)[2]) : 1
+      const startAttribute = firstNumber !== 1 ? ` start="${firstNumber}"` : ''
+
+      const itemsHtml = items.map(({ text, children }) => {
+        const task = text.match(BLOCK.task)
+        const content = task
+          ? `<input type="checkbox" disabled${task[1] === ' ' ? '' : ' checked'}> ${parseInline(task[2])}`
+          : parseInline(text)
+        const nested = children.length > 0 ? parseBlocks(dedent(children)) : ''
+        return `<li${task ? ' class="task"' : ''}>${content}${nested}</li>`
+      })
+
+      return {
+        html: `<${tag}${startAttribute}>${itemsHtml.join('')}</${tag}>`,
+        nextIndex: i
+      }
+    }
+
+    // RENDER Y ESTADÍSTICAS
+    function render() {
+      $preview.innerHTML = parseMarkdown($editor.value)
+
+      const text = $preview.textContent.trim()
+      const words = text ? text.split(/\s+/).length : 0
+      $words.textContent = words.toLocaleString('es')
+      $chars.textContent = $editor.value.length.toLocaleString('es')
+      $reading.textContent = `${Math.max(1, Math.ceil(words / WORDS_PER_MINUTE))} min`
+    }
+
+    // GUARDADO AUTOMÁTICO
+    // "Debounce": no guardamos en cada tecla, sino cuando el usuario
+    // lleva SAVE_DELAY ms sin escribir
+    let saveTimeoutId = null
+
+    function scheduleSave() {
+      clearTimeout(saveTimeoutId)
+      $saveStatus.textContent = '● Sin guardar'
+      saveTimeoutId = setTimeout(save, SAVE_DELAY)
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(STORAGE_KEY, $editor.value)
+        $saveStatus.textContent = '✓ Guardado'
+      } catch {
+        $saveStatus.textContent = '⚠️ No se pudo guardar'
+      }
+    }
+
+    function loadSaved() {
+      try {
+        return localStorage.getItem(STORAGE_KEY)
+      } catch {
+        return null
+      }
+    }
+
+    // ACCIONES
+    let toastTimeoutId = null
+
+    function showToast(message) {
+      $toast.textContent = message
+      $toast.classList.add('is-visible')
+      clearTimeout(toastTimeoutId)
+      toastTimeoutId = setTimeout(() => $toast.classList.remove('is-visible'), 1800)
+    }
+
+    async function copyHtml() {
+      try {
+        await navigator.clipboard.writeText($preview.innerHTML)
+        showToast('📋 HTML copiado al portapapeles')
+      } catch {
+        showToast('⚠️ Tu navegador no ha permitido copiar')
+      }
+    }
+
+    function downloadMarkdown() {
+      // Creamos un archivo en memoria (Blob) y una URL temporal para descargarlo
+      const blob = new Blob([$editor.value], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const $link = document.createElement('a')
+      $link.href = url
+      $link.download = 'documento.md'
+      $link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+
+    function restoreSample() {
+      $editor.value = SAMPLE
+      render()
+      save()
+      showToast('📝 Ejemplo restaurado')
+    }
+
+    // SCROLL SINCRONIZADO
+    // Solo sincronizamos desde el panel que el usuario está usando; si no,
+    // cada panel movería al otro en un bucle infinito de eventos scroll
+    let activePane = $editor
+
+    function syncScroll(source, target) {
+      if (!$sync.checked || source !== activePane) return
+      const sourceMax = source.scrollHeight - source.clientHeight
+      const ratio = sourceMax > 0 ? source.scrollTop / sourceMax : 0
+      target.scrollTop = ratio * (target.scrollHeight - target.clientHeight)
+    }
+
+    for (const $pane of [$editor, $preview]) {
+      $pane.addEventListener('pointerenter', () => { activePane = $pane })
+      $pane.addEventListener('focus', () => { activePane = $pane })
+    }
+
+    $editor.addEventListener('scroll', () => syncScroll($editor, $preview))
+    $preview.addEventListener('scroll', () => syncScroll($preview, $editor))
+
+    // EVENTOS
+    $editor.addEventListener('input', () => {
+      render()
+      scheduleSave()
+    })
+
+    // Tab inserta dos espacios en lugar de saltar al siguiente elemento
+    $editor.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || event.shiftKey) return
+      event.preventDefault()
+      $editor.setRangeText('  ', $editor.selectionStart, $editor.selectionEnd, 'end')
+      render()
+      scheduleSave()
+    })
+
+    document.querySelector('#copy-html').addEventListener('click', copyHtml)
+    document.querySelector('#download').addEventListener('click', downloadMarkdown)
+    document.querySelector('#restore').addEventListener('click', restoreSample)
+
+    const saved = loadSaved()
+    if (saved !== null) $editor.value = saved
+    render()
+  </script>
+</head>
+
+<body>
+  <header>
+    <h1>📝 Editor de Markdown</h1>
+    <div class="stats">
+      <span><strong id="words">0</strong> palabras</span>
+      <span><strong id="chars">0</strong> caracteres</span>
+      <span>⏱ <strong id="reading">1 min</strong></span>
+      <span id="save-status">✓ Guardado</span>
+    </div>
+    <div class="actions">
+      <label><input id="sync" type="checkbox" checked> Scroll sincronizado</label>
+      <button id="restore">↺ Ejemplo</button>
+      <button id="copy-html">📋 Copiar HTML</button>
+      <button id="download">⬇️ Descargar .md</button>
+    </div>
+  </header>
+
+  <main class="panes">
+    <section class="pane">
+      <div class="pane-title">MARKDOWN</div>
+      <textarea spellcheck="false" aria-label="Editor de Markdown">
+# Editor de Markdown ✍️
+
+Escribe a la **izquierda** y mira el resultado a la *derecha* en tiempo real.
+Todo se guarda automáticamente en `localStorage`.
+
+## ¿Qué soporta este mini parser?
+
+- Encabezados del `#` al `######`
+- **Negrita**, *cursiva*, ***las dos a la vez*** y ~~tachado~~
+- `código en línea` y bloques de código
+- [Enlaces](https://developer.mozilla.org/es/ "MDN") e imágenes
+- Listas anidadas:
+  - Con guiones, asteriscos o `+`
+  - Y listas de tareas:
+    - [x] Escribir el parser
+    - [ ] Conquistar el mundo
+
+1. Listas numeradas
+2. Que se numeran solas
+3. ¡Y admiten **formato**!
+
+> Las citas también pueden contener *Markdown*.
+>
+> — Alguien muy sabio
+
+---
+
+## Código
+
+```js
+function saludar(nombre) {
+  return `¡Hola, ${nombre}!`
+}
+```
+
+![Imagen de ejemplo](https://picsum.photos/seed/markdown-editor/800/260)
+
+## Seguridad
+
+Esto no se ejecuta porque escapamos el HTML: <script>alert('XSS')</script>
+y este [enlace malicioso](javascript:alert('XSS')) apunta a `#`.
+</textarea>
+    </section>
+
+    <section class="pane">
+      <div class="pane-title">VISTA PREVIA</div>
+      <article class="preview" aria-live="polite"></article>
+    </section>
+  </main>
+
+  <div class="toast" role="status"></div>
+</body>
+
+</html>

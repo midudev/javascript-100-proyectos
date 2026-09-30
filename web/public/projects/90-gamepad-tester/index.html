@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>90 - Tester de mandos</title>
+  <style>
+    :root {
+      --bg: #080a10;
+      --panel: #10131c;
+      --border: #202637;
+      --text: #e9edf7;
+      --muted: #8089a0;
+      --accent: #22d3ee;
+      --off: #222838;
+      --a: #4ade80;
+      --b: #f87171;
+      --x: #60a5fa;
+      --y: #facc15;
+      --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      background:
+        radial-gradient(700px 400px at 35% 45%, rgba(34, 211, 238, .08), transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 20px;
+      padding: 16px 20px 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .pads {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pads button,
+    .action {
+      max-width: 320px;
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pads button[aria-pressed="true"] {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    .action:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 20px;
+      padding: 16px 20px 20px;
+      min-height: 0;
+    }
+
+    /* ---------- Mando ---------- */
+    .stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    svg.gamepad {
+      width: 100%;
+      max-height: 100%;
+      overflow: visible;
+    }
+
+    .body {
+      fill: #151a26;
+      stroke: #2b3246;
+      stroke-width: 2;
+    }
+
+    /* Cada botón tiene --v (0 a 1) que escribimos desde JS. color-mix
+       mezcla el color apagado y el encendido según ese valor */
+    .btn {
+      --v: 0;
+      --on: var(--accent);
+      fill: color-mix(in oklab, var(--on) calc(var(--v) * 100%), var(--off));
+      stroke: #343c54;
+      stroke-width: 1.5;
+    }
+
+    .btn.pressed {
+      filter: drop-shadow(0 0 8px var(--on));
+    }
+
+    .label {
+      fill: #cfd6e6;
+      font: 700 15px system-ui, sans-serif;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .label.small {
+      font-size: 10px;
+      fill: var(--muted);
+    }
+
+    .trigger-fill {
+      fill: var(--accent);
+      transform-box: fill-box;
+      transform-origin: bottom;
+      transform: scaleY(var(--v, 0));
+    }
+
+    .stick-base {
+      fill: #0d1119;
+      stroke: #343c54;
+      stroke-width: 2;
+    }
+
+    .deadzone {
+      fill: rgba(248, 113, 113, .12);
+      stroke: rgba(248, 113, 113, .5);
+      stroke-dasharray: 3 3;
+    }
+
+    .stick-line {
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-linecap: round;
+      opacity: .6;
+    }
+
+    /* ---------- Pantalla de espera ---------- */
+    .waiting {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 10px;
+      text-align: center;
+      background: radial-gradient(circle, rgba(8, 10, 16, .88) 35%, rgba(8, 10, 16, .4) 80%);
+    }
+
+    .waiting[hidden] {
+      display: none;
+    }
+
+    .waiting h2 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 32px);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    .waiting p {
+      max-width: 440px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .waiting .emoji {
+      font-size: 56px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: .45;
+      }
+    }
+
+    @keyframes float {
+      50% {
+        translate: 0 -8px;
+      }
+    }
+
+    /* ---------- Panel lateral ---------- */
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      overflow-y: auto;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .info {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      margin: 0;
+      font-size: 12.5px;
+    }
+
+    .info dt {
+      color: var(--muted);
+    }
+
+    .info dd {
+      margin: 0;
+      font-family: var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .warning {
+      color: var(--y);
+    }
+
+    .axes,
+    .buttons {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+
+    .axes li {
+      display: grid;
+      grid-template-columns: 58px 1fr 52px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .axis-bar {
+      position: relative;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--off);
+    }
+
+    /* La barra del eje crece desde el centro (0) hacia -1 o hacia 1 */
+    .axis-bar span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(50% + min(0%, var(--v, 0) * 50%));
+      /* max(v, -v) es el valor absoluto */
+      width: calc(max(var(--v, 0), var(--v, 0) * -1) * 50%);
+      border-radius: 4px;
+      background: var(--accent);
+    }
+
+    .axis-bar::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: -2px;
+      bottom: -2px;
+      width: 1px;
+      background: var(--muted);
+    }
+
+    .buttons {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .buttons li {
+      position: relative;
+      padding: 4px 6px;
+      border-radius: 6px;
+      background: var(--off);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .buttons li::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      opacity: .35;
+      transform: scaleX(var(--v, 0));
+      transform-origin: left;
+    }
+
+    .buttons li.pressed {
+      outline: 1px solid var(--accent);
+    }
+
+    .buttons span {
+      position: relative;
+    }
+
+    .deadzone-control {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .deadzone-control input {
+      accent-color: var(--accent);
+    }
+
+    .note {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      font-size: 14px;
+      translate: 0 80px;
+      opacity: 0;
+      transition: translate .3s, opacity .3s;
+    }
+
+    .toast.visible {
+      translate: 0 0;
+      opacity: 1;
+    }
+
+    @media (width < 860px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+        overflow: auto;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .stage {
+        min-height: 300px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const svg = $('svg.gamepad')
+    const waiting = $('.waiting')
+    const padsList = $('.pads')
+    const axesList = $('.axes')
+    const buttonsList = $('.buttons')
+    const deadzoneInput = $('#deadzone')
+    const deadzoneLabel = $('#deadzone-value')
+    const vibrateButton = $('#vibrate')
+    const demoButton = $('#demo')
+    const toast = $('.toast')
+
+    // CONSTANTES
+    // Nombres de los botones según el mapeo "standard" de la especificación
+    const BUTTON_NAMES = [
+      'A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start',
+      'L3', 'R3', '↑', '↓', '←', '→', 'Home', 'Touchpad'
+    ]
+    const AXIS_NAMES = ['LX', 'LY', 'RX', 'RY']
+    const STICK_TRAVEL = 24 // píxeles del SVG que se mueve el joystick
+    const STICKS = [
+      { id: 'left', axes: [0, 1], button: 10, cx: 170, cy: 170 },
+      { id: 'right', axes: [2, 3], button: 11, cx: 375, cy: 250 }
+    ]
+
+    // ESTADO
+    let selectedIndex = null
+    let demoMode = false
+    let lastTimestamp = -1
+    let lastPadsKey = null
+    let toastTimeout = null
+    let apiBlocked = false
+
+    // ---------- Lectura de mandos ----------
+
+    // La Gamepad API es de SONDEO (polling), no de eventos: no hay un
+    // evento "botón pulsado". Hay que pedir el estado con getGamepads()
+    // en cada frame y comparar. Además, en Chrome cada llamada devuelve una
+    // "foto" nueva, así que no sirve guardar el objeto y leerlo más tarde
+    function readGamepads () {
+      if (!navigator.getGamepads) return []
+      try {
+        // Devuelve un array con huecos (null) donde no hay mando
+        return [...navigator.getGamepads()].filter(Boolean)
+      } catch {
+        // Puede estar bloqueada por Permissions-Policy (p. ej. en un iframe)
+        apiBlocked = true
+        return []
+      }
+    }
+
+    // Mando simulado con la misma forma que un objeto Gamepad real, para
+    // probar la interfaz sin tener un mando a mano
+    function createDemoGamepad (time) {
+      const t = time / 1000
+      const buttons = BUTTON_NAMES.slice(0, 17).map((_, index) => {
+        const pressed = Math.floor(t * 2.5) % 17 === index && ![6, 7].includes(index)
+        return { pressed, touched: pressed, value: pressed ? 1 : 0 }
+      })
+      // Gatillos analógicos: valores intermedios entre 0 y 1
+      buttons[6] = { pressed: false, touched: true, value: (Math.sin(t * 2) + 1) / 2 }
+      buttons[7] = { pressed: false, touched: true, value: (Math.cos(t * 1.4) + 1) / 2 }
+
+      return {
+        id: 'Mando de demostración (simulado)',
+        index: -1,
+        mapping: 'standard',
+        connected: true,
+        timestamp: time,
+        axes: [Math.cos(t * 1.5), Math.sin(t * 3) * 0.9, Math.sin(t * 0.9) * 0.4, Math.cos(t * 2.2) * 0.7],
+        buttons,
+        vibrationActuator: null
+      }
+    }
+
+    // ---------- Zona muerta ----------
+
+    // Los joysticks nunca vuelven exactamente a 0: en reposo pueden marcar
+    // 0.03 o -0.05. La zona muerta ignora ese ruido. Usamos una zona RADIAL
+    // (sobre la distancia al centro) y reescalamos para que el valor siga
+    // yendo de 0 a 1 justo desde el borde de la zona muerta
+    function applyDeadzone (x, y, deadzone) {
+      const magnitude = Math.hypot(x, y)
+      if (magnitude < deadzone) return { x: 0, y: 0 }
+      const scaled = Math.min(1, (magnitude - deadzone) / (1 - deadzone))
+      return { x: x / magnitude * scaled, y: y / magnitude * scaled }
+    }
+
+    // ---------- Pintar el mando ----------
+
+    function renderButtons (gamepad) {
+      svg.querySelectorAll('[data-button]').forEach(element => {
+        const button = gamepad.buttons[element.dataset.button]
+        const value = button?.value ?? 0
+        element.style.setProperty('--v', value.toFixed(3))
+        element.classList.toggle('pressed', Boolean(button?.pressed))
+      })
+    }
+
+    function renderSticks (gamepad) {
+      const deadzone = Number(deadzoneInput.value)
+
+      for (const stick of STICKS) {
+        const rawX = gamepad.axes[stick.axes[0]] ?? 0
+        const rawY = gamepad.axes[stick.axes[1]] ?? 0
+        const { x, y } = applyDeadzone(rawX, rawY, deadzone)
+        const knob = svg.querySelector(`#${stick.id}-knob`)
+        const line = svg.querySelector(`#${stick.id}-line`)
+        const knobX = stick.cx + x * STICK_TRAVEL
+        const knobY = stick.cy + y * STICK_TRAVEL
+
+        knob.setAttribute('cx', knobX)
+        knob.setAttribute('cy', knobY)
+        line.setAttribute('x2', knobX)
+        line.setAttribute('y2', knobY)
+        svg.querySelector(`#${stick.id}-deadzone`).setAttribute('r', deadzone * STICK_TRAVEL + 20)
+      }
+    }
+
+    // ---------- Valores en crudo ----------
+
+    // Construimos la lista una vez por mando (según cuántos botones y ejes
+    // tenga) y en cada frame solo actualizamos los números
+    function buildRawLists (gamepad) {
+      axesList.replaceChildren(...gamepad.axes.map((_, index) => {
+        const item = document.createElement('li')
+        item.innerHTML = `<span>${AXIS_NAMES[index] ?? `Eje ${index}`}</span><div class="axis-bar"><span></span></div><span class="value"></span>`
+        return item
+      }))
+
+      buttonsList.replaceChildren(...gamepad.buttons.map((_, index) => {
+        const item = document.createElement('li')
+        item.innerHTML = `<span>${index} ${BUTTON_NAMES[index] ?? ''}</span> <span class="value"></span>`
+        return item
+      }))
+    }
+
+    function renderRawValues (gamepad) {
+      gamepad.axes.forEach((value, index) => {
+        const item = axesList.children[index]
+        item.style.setProperty('--v', value.toFixed(3))
+        item.querySelector('.value').textContent = value.toFixed(2).padStart(5, ' ')
+      })
+
+      gamepad.buttons.forEach((button, index) => {
+        const item = buttonsList.children[index]
+        item.style.setProperty('--v', button.value.toFixed(3))
+        item.classList.toggle('pressed', button.pressed)
+        item.querySelector('.value').textContent = button.value.toFixed(2)
+      })
+    }
+
+    function renderInfo (gamepad) {
+      $('#info-id').textContent = gamepad.id
+      $('#info-index').textContent = gamepad.index
+      const mapping = $('#info-mapping')
+      mapping.textContent = gamepad.mapping || '(sin mapeo estándar)'
+      // Sin mapeo "standard" los índices de los botones pueden no coincidir
+      mapping.classList.toggle('warning', gamepad.mapping !== 'standard')
+      $('#info-count').textContent = `${gamepad.buttons.length} botones · ${gamepad.axes.length} ejes`
+      $('#info-timestamp').textContent = Math.round(gamepad.timestamp)
+    }
+
+    // ---------- Lista de mandos conectados ----------
+
+    function syncPadsList (gamepads) {
+      // Solo reconstruimos los botones si cambia el conjunto de mandos
+      const key = gamepads.map(pad => `${pad.index}:${pad.id}`).join('|')
+      if (key === lastPadsKey) return
+      lastPadsKey = key
+      lastTimestamp = -1
+
+      if (!gamepads.some(pad => pad.index === selectedIndex)) {
+        selectedIndex = gamepads[0]?.index ?? null
+        if (gamepads[0]) buildRawLists(gamepads[0])
+      }
+
+      padsList.replaceChildren(...gamepads.map(pad => {
+        const button = document.createElement('button')
+        button.textContent = `🎮 ${pad.index >= 0 ? pad.index + 1 : 'Demo'} · ${pad.id}`
+        button.title = pad.id
+        button.setAttribute('aria-pressed', String(pad.index === selectedIndex))
+        button.addEventListener('click', () => {
+          selectedIndex = pad.index
+          lastPadsKey = null
+          buildRawLists(pad)
+        })
+        return button
+      }))
+    }
+
+    function updateWaitingScreen (hasGamepad) {
+      waiting.hidden = hasGamepad
+      if (apiBlocked) {
+        waiting.querySelector('h2').textContent = 'Acceso a mandos bloqueado'
+        waiting.querySelector('p').textContent = 'Esta página no tiene permiso para usar la Gamepad API (puede pasar dentro de un iframe). Ábrela en su propia pestaña.'
+      }
+    }
+
+    // ---------- Bucle principal ----------
+
+    function loop (time) {
+      const realPads = readGamepads()
+      // Si se conecta un mando real, salimos del modo demostración
+      if (demoMode && realPads.length > 0) toggleDemo(false)
+
+      const gamepads = demoMode ? [createDemoGamepad(time)] : realPads
+      syncPadsList(gamepads)
+      updateWaitingScreen(gamepads.length > 0)
+
+      const gamepad = gamepads.find(pad => pad.index === selectedIndex)
+      // timestamp solo cambia cuando el mando envía datos nuevos: si es el
+      // mismo que en el frame anterior, no hace falta repintar nada
+      if (gamepad && gamepad.timestamp !== lastTimestamp) {
+        lastTimestamp = gamepad.timestamp
+        renderButtons(gamepad)
+        renderSticks(gamepad)
+        renderRawValues(gamepad)
+        renderInfo(gamepad)
+        vibrateButton.disabled = !gamepad.vibrationActuator
+      }
+
+      requestAnimationFrame(loop)
+    }
+
+    // ---------- Vibración ----------
+
+    async function vibrate () {
+      const gamepad = readGamepads().find(pad => pad.index === selectedIndex)
+      const actuator = gamepad?.vibrationActuator
+      if (!actuator) {
+        showToast('Este mando no expone vibración en tu navegador')
+        return
+      }
+
+      try {
+        // dual-rumble: motor fuerte (graves) y débil (agudos) por separado
+        await actuator.playEffect('dual-rumble', {
+          startDelay: 0,
+          duration: 700,
+          strongMagnitude: 1,
+          weakMagnitude: 0.6
+        })
+        showToast('📳 ¡Brrrr!')
+      } catch {
+        showToast('El mando no ha aceptado el efecto de vibración')
+      }
+    }
+
+    // ---------- Otros ----------
+
+    function toggleDemo (value = !demoMode) {
+      demoMode = value
+      demoButton.textContent = demoMode ? '⏹ Parar demo' : '▶ Ver demostración'
+      lastPadsKey = null // fuerza a reconstruir la lista de mandos
+      selectedIndex = null
+    }
+
+    function showToast (message) {
+      toast.textContent = message
+      toast.classList.add('visible')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => toast.classList.remove('visible'), 2400)
+    }
+
+    function init () {
+      if (!('getGamepads' in navigator)) {
+        waiting.querySelector('h2').textContent = 'Tu navegador no soporta la Gamepad API'
+        return
+      }
+
+      // Los eventos solo avisan de conexiones y desconexiones; el estado de
+      // los botones hay que leerlo en el bucle
+      window.addEventListener('gamepadconnected', (event) => {
+        showToast(`✅ Conectado: ${event.gamepad.id}`)
+      })
+      window.addEventListener('gamepaddisconnected', (event) => {
+        showToast(`❌ Desconectado: ${event.gamepad.id}`)
+      })
+
+      deadzoneInput.addEventListener('input', () => {
+        deadzoneLabel.textContent = Number(deadzoneInput.value).toFixed(2)
+        lastTimestamp = -1
+      })
+      vibrateButton.addEventListener('click', vibrate)
+      demoButton.addEventListener('click', () => toggleDemo())
+      $('#demo-inline').addEventListener('click', () => toggleDemo(true))
+
+      // Listas vacías (a cero) para que el panel no aparezca en blanco
+      buildRawLists({ axes: [0, 0, 0, 0], buttons: BUTTON_NAMES.slice(0, 17).map(() => ({ value: 0, pressed: false })) })
+      renderRawValues({ axes: [0, 0, 0, 0], buttons: BUTTON_NAMES.slice(0, 17).map(() => ({ value: 0, pressed: false })) })
+
+      requestAnimationFrame(loop)
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <header>
+    <h1>🎮 Tester de <span>mandos</span></h1>
+    <div class="pads" aria-label="Mandos conectados"></div>
+    <button id="demo" class="action">▶ Ver demostración</button>
+  </header>
+
+  <main>
+    <section class="stage">
+      <svg class="gamepad" viewBox="-10 0 620 390" role="img" aria-label="Mando con los botones pulsados iluminados">
+        <!-- Gatillos (analógicos): el relleno crece con el valor -->
+        <g>
+          <rect class="btn" x="120" y="8" width="90" height="46" rx="12" />
+          <rect class="trigger-fill" data-button="6" x="120" y="8" width="90" height="46" rx="12" />
+          <text class="label" x="165" y="31">LT</text>
+          <rect class="btn" x="390" y="8" width="90" height="46" rx="12" />
+          <rect class="trigger-fill" data-button="7" x="390" y="8" width="90" height="46" rx="12" />
+          <text class="label" x="435" y="31">RT</text>
+        </g>
+
+        <!-- Bumpers -->
+        <rect class="btn" data-button="4" x="100" y="62" width="130" height="24" rx="12" />
+        <text class="label small" x="165" y="74">LB</text>
+        <rect class="btn" data-button="5" x="370" y="62" width="130" height="24" rx="12" />
+        <text class="label small" x="435" y="74">RB</text>
+
+        <!-- Cuerpo -->
+        <path class="body"
+          d="M150 92 H450 C520 92 560 132 575 200 L595 300 C605 352 570 386 530 371 C500 359 470 322 440 302 H160 C130 322 100 359 70 371 C30 386 -5 352 5 300 L25 200 C40 132 80 92 150 92 Z" />
+
+        <!-- Select, Home, Start -->
+        <rect class="btn" data-button="8" x="248" y="150" width="30" height="18" rx="9" />
+        <text class="label small" x="263" y="182">SELECT</text>
+        <rect class="btn" data-button="9" x="322" y="150" width="30" height="18" rx="9" />
+        <text class="label small" x="337" y="182">START</text>
+        <circle class="btn" data-button="16" cx="300" cy="124" r="15" style="--on: #e9edf7" />
+
+        <!-- Joystick izquierdo -->
+        <circle class="stick-base" cx="170" cy="170" r="46" />
+        <circle class="deadzone" id="left-deadzone" cx="170" cy="170" r="22" />
+        <line class="stick-line" id="left-line" x1="170" y1="170" x2="170" y2="170" />
+        <circle class="btn" id="left-knob" data-button="10" cx="170" cy="170" r="20" />
+
+        <!-- Cruceta -->
+        <rect class="btn" data-button="12" x="213" y="210" width="24" height="30" rx="4" />
+        <rect class="btn" data-button="13" x="213" y="260" width="24" height="30" rx="4" />
+        <rect class="btn" data-button="14" x="185" y="238" width="30" height="24" rx="4" />
+        <rect class="btn" data-button="15" x="235" y="238" width="30" height="24" rx="4" />
+
+        <!-- Joystick derecho -->
+        <circle class="stick-base" cx="375" cy="250" r="46" />
+        <circle class="deadzone" id="right-deadzone" cx="375" cy="250" r="22" />
+        <line class="stick-line" id="right-line" x1="375" y1="250" x2="375" y2="250" />
+        <circle class="btn" id="right-knob" data-button="11" cx="375" cy="250" r="20" />
+
+        <!-- Botones frontales -->
+        <circle class="btn" data-button="3" cx="440" cy="132" r="18" style="--on: var(--y)" />
+        <text class="label" x="440" y="132">Y</text>
+        <circle class="btn" data-button="2" cx="404" cy="168" r="18" style="--on: var(--x)" />
+        <text class="label" x="404" y="168">X</text>
+        <circle class="btn" data-button="1" cx="476" cy="168" r="18" style="--on: var(--b)" />
+        <text class="label" x="476" y="168">B</text>
+        <circle class="btn" data-button="0" cx="440" cy="204" r="18" style="--on: var(--a)" />
+        <text class="label" x="440" y="204">A</text>
+      </svg>
+
+      <div class="waiting" role="status">
+        <span class="emoji" aria-hidden="true">🎮</span>
+        <h2>Pulsa cualquier botón del mando</h2>
+        <p>Conecta un mando por USB o Bluetooth. Por privacidad, el navegador no lo muestra hasta que pulsas un botón.</p>
+        <button class="action" id="demo-inline">¿No tienes mando? Ver demostración</button>
+      </div>
+    </section>
+
+    <aside>
+      <section>
+        <h3>Mando</h3>
+        <dl class="info">
+          <dt>id</dt>
+          <dd id="info-id">—</dd>
+          <dt>índice</dt>
+          <dd id="info-index">—</dd>
+          <dt>mapping</dt>
+          <dd id="info-mapping">—</dd>
+          <dt>controles</dt>
+          <dd id="info-count">—</dd>
+          <dt>timestamp</dt>
+          <dd id="info-timestamp">—</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h3>Ejes</h3>
+        <ul class="axes"></ul>
+      </section>
+
+      <label class="deadzone-control">
+        <span>Zona muerta de los joysticks: <strong id="deadzone-value">0.10</strong></span>
+        <input id="deadzone" type="range" min="0" max="0.4" step="0.01" value="0.1">
+      </label>
+
+      <section>
+        <h3>Botones</h3>
+        <ul class="buttons"></ul>
+      </section>
+
+      <button id="vibrate" class="action" disabled>📳 Probar vibración</button>
+      <p class="note">La vibración usa vibrationActuator.playEffect('dual-rumble') y solo funciona en navegadores y mandos compatibles.</p>
+    </aside>
+  </main>
+
+  <div class="toast" role="status"></div>
+</body>
+
+</html>

@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>53 - Router SPA</title>
+  <style>
+    :root {
+      --bg: #f7f7f4;
+      --surface: #ffffff;
+      --text: #1d1f24;
+      --muted: #6b6f78;
+      --border: #e4e4df;
+      --accent: #0f766e;
+      --accent-soft: #ccfbf1;
+      --code: #f1f1ec;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    /* ---------- Barra de direcciones simulada ---------- */
+
+    .browser-bar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: #ecece7;
+    }
+
+    .browser-bar button {
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .browser-bar button:hover:not(:disabled) {
+      background: rgb(0 0 0 / 7%);
+    }
+
+    .browser-bar button:disabled {
+      opacity: .3;
+      cursor: default;
+    }
+
+    .url {
+      flex: 1;
+      min-width: 0;
+      padding: 7px 14px;
+      border-radius: 99px;
+      background: var(--surface);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .url .host {
+      color: var(--muted);
+    }
+
+    .url .hash {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* ---------- Blog ---------- */
+
+    .site-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 24px;
+      padding: 16px clamp(16px, 4vw, 40px);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .logo {
+      color: var(--text);
+      font-weight: 800;
+      font-size: 20px;
+      text-decoration: none;
+    }
+
+    .logo span {
+      color: var(--accent);
+    }
+
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .site-nav a {
+      padding: 7px 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .site-nav a:hover {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .site-nav a[aria-current="page"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+      width: min(100%, 1200px);
+      margin: 0 auto;
+      padding: 24px clamp(16px, 4vw, 40px) 40px;
+    }
+
+    #app {
+      min-width: 0;
+      outline: none;
+    }
+
+    #app h1 {
+      margin: 0 0 8px;
+      font-size: clamp(26px, 4vw, 38px);
+      letter-spacing: -.02em;
+      line-height: 1.15;
+      outline: none;
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      color: inherit;
+      text-decoration: none;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 12px 24px -16px rgb(15 118 110 / 50%);
+    }
+
+    .card .emoji {
+      font-size: 28px;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .card p {
+      flex: 1;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .tag {
+      padding: 2px 9px;
+      border-radius: 99px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tags a {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .tags a.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    article {
+      max-width: 680px;
+      line-height: 1.7;
+      font-size: 17px;
+    }
+
+    article code,
+    .panel code {
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: var(--code);
+      font-size: .9em;
+    }
+
+    .section-title {
+      margin: 32px 0 12px;
+      font-size: 20px;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .steps li {
+      padding: 14px;
+      border-left: 3px solid var(--accent);
+      border-radius: 4px 12px 12px 4px;
+      background: var(--surface);
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .steps strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 32px;
+      font-size: 15px;
+    }
+
+    .not-found {
+      padding: 40px 0;
+      text-align: center;
+    }
+
+    .not-found .big {
+      font-size: 96px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--accent);
+    }
+
+    /* ---------- Panel del router ---------- */
+
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel {
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      font-size: 13px;
+    }
+
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .routes,
+    .log {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 12px;
+    }
+
+    .routes li {
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .routes li.matched {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .log {
+      max-height: 210px;
+      overflow-y: auto;
+    }
+
+    .log li {
+      padding: 3px 0;
+      border-bottom: 1px dashed var(--border);
+      overflow-wrap: anywhere;
+    }
+
+    .log .type {
+      display: inline-block;
+      min-width: 74px;
+      font-weight: 700;
+    }
+
+    .log .push {
+      color: #0f766e;
+    }
+
+    .log .pop {
+      color: #7c3aed;
+    }
+
+    .log .skip {
+      color: #b45309;
+    }
+
+    .log .load {
+      color: #2563eb;
+    }
+
+    .engine {
+      margin: 10px 0 0;
+      color: var(--muted);
+    }
+
+    @media (width < 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (width < 560px) {
+      .url .host {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: .2s;
+      }
+    }
+  </style>
+
+  <script type="module">
+    // ---------- Datos del blog ----------
+
+    const ARTICLES = [
+      { id: 1, emoji: '🧭', tag: 'js', date: '2026-09-02', title: 'Qué es un router en una SPA', excerpt: 'Cambiar de "página" sin recargar: la idea detrás de React Router, Vue Router y compañía.', body: ['Una <em>Single Page Application</em> carga un único HTML y a partir de ahí es JavaScript quien pinta cada vista.', 'El router se encarga de tres cosas: leer la URL, decidir qué vista toca y mantener sincronizado el historial del navegador para que los botones atrás y adelante sigan funcionando.'] },
+      { id: 2, emoji: '📜', tag: 'js', date: '2026-09-09', title: 'La History API sin misterios', excerpt: 'pushState, replaceState y el evento popstate explicados con ejemplos.', body: ['<code>history.pushState(estado, "", url)</code> añade una entrada al historial y cambia la URL <strong>sin hacer ninguna petición</strong>.', 'Cuando el usuario pulsa atrás o adelante el navegador dispara <code>popstate</code>. Ojo: pushState NO dispara popstate, por eso después de llamarlo tenemos que pintar nosotros la vista.'] },
+      { id: 3, emoji: '🧩', tag: 'js', date: '2026-09-16', title: 'URLPattern: rutas con parámetros', excerpt: 'La API nativa para reconocer rutas como /articulos/:id sin escribir expresiones regulares.', body: ['<code>new URLPattern({ pathname: "/articulos/:id" })</code> crea un patrón y <code>exec()</code> nos devuelve los grupos capturados.', 'No está en todos los navegadores, así que es buena idea tener un plan B con expresiones regulares.'] },
+      { id: 4, emoji: '🎨', tag: 'css', date: '2026-09-18', title: 'Transiciones entre vistas', excerpt: 'Con la View Transitions API, cambiar de página puede tener una animación suave.', body: ['<code>document.startViewTransition(callback)</code> hace una captura de la vista actual, ejecuta el callback que actualiza el DOM y anima entre ambos estados.', 'Si el navegador no la soporta simplemente llamamos al callback: mejora progresiva.'] },
+      { id: 5, emoji: '♿', tag: 'a11y', date: '2026-09-23', title: 'Accesibilidad al cambiar de ruta', excerpt: 'Un lector de pantalla no se entera de que la "página" ha cambiado si no le ayudamos.', body: ['Al navegar en una SPA el foco se queda en el enlace pulsado. Mover el foco al nuevo título ayuda a que el lector de pantalla anuncie la nueva vista.', 'Actualizar <code>document.title</code> y marcar el enlace activo con <code>aria-current="page"</code> completan la experiencia.'] },
+      { id: 6, emoji: '🗂️', tag: 'css', date: '2026-09-28', title: 'Diseñando un blog minimalista', excerpt: 'Tipografía, espacio en blanco y un solo color de acento. Menos es más.', body: ['Un buen diseño de blog deja respirar al texto: líneas de 60 a 75 caracteres y un interlineado generoso.', 'Un único color de acento para enlaces y estados activos da coherencia sin distraer.'] }
+    ]
+
+    const TAGS = { js: 'JavaScript', css: 'CSS', a11y: 'Accesibilidad' }
+    const dateFormatter = new Intl.DateTimeFormat('es', { dateStyle: 'medium' })
+
+    // ---------- Vistas: funciones que devuelven { title, html } ----------
+
+    function articleCard({ id, emoji, tag, date, title, excerpt }) {
+      return `
+        <a class="card" href="#/articulos/${id}">
+          <span class="emoji">${emoji}</span>
+          <h2>${title}</h2>
+          <p>${excerpt}</p>
+          <span class="meta"><span class="tag">${TAGS[tag]}</span>${dateFormatter.format(new Date(`${date}T12:00`))}</span>
+        </a>`
+    }
+
+    function HomeView() {
+      return {
+        title: 'Inicio',
+        html: `
+          <h1 tabindex="-1">Un blog que nunca recarga la página</h1>
+          <p class="lead">Navega por los artículos y mira la barra de direcciones y el registro del router: cada clic
+            es un <code>pushState</code>, cada atrás/adelante un <code>popstate</code>. ¡Y puedes recargar sin miedo!</p>
+          <div class="cards">${ARTICLES.slice(-3).reverse().map(articleCard).join('')}</div>
+          <h2 class="section-title">¿Cómo funciona?</h2>
+          <ol class="steps">
+            <li><strong>1. Clic en un enlace</strong>Un único listener en <code>document</code> lo intercepta con <code>preventDefault()</code>.</li>
+            <li><strong>2. pushState</strong>Cambiamos la URL y añadimos una entrada al historial sin pedir nada al servidor.</li>
+            <li><strong>3. Buscar la ruta</strong><code>URLPattern</code> compara la URL con cada ruta y extrae los parámetros.</li>
+            <li><strong>4. Pintar la vista</strong>Actualizamos el contenido, <code>document.title</code> y el enlace activo.</li>
+          </ol>`
+      }
+    }
+
+    function ArticlesView({ query }) {
+      const tag = query.get('tag')
+      const list = tag ? ARTICLES.filter((article) => article.tag === tag) : ARTICLES
+      const tagLinks = [['', 'Todos'], ...Object.entries(TAGS)].map(([key, name]) => `
+        <a href="#/articulos${key ? `?tag=${key}` : ''}" class="${(tag ?? '') === key ? 'active' : ''}">${name}</a>`).join('')
+
+      return {
+        title: tag ? `Artículos de ${TAGS[tag] ?? tag}` : 'Artículos',
+        html: `
+          <h1 tabindex="-1">Artículos</h1>
+          <p class="lead">Los filtros también son parte de la URL (<code>?tag=</code>), así que se pueden compartir.</p>
+          <nav class="tags" aria-label="Filtrar por etiqueta">${tagLinks}</nav>
+          <div class="cards">${list.map(articleCard).join('') || '<p>No hay artículos con esa etiqueta.</p>'}</div>`
+      }
+    }
+
+    function ArticleView({ params }) {
+      const index = ARTICLES.findIndex((article) => String(article.id) === params.id)
+      if (index === -1) return NotFoundView({ path: `/articulos/${params.id}` })
+
+      const { emoji, title, tag, date, body } = ARTICLES[index]
+      const previous = ARTICLES[index - 1]
+      const next = ARTICLES[index + 1]
+
+      return {
+        title,
+        html: `
+          <article>
+            <p class="meta"><a href="#/articulos">← Artículos</a> · <span class="tag">${TAGS[tag]}</span> ${dateFormatter.format(new Date(`${date}T12:00`))}</p>
+            <h1 tabindex="-1">${emoji} ${title}</h1>
+            ${body.map((paragraph) => `<p>${paragraph}</p>`).join('')}
+            <nav class="pager">
+              ${previous ? `<a href="#/articulos/${previous.id}">← ${previous.title}</a>` : '<span></span>'}
+              ${next ? `<a href="#/articulos/${next.id}">${next.title} →</a>` : ''}
+            </nav>
+          </article>`
+      }
+    }
+
+    function AboutView() {
+      return {
+        title: 'Sobre mí',
+        html: `
+          <h1 tabindex="-1">Sobre mí 👋</h1>
+          <p class="lead">Este blog es una demo del proyecto 53 de los 100 proyectos de JavaScript.</p>
+          <article>
+            <p>Todo lo que ves está en un único <code>index.html</code>. El router ocupa unas 50 líneas y usa solo
+              APIs del navegador: <code>history.pushState</code>, el evento <code>popstate</code> y <code>URLPattern</code>.</p>
+            <p>Prueba a abrir un enlace con <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + clic: el router no lo intercepta y el
+              navegador lo abre en otra pestaña, como debe ser. Lo mismo con los enlaces con
+              <code>target="_blank"</code>, como esta
+              <a href="https://developer.mozilla.org/es/docs/Web/API/History_API" target="_blank" rel="noopener">documentación de la History API en MDN</a>.</p>
+          </article>`
+      }
+    }
+
+    function NotFoundView({ path }) {
+      return {
+        title: 'Página no encontrada',
+        html: `
+          <div class="not-found">
+            <div class="big">404</div>
+            <h1 tabindex="-1">Aquí no hay nada</h1>
+            <p class="lead">La ruta <code>${path.replaceAll('<', '&lt;')}</code> no existe.</p>
+            <a href="#/">Volver al inicio</a>
+          </div>`
+      }
+    }
+
+    // ---------- Router ----------
+
+    // ¿Hash (#/articulos/1) o History "limpio" (/articulos/1)?
+    //  - Con rutas limpias, al RECARGAR el navegador pide /articulos/1 al servidor.
+    //    Un servidor estático no tiene ese archivo y devuelve 404, salvo que lo
+    //    configures para servir siempre index.html (lo que hacen Vercel, Netlify...).
+    //    Además aquí estamos en una subcarpeta, habría que calcular una "base".
+    //  - Con hash, todo lo que va tras # NUNCA se envía al servidor: siempre se
+    //    sirve este index.html y recargar funciona en cualquier sitio. A cambio,
+    //    las URLs son menos bonitas y el SEO es peor.
+    // Usamos hash, pero navegamos con pushState/popstate igual que con rutas limpias.
+
+    const USE_URL_PATTERN = 'URLPattern' in window
+
+    // Convierte '/articulos/:id' en una función que devuelve los parámetros o null
+    function compile(path) {
+      if (USE_URL_PATTERN) {
+        const pattern = new URLPattern({ pathname: path })
+        return (pathname) => pattern.exec({ pathname })?.pathname.groups ?? null
+      }
+
+      // Plan B: '/articulos/:id' -> /^\/articulos\/([^/]+)\/?$/
+      const keys = []
+      const source = path.replace(/:(\w+)/g, (_, key) => {
+        keys.push(key)
+        return '([^/]+)'
+      })
+      const regex = new RegExp(`^${source}/?$`)
+      return (pathname) => {
+        const match = regex.exec(pathname)
+        return match ? Object.fromEntries(keys.map((key, i) => [key, decodeURIComponent(match[i + 1])])) : null
+      }
+    }
+
+    function createRouter({ routes, notFound, onChange, onSkip = () => {} }) {
+      const compiled = routes.map((route) => ({ ...route, match: compile(route.path) }))
+
+      function getLocation() {
+        // '#/articulos?tag=css' -> pathname '/articulos' y query 'tag=css'
+        const [pathname, search = ''] = (location.hash.slice(1) || '/').split('?')
+        return { pathname, query: new URLSearchParams(search) }
+      }
+
+      function render(reason) {
+        const { pathname, query } = getLocation()
+        for (const route of compiled) {
+          const params = route.match(pathname)
+          if (params) return onChange({ route, view: route.view({ params, query }), pathname, reason })
+        }
+        onChange({ route: null, view: notFound({ path: pathname }), pathname, reason })
+      }
+
+      function navigate(hash) {
+        if (hash === location.hash) return
+        // Guardamos el scroll de la página actual para restaurarlo al volver atrás
+        history.replaceState({ ...history.state, scrollY: window.scrollY }, '')
+        const index = (history.state?.index ?? 0) + 1
+        history.pushState({ index }, '', hash)
+        // pushState NO dispara popstate: pintamos nosotros
+        render('push')
+      }
+
+      // Atrás / adelante (y cambios manuales del hash en la barra de direcciones)
+      window.addEventListener('popstate', () => render('pop'))
+
+      // Delegación: un único listener en document para TODOS los enlaces,
+      // también los que se pinten más tarde
+      document.addEventListener('click', (event) => {
+        const link = event.target.closest('a[href]')
+        if (!link) return
+
+        // Respetamos lo que el usuario espera del navegador:
+        // Ctrl/Cmd/Shift + clic (nueva pestaña/ventana), botón central, target="_blank", download...
+        const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+        const opensElsewhere = (link.target && link.target !== '_self') || link.hasAttribute('download')
+        if (event.defaultPrevented || event.button !== 0 || hasModifier || opensElsewhere) {
+          onSkip(link, hasModifier ? 'modificador' : 'target')
+          return
+        }
+
+        // Solo interceptamos enlaces internos a nuestras rutas (#/...)
+        const url = new URL(link.href)
+        const isInternal = url.origin === location.origin && url.pathname === location.pathname && url.hash.startsWith('#/')
+        if (!isInternal) return
+
+        event.preventDefault()
+        navigate(url.hash)
+      })
+
+      return { render, navigate }
+    }
+
+    // ---------- Integración con la página ----------
+
+    const $ = (selector) => document.querySelector(selector)
+    const app = $('#app')
+    const logList = $('#log')
+    const routesList = $('#routes')
+    const urlElement = $('#url')
+    const backButton = $('#back')
+    const forwardButton = $('#forward')
+
+    const ROUTES = [
+      { path: '/', view: HomeView },
+      { path: '/articulos', view: ArticlesView },
+      { path: '/articulos/:id', view: ArticleView },
+      { path: '/sobre-mi', view: AboutView }
+    ]
+
+    let maxIndex = history.state?.index ?? 0
+    let currentIndex = maxIndex
+
+    // Restauramos el scroll nosotros (con history.state), así que desactivamos el automático
+    history.scrollRestoration = 'manual'
+
+    function log(type, text) {
+      const item = document.createElement('li')
+      item.innerHTML = `<span class="type ${type}">${type}</span> ${text.replaceAll('<', '&lt;')}`
+      logList.prepend(item)
+      while (logList.children.length > 30) logList.lastChild.remove()
+    }
+
+    function onSkip(link, why) {
+      log('skip', `${link.getAttribute('href')} (${why}: lo gestiona el navegador)`)
+    }
+
+    function updateBrowserBar() {
+      const { host, pathname, hash } = location
+      urlElement.innerHTML = `<span class="host">${host}${pathname}</span><span class="hash">${hash.replaceAll('<', '&lt;')}</span>`
+
+      // Llevamos la cuenta de nuestra posición en el historial con history.state.
+      // Dentro de un iframe, history.back() sin entradas propias movería la página PADRE
+      const index = history.state?.index ?? 0
+      backButton.disabled = index <= 0
+      forwardButton.disabled = index >= maxIndex
+    }
+
+    function markActiveLinks(pathname) {
+      document.querySelectorAll('.site-nav a').forEach((link) => {
+        const linkPath = link.getAttribute('href').slice(1)
+        // "Artículos" también está activo dentro de /articulos/3
+        const isActive = linkPath === '/' ? pathname === '/' : pathname.startsWith(linkPath)
+        if (isActive) link.setAttribute('aria-current', 'page')
+        else link.removeAttribute('aria-current')
+      })
+    }
+
+    function renderView({ route, view, pathname, reason }) {
+      const update = () => {
+        app.innerHTML = view.html
+        document.title = `${view.title} · Blog SPA`
+        markActiveLinks(pathname)
+        routesList.querySelectorAll('li').forEach((item) => {
+          item.classList.toggle('matched', item.dataset.path === route?.path)
+        })
+      }
+
+      // View Transitions si el navegador las soporta (mejora progresiva)
+      if (document.startViewTransition && reason !== 'load') document.startViewTransition(update)
+      else update()
+
+      // Si el usuario cambia el hash a mano, la nueva entrada no tiene estado: se lo ponemos
+      if (!history.state) {
+        history.replaceState({ index: currentIndex + 1 }, '')
+        maxIndex = currentIndex + 1
+      }
+      currentIndex = history.state.index
+      if (reason === 'push') maxIndex = currentIndex
+      updateBrowserBar()
+
+      const params = route ? JSON.stringify(route.match(pathname)) : '—'
+      log(reason, `${location.hash} → ${route?.path ?? '404'} ${route?.path.includes(':') ? params : ''}`)
+
+      // Al navegar hacia delante subimos arriba; al volver, restauramos el scroll
+      if (reason === 'pop') window.scrollTo(0, history.state?.scrollY ?? 0)
+      else if (reason === 'push') window.scrollTo(0, 0)
+
+      // Movemos el foco al título para que los lectores de pantalla anuncien la nueva vista
+      if (reason !== 'load') requestAnimationFrame(() => app.querySelector('h1')?.focus({ preventScroll: true }))
+    }
+
+    routesList.innerHTML = ROUTES.map(({ path }) => `<li data-path="${path}">${path}</li>`).join('') + '<li>*  → 404</li>'
+    $('#engine').textContent = USE_URL_PATTERN ? '✅ Usando URLPattern nativo' : '⚠️ URLPattern no disponible: usando RegExp'
+
+    const router = createRouter({ routes: ROUTES, notFound: NotFoundView, onChange: renderView, onSkip })
+
+    backButton.addEventListener('click', () => history.back())
+    forwardButton.addEventListener('click', () => history.forward())
+    $('#reload').addEventListener('click', () => location.reload())
+
+    // Primera carga: si no hay hash, lo ponemos sin crear una entrada nueva en el historial
+    if (!location.hash.startsWith('#/')) history.replaceState({ index: 0 }, '', '#/')
+    else if (!history.state) history.replaceState({ index: 0 }, '')
+    router.render('load')
+  </script>
+</head>
+
+<body>
+  <div class="browser-bar">
+    <button id="back" aria-label="Atrás" title="Atrás">←</button>
+    <button id="forward" aria-label="Adelante" title="Adelante">→</button>
+    <button id="reload" aria-label="Recargar" title="Recargar (¡prueba que funciona!)">↻</button>
+    <div id="url" class="url" aria-label="URL actual"></div>
+  </div>
+
+  <header class="site-header">
+    <a class="logo" href="#/">📝 blog<span>.spa</span></a>
+    <nav class="site-nav" aria-label="Principal">
+      <a href="#/">Inicio</a>
+      <a href="#/articulos">Artículos</a>
+      <a href="#/sobre-mi">Sobre mí</a>
+      <a href="#/esta-ruta-no-existe">Enlace roto</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <main id="app"></main>
+
+    <aside>
+      <section class="panel">
+        <h3>Rutas</h3>
+        <ul id="routes" class="routes"></ul>
+        <p id="engine" class="engine"></p>
+      </section>
+      <section class="panel">
+        <h3>Registro del router</h3>
+        <ul id="log" class="log"></ul>
+      </section>
+    </aside>
+  </div>
+</body>
+
+</html>

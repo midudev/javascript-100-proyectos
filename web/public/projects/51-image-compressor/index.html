@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>51 - Compresor de imágenes</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --text: #131722;
+      --muted: #687086;
+      --border: #e3e6ef;
+      --accent: #0ea5e9;
+      --accent-dark: #0369a1;
+      --green: #15803d;
+      --green-bg: #dcfce7;
+      --red: #b91c1c;
+      --red-bg: #fee2e2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px clamp(16px, 3vw, 32px);
+      background:
+        radial-gradient(700px 300px at 0% 0%, #e0f2fe, transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 26px);
+    }
+
+    h1 small {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .settings {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 18px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      font-size: 14px;
+    }
+
+    .settings label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+    }
+
+    .settings output {
+      min-width: 36px;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    select,
+    button {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(300px, 400px) 1fr;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .dropzone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      padding: 18px;
+      border: 2px dashed #b8c2d8;
+      border-radius: 16px;
+      background: var(--surface);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+
+    .dropzone:hover,
+    .dropzone:focus-within,
+    .dropzone.dragging {
+      border-color: var(--accent);
+      background: #f0f9ff;
+    }
+
+    .dropzone strong {
+      font-size: 15px;
+    }
+
+    .dropzone span {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .dropzone input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .summary strong {
+      color: var(--green);
+    }
+
+    .summary button {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .files {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .file {
+      display: grid;
+      grid-template-columns: 52px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .file.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgb(14 165 233 / 15%);
+    }
+
+    .file img {
+      width: 52px;
+      height: 52px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--border);
+    }
+
+    .file .info {
+      min-width: 0;
+      font-size: 13px;
+    }
+
+    .file .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .file .sizes {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 2px;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .badge.worse {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+
+    .badge.pending {
+      background: #eef2f7;
+      color: var(--muted);
+    }
+
+    .file .buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .file .buttons button {
+      height: 32px;
+      padding: 0 10px;
+    }
+
+    .compare-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .compare-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .compare-header strong {
+      color: var(--text);
+    }
+
+    .compare {
+      --pos: 50%;
+      position: relative;
+      flex: 1;
+      min-height: 240px;
+      border-radius: 10px;
+      overflow: hidden;
+      /* Tablero de ajedrez para ver la transparencia */
+      background: repeating-conic-gradient(#eef0f5 0 25%, #fff 0 50%) 0 0 / 20px 20px;
+    }
+
+    .compare img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* La imagen comprimida solo se ve a la derecha de la línea */
+    .compare .after {
+      clip-path: inset(0 0 0 var(--pos));
+    }
+
+    .compare .divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--pos);
+      width: 3px;
+      background: white;
+      box-shadow: 0 0 0 1px rgb(0 0 0 / 20%);
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .compare .divider::after {
+      content: '⇆';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: grid;
+      place-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 4px 14px rgb(0 0 0 / 25%);
+      color: var(--accent-dark);
+      font-weight: 700;
+      transform: translate(-50%, -50%);
+    }
+
+    .compare .label {
+      position: absolute;
+      top: 10px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: rgb(0 0 0 / 60%);
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .compare .label.before {
+      left: 10px;
+    }
+
+    .compare .label.after-label {
+      right: 10px;
+    }
+
+    /* Un range invisible encima de todo: accesible con teclado y fácil de arrastrar */
+    .compare input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: ew-resize;
+    }
+
+    .empty {
+      display: grid;
+      place-content: center;
+      height: 100%;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: var(--text);
+      color: white;
+      font-size: 14px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (width < 820px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .compare {
+        min-height: 300px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const MIME_TYPES = { webp: 'image/webp', jpeg: 'image/jpeg' }
+    const EXTENSIONS = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' }
+    const SETTINGS_DEBOUNCE = 300
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const dropzone = $('#dropzone')
+    const fileInput = $('#file-input')
+    const fileList = $('#files')
+    const summary = $('#summary')
+    const formatSelect = $('#format')
+    const qualityInput = $('#quality')
+    const qualityOutput = $('#quality-output')
+    const maxWidthSelect = $('#max-width')
+    const compareElement = $('#compare')
+    const compareHeader = $('#compare-header')
+    const toastElement = $('#toast')
+
+    // Cada imagen: { id, file, originalURL, result, element }
+    const items = []
+    let selectedId = null
+    let settingsVersion = 0
+    let nextId = 1
+
+    // ---------- Utilidades ----------
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return `${bytes} B`
+      if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
+      return `${(bytes / 1024 ** 2).toFixed(2)} MB`
+    }
+
+    function getSettings() {
+      return {
+        type: MIME_TYPES[formatSelect.value],
+        quality: Number(qualityInput.value),
+        maxWidth: Number(maxWidthSelect.value) || Infinity
+      }
+    }
+
+    let toastTimeout
+    function toast(message) {
+      toastElement.textContent = message
+      toastElement.classList.add('show')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => toastElement.classList.remove('show'), 3000)
+    }
+
+    // ---------- Compresión ----------
+
+    async function compressImage(file, { type, quality, maxWidth }) {
+      // createImageBitmap decodifica la imagen (sin tener que crear un <img> y esperar
+      // a su onload) y respeta la orientación EXIF de las fotos del móvil
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      const scale = Math.min(1, maxWidth / bitmap.width)
+      const width = Math.round(bitmap.width * scale)
+      const height = Math.round(bitmap.height * scale)
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d')
+
+      // JPEG no admite transparencia: sin fondo, lo transparente saldría negro
+      if (type === 'image/jpeg') {
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, width, height)
+      }
+
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(bitmap, 0, 0, width, height)
+
+      const original = { width: bitmap.width, height: bitmap.height }
+      // Un ImageBitmap ocupa la imagen DESCOMPRIMIDA en memoria (ancho × alto × 4 bytes).
+      // close() la libera ya, sin esperar al recolector de basura
+      bitmap.close()
+
+      // toBlob vuelve a codificar los píxeles en el formato y calidad (0 a 1) que pidamos
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((result) => (result ? resolve(result) : reject(new Error('toBlob ha fallado'))), type, quality)
+      })
+
+      return { blob, width, height, original }
+    }
+
+    async function processItem(item, version) {
+      renderItem(item, { pending: true })
+
+      try {
+        const result = await compressImage(item.file, getSettings())
+        // Si mientras comprimíamos han cambiado los ajustes (o se ha borrado la imagen),
+        // descartamos este resultado para no pisar uno más reciente
+        if (version !== settingsVersion || !items.includes(item)) return
+
+        // IMPORTANTE: cada URL.createObjectURL mantiene el Blob vivo en memoria hasta
+        // que se revoca o se cierra la página. Si no liberamos la anterior al
+        // recomprimir, cada cambio de calidad dejaría varios MB "perdidos" (fuga de memoria)
+        if (item.result) URL.revokeObjectURL(item.result.url)
+        item.result = { ...result, url: URL.createObjectURL(result.blob) }
+
+        if (result.blob.type !== getSettings().type) {
+          toast(`Tu navegador no sabe codificar ${formatSelect.value.toUpperCase()}, se ha usado ${EXTENSIONS[result.blob.type].toUpperCase()}`)
+        }
+      } catch (error) {
+        item.error = 'No se ha podido leer la imagen'
+        console.warn(error)
+      }
+
+      renderItem(item)
+      if (item.id === selectedId) renderCompare()
+      renderSummary()
+    }
+
+    async function processAll() {
+      const version = ++settingsVersion
+      // Una a una (y no todas a la vez con Promise.all) para no disparar la memoria
+      // con muchas imágenes grandes descomprimidas al mismo tiempo
+      for (const item of [...items]) {
+        if (version !== settingsVersion) return
+        await processItem(item, version)
+      }
+    }
+
+    // ---------- Gestión de archivos ----------
+
+    function addFiles(fileArray) {
+      const images = fileArray.filter((file) => file.type.startsWith('image/'))
+      const rejected = fileArray.length - images.length
+      if (rejected > 0) toast(`Se han ignorado ${rejected} archivo(s) que no son imágenes`)
+
+      const newItems = images.map((file) => {
+        const item = {
+          id: nextId++,
+          file,
+          // Una Object URL apunta al archivo local sin leerlo entero en memoria ni subirlo
+          originalURL: URL.createObjectURL(file),
+          result: null,
+          error: null,
+          element: createItemElement()
+        }
+        item.element.dataset.id = item.id
+        fileList.append(item.element)
+        return item
+      })
+
+      items.push(...newItems)
+      if (!selectedId && newItems.length > 0) selectedId = newItems[0].id
+
+      const version = settingsVersion
+      newItems.reduce((chain, item) => chain.then(() => processItem(item, version)), Promise.resolve())
+      renderSummary()
+      renderCompare()
+    }
+
+    function removeItem(id) {
+      const index = items.findIndex((item) => item.id === id)
+      if (index === -1) return
+      const [item] = items.splice(index, 1)
+
+      // Al quitar la imagen liberamos TODAS sus URLs
+      URL.revokeObjectURL(item.originalURL)
+      if (item.result) URL.revokeObjectURL(item.result.url)
+      item.element.remove()
+
+      if (selectedId === id) selectedId = items[0]?.id ?? null
+      renderSummary()
+      renderCompare()
+      updateSelection()
+    }
+
+    function downloadItem(item) {
+      if (!item.result) return
+      const baseName = item.file.name.replace(/\.[^.]+$/, '')
+      const link = document.createElement('a')
+      // Reutilizamos la URL que ya tenemos: no hace falta crear otra
+      link.href = item.result.url
+      link.download = `${baseName}-comprimida.${EXTENSIONS[item.result.blob.type]}`
+      link.click()
+    }
+
+    // ---------- Pintado ----------
+
+    function createItemElement() {
+      const element = document.createElement('li')
+      element.className = 'file'
+      element.innerHTML = `
+        <img alt="">
+        <div class="info">
+          <div class="name"></div>
+          <div class="sizes"></div>
+          <span class="badge pending"></span>
+        </div>
+        <div class="buttons">
+          <button class="download primary" title="Descargar">⬇️</button>
+          <button class="remove" title="Quitar">✕</button>
+        </div>
+      `
+      return element
+    }
+
+    function renderItem(item, { pending = false } = {}) {
+      const { element, file, result, error } = item
+      element.querySelector('img').src = item.originalURL
+      element.querySelector('.name').textContent = file.name
+      const badge = element.querySelector('.badge')
+      const sizes = element.querySelector('.sizes')
+      element.querySelector('.download').disabled = !result || pending
+
+      if (error) {
+        sizes.textContent = formatBytes(file.size)
+        badge.className = 'badge worse'
+        badge.textContent = error
+        return
+      }
+
+      if (pending || !result) {
+        sizes.textContent = `${formatBytes(file.size)} → …`
+        badge.className = 'badge pending'
+        badge.textContent = 'Comprimiendo…'
+        return
+      }
+
+      const saved = 1 - result.blob.size / file.size
+      sizes.textContent = `${formatBytes(file.size)} → ${formatBytes(result.blob.size)} · ${result.width}×${result.height}`
+      badge.className = `badge ${saved < 0 ? 'worse' : ''}`
+      badge.textContent = saved >= 0 ? `−${(saved * 100).toFixed(0)}%` : `+${(-saved * 100).toFixed(0)}% (más grande)`
+    }
+
+    function renderSummary() {
+      const done = items.filter((item) => item.result)
+      const before = done.reduce((sum, item) => sum + item.file.size, 0)
+      const after = done.reduce((sum, item) => sum + item.result.blob.size, 0)
+      const saved = before ? (1 - after / before) * 100 : 0
+
+      summary.innerHTML = items.length === 0
+        ? 'Aún no hay imágenes'
+        : `<span>${items.length} imagen(es) · ${formatBytes(before)} → ${formatBytes(after)} <strong>(−${saved.toFixed(0)}%)</strong></span>
+           <button id="download-all" ${done.length ? '' : 'disabled'}>Descargar todas</button>`
+    }
+
+    function updateSelection() {
+      for (const item of items) item.element.classList.toggle('selected', item.id === selectedId)
+    }
+
+    function renderCompare() {
+      const item = items.find(({ id }) => id === selectedId)
+      updateSelection()
+
+      if (!item) {
+        compareHeader.textContent = ''
+        compareElement.innerHTML = '<div class="empty">Añade una imagen para comparar el antes y el después</div>'
+        return
+      }
+
+      const { result, file } = item
+      compareHeader.innerHTML = result
+        ? `<span><strong>${file.name}</strong> · ${result.original.width}×${result.original.height} → ${result.width}×${result.height}</span>
+           <span>Arrastra la línea para comparar</span>`
+        : `<span><strong>${file.name}</strong></span>`
+
+      const position = compareElement.style.getPropertyValue('--pos') || '50%'
+      compareElement.innerHTML = `
+        <img src="${item.originalURL}" alt="Original">
+        ${result ? `<img class="after" src="${result.url}" alt="Comprimida">` : ''}
+        <span class="label before">Antes · ${formatBytes(file.size)}</span>
+        ${result ? `<span class="label after-label">Después · ${formatBytes(result.blob.size)}</span>` : ''}
+        <div class="divider"></div>
+        <input type="range" min="0" max="100" step="0.1" value="${parseFloat(position)}" aria-label="Posición del comparador">
+      `
+      compareElement.style.setProperty('--pos', position)
+    }
+
+    // ---------- Imagen de ejemplo generada con canvas ----------
+
+    async function createSampleImage() {
+      const WIDTH = 2400
+      const HEIGHT = 1500
+      const canvas = document.createElement('canvas')
+      canvas.width = WIDTH
+      canvas.height = HEIGHT
+      const context = canvas.getContext('2d')
+
+      const sky = context.createLinearGradient(0, 0, 0, HEIGHT)
+      sky.addColorStop(0, '#1e3a8a')
+      sky.addColorStop(0.45, '#f472b6')
+      sky.addColorStop(0.7, '#fdba74')
+      context.fillStyle = sky
+      context.fillRect(0, 0, WIDTH, HEIGHT)
+
+      context.fillStyle = '#fef3c7'
+      context.shadowColor = '#fde68a'
+      context.shadowBlur = 120
+      context.beginPath()
+      context.arc(WIDTH * 0.62, HEIGHT * 0.52, 190, 0, Math.PI * 2)
+      context.fill()
+      context.shadowBlur = 0
+
+      // Capas de montañas con ruido para que parezca una foto
+      const LAYERS = ['#7c3aed', '#5b21b6', '#3b0764', '#1e0536']
+      LAYERS.forEach((color, layer) => {
+        context.fillStyle = color
+        context.beginPath()
+        context.moveTo(0, HEIGHT)
+        for (let x = 0; x <= WIDTH; x += 8) {
+          const base = HEIGHT * (0.55 + layer * 0.1)
+          const y = base - Math.sin(x / (260 - layer * 40) + layer * 2) * 90 - Math.sin(x / 57 + layer) * 22 - Math.random() * 10
+          context.lineTo(x, y)
+        }
+        context.lineTo(WIDTH, HEIGHT)
+        context.fill()
+      })
+
+      // Grano fotográfico: el ruido es lo que más pesa en un PNG sin pérdida
+      const imageData = context.getImageData(0, 0, WIDTH, HEIGHT)
+      const { data } = imageData
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 22
+        data[i] += noise
+        data[i + 1] += noise
+        data[i + 2] += noise
+      }
+      context.putImageData(imageData, 0, 0)
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      return new File([blob], 'atardecer-ejemplo.png', { type: 'image/png' })
+    }
+
+    // Segundo ejemplo: un icono con fondo TRANSPARENTE (WebP lo conserva, JPEG no)
+    async function createSampleIcon() {
+      const SIZE = 1200
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE
+      canvas.height = SIZE
+      const context = canvas.getContext('2d')
+
+      const gradient = context.createLinearGradient(0, 0, SIZE, SIZE)
+      gradient.addColorStop(0, '#0ea5e9')
+      gradient.addColorStop(1, '#6366f1')
+      context.fillStyle = gradient
+      context.beginPath()
+      context.roundRect(150, 150, SIZE - 300, SIZE - 300, 220)
+      context.fill()
+
+      context.font = `${SIZE * 0.42}px system-ui, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('🗜️', SIZE / 2, SIZE / 2 + 20)
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      return new File([blob], 'icono-transparente.png', { type: 'image/png' })
+    }
+
+    // ---------- Eventos ----------
+
+    // Para que el navegador permita soltar archivos hay que cancelar dragover:
+    // por defecto, soltar una imagen hace que el navegador la abra y salga de la página
+    dropzone.addEventListener('dragover', (event) => {
+      event.preventDefault()
+      dropzone.classList.add('dragging')
+    })
+
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragging'))
+
+    dropzone.addEventListener('drop', (event) => {
+      event.preventDefault()
+      dropzone.classList.remove('dragging')
+      addFiles([...event.dataTransfer.files])
+    })
+
+    // Si sueltan la imagen fuera de la zona, evitamos que el navegador navegue a ella
+    window.addEventListener('dragover', (event) => event.preventDefault())
+    window.addEventListener('drop', (event) => event.preventDefault())
+
+    fileInput.addEventListener('change', () => {
+      addFiles([...fileInput.files])
+      fileInput.value = '' // permite volver a elegir el mismo archivo
+    })
+
+    // Extra: pegar imágenes con Ctrl/Cmd + V
+    document.addEventListener('paste', (event) => {
+      const files = [...(event.clipboardData?.files ?? [])]
+      if (files.length) addFiles(files)
+    })
+
+    fileList.addEventListener('click', (event) => {
+      const element = event.target.closest('.file')
+      if (!element) return
+      const item = items.find(({ id }) => id === Number(element.dataset.id))
+
+      if (event.target.closest('.remove')) return removeItem(item.id)
+      if (event.target.closest('.download')) return downloadItem(item)
+
+      selectedId = item.id
+      renderCompare()
+    })
+
+    summary.addEventListener('click', (event) => {
+      if (!event.target.closest('#download-all')) return
+      items.forEach((item, index) => setTimeout(() => downloadItem(item), index * 300))
+    })
+
+    compareElement.addEventListener('input', (event) => {
+      compareElement.style.setProperty('--pos', `${event.target.value}%`)
+    })
+
+    let settingsTimeout
+    function onSettingsChange() {
+      qualityOutput.textContent = `${Math.round(qualityInput.value * 100)}%`
+      clearTimeout(settingsTimeout)
+      settingsTimeout = setTimeout(processAll, SETTINGS_DEBOUNCE)
+    }
+
+    formatSelect.addEventListener('change', onSettingsChange)
+    qualityInput.addEventListener('input', onSettingsChange)
+    maxWidthSelect.addEventListener('change', onSettingsChange)
+
+    // Liberamos todo al salir (en la mayoría de casos el navegador lo hace, pero es buena práctica)
+    window.addEventListener('pagehide', () => {
+      for (const item of items) {
+        URL.revokeObjectURL(item.originalURL)
+        if (item.result) URL.revokeObjectURL(item.result.url)
+      }
+    })
+
+    qualityOutput.textContent = `${Math.round(qualityInput.value * 100)}%`
+    renderSummary()
+    renderCompare()
+    addFiles([await createSampleImage(), await createSampleIcon()])
+  </script>
+</head>
+
+<body>
+  <header>
+    <h1>🗜️ Compresor de imágenes <small>100% en tu navegador: tus imágenes nunca salen de tu ordenador</small></h1>
+    <div class="settings">
+      <label>Formato
+        <select id="format">
+          <option value="webp">WebP</option>
+          <option value="jpeg">JPEG</option>
+        </select>
+      </label>
+      <label>Calidad
+        <input id="quality" type="range" min="0.05" max="1" step="0.05" value="0.75">
+        <output id="quality-output" for="quality"></output>
+      </label>
+      <label>Ancho máx.
+        <select id="max-width">
+          <option value="0">Original</option>
+          <option value="2560">2560 px</option>
+          <option value="1920" selected>1920 px</option>
+          <option value="1280">1280 px</option>
+          <option value="800">800 px</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <div class="left">
+      <label id="dropzone" class="dropzone">
+        <input id="file-input" type="file" accept="image/*" multiple>
+        <strong>📂 Suelta tus imágenes aquí</strong>
+        <span>o haz clic para elegirlas (también puedes pegarlas con Ctrl/⌘ + V)</span>
+      </label>
+      <div id="summary" class="summary"></div>
+      <ul id="files" class="files"></ul>
+    </div>
+
+    <section class="compare-card">
+      <div id="compare-header" class="compare-header"></div>
+      <div id="compare" class="compare"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+
+</html>

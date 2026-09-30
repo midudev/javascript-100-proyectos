@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>43 - Quiz de JavaScript</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0f1014;
+      --card: #17181f;
+      --card-2: #1f212b;
+      --border: #2a2d3a;
+      --text: #f1f2f6;
+      --muted: #9296a8;
+      --yellow: #f7df1e;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100dvh;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% -10%, rgb(247 223 30 / .12) 0, transparent 45%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #app {
+      width: min(760px, 100%);
+      padding: 28px 20px 40px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    p code,
+    h2 code,
+    .explanation code {
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: #2a2d3a;
+      color: var(--yellow);
+      font-size: .9em;
+    }
+
+    .primary {
+      padding: 14px 28px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--yellow);
+      color: #111;
+      font-weight: 800;
+      font-size: 16px;
+      transition: transform .15s;
+    }
+
+    .primary:hover {
+      transform: translateY(-2px);
+    }
+
+    .secondary {
+      padding: 14px 22px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ---------- INICIO ---------- */
+    .start {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+      gap: 18px;
+      padding-top: 5dvh;
+      text-align: center;
+    }
+
+    .logo {
+      display: grid;
+      place-content: end;
+      width: 110px;
+      height: 110px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: var(--yellow);
+      color: #111;
+      font-size: 44px;
+      font-weight: 900;
+      box-shadow: 0 20px 60px rgb(247 223 30 / .25);
+      rotate: -6deg;
+    }
+
+    .start h1 {
+      margin: 8px 0 0;
+      font-size: clamp(30px, 5vw, 44px);
+      letter-spacing: -1px;
+    }
+
+    .start p {
+      margin: 0;
+      max-width: 520px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .pill {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      background: var(--card);
+      font-size: 13px;
+    }
+
+    .preview {
+      width: min(460px, 100%);
+      margin-top: 8px;
+      text-align: left;
+    }
+
+    .preview .preview-title {
+      margin: 0 0 8px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* ---------- PREGUNTA ---------- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .topbar strong {
+      color: var(--text);
+    }
+
+    .progress {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: var(--card-2);
+    }
+
+    .progress div {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--yellow);
+      transition: width .4s;
+    }
+
+    .card {
+      margin-top: 18px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+    }
+
+    .timer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-track {
+      flex: 1;
+      height: 4px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: var(--card-2);
+    }
+
+    .timer-bar {
+      height: 100%;
+      background: var(--green);
+      transform-origin: left;
+    }
+
+    .timer.urgent {
+      color: var(--red);
+    }
+
+    .timer.urgent .timer-bar {
+      background: var(--red);
+    }
+
+    .card h2 {
+      margin: 0 0 16px;
+      font-size: clamp(19px, 2.6vw, 23px);
+      line-height: 1.35;
+    }
+
+    pre {
+      margin: 0 0 18px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0b0c10;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .kw {
+      color: #c792ea;
+    }
+
+    .str {
+      color: #c3e88d;
+    }
+
+    .num {
+      color: #f78c6c;
+    }
+
+    .com {
+      color: #676e95;
+      font-style: italic;
+    }
+
+    .fn {
+      color: #82aaff;
+    }
+
+    .options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--card-2);
+      color: var(--text);
+      text-align: left;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 15px;
+      transition: border-color .15s, background .15s, opacity .2s;
+    }
+
+    .option:not(:disabled):hover {
+      border-color: var(--yellow);
+    }
+
+    .option:disabled {
+      cursor: default;
+    }
+
+    .option kbd {
+      display: grid;
+      place-content: center;
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--border);
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .option.correct {
+      border-color: var(--green);
+      background: rgb(34 197 94 / .14);
+    }
+
+    .option.correct kbd {
+      background: var(--green);
+      color: #04130a;
+    }
+
+    .option.wrong {
+      border-color: var(--red);
+      background: rgb(239 68 68 / .14);
+    }
+
+    .option.wrong kbd {
+      background: var(--red);
+    }
+
+    .option.dim {
+      opacity: .45;
+    }
+
+    .feedback {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--card-2);
+      animation: appear .3s ease-out;
+    }
+
+    .feedback strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+
+    .explanation {
+      margin: 0;
+      color: #cfd2de;
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    /* ---------- RESULTADO ---------- */
+    .result {
+      text-align: center;
+    }
+
+    .score-ring {
+      display: grid;
+      place-content: center;
+      width: 160px;
+      height: 160px;
+      margin: 12px auto;
+      border-radius: 50%;
+      background: conic-gradient(var(--yellow) calc(var(--percent) * 1%), var(--card-2) 0);
+    }
+
+    .score-ring div {
+      display: grid;
+      place-content: center;
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: var(--bg);
+      font-size: 34px;
+      font-weight: 900;
+    }
+
+    .score-ring small {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .result h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 34px);
+    }
+
+    .result > p {
+      color: var(--muted);
+    }
+
+    .mistakes {
+      display: grid;
+      gap: 12px;
+      margin-top: 24px;
+      text-align: left;
+    }
+
+    .mistakes h3 {
+      margin: 0 0 12px;
+      font-size: 17px;
+    }
+
+    .mistake h2 {
+      font-size: 17px;
+    }
+
+    .answer-line {
+      margin: 0 0 6px;
+      font-size: 14px;
+    }
+
+    .answer-line code {
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: #2a2d3a;
+    }
+
+    .answer-line.bad code {
+      color: #fca5a5;
+    }
+
+    .answer-line.good code {
+      color: #86efac;
+    }
+
+    .result .actions {
+      justify-content: center;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        translate: 0 8px;
+      }
+    }
+
+    @media (width < 600px) {
+      #app {
+        padding: 18px 16px 32px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main id="app"></main>
+
+  <script type="module">
+    // Import de un módulo ES: el navegador descarga questions.js y nos da
+    // acceso SOLO a lo que ese archivo exporta. Requiere type="module" y
+    // servir la página por HTTP (con file:// los módulos no funcionan)
+    import { QUESTIONS } from './questions.js'
+
+    const QUESTIONS_PER_GAME = 10
+    const TIME_PER_QUESTION = 20_000 // ms
+    const LETTERS = ['A', 'B', 'C', 'D']
+
+    const $app = document.querySelector('#app')
+
+    // ---------- BARAJAR: ALGORITMO DE FISHER-YATES ----------
+    // Recorremos el array desde el final e intercambiamos cada elemento con
+    // otro elegido al azar entre los que quedan por colocar. Todas las
+    // permutaciones son igual de probables. El típico
+    // array.sort(() => Math.random() - 0.5) NO lo garantiza: está sesgado
+    function shuffle(array) {
+      const result = [...array] // copia: no modificamos el original
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        const temp = result[i]
+        result[i] = result[j]
+        result[j] = temp
+      }
+      return result
+    }
+
+    function prepareQuestions() {
+      return shuffle(QUESTIONS)
+        .slice(0, QUESTIONS_PER_GAME)
+        .map((question) => {
+          // Al barajar las opciones perdemos el índice "answer", así que
+          // marcamos cada opción con si es correcta o no ANTES de barajar
+          const options = shuffle(question.options.map((text, i) => ({ text, isCorrect: i === question.answer })))
+          return { ...question, options }
+        })
+    }
+
+    // ---------- MÁQUINA DE ESTADOS ----------
+    // La app solo puede estar en UNO de estos estados y solo puede pasar de
+    // uno a otro mediante los eventos definidos aquí. Así es imposible, por
+    // ejemplo, responder dos veces o que salte el temporizador en el resumen:
+    // si un evento no aparece en el estado actual, simplemente se ignora
+    const MACHINE = {
+      start: { START: 'question' },
+      question: { ANSWER: 'answered', TIMEOUT: 'answered' },
+      answered: { NEXT: 'question', FINISH: 'result' },
+      result: { RESTART: 'question', HOME: 'start' }
+    }
+
+    let state = 'start'
+    const context = {
+      questions: [],
+      index: 0,
+      answers: [] // { question, selected, isCorrect, timedOut }
+    }
+
+    // Acciones: qué datos cambian con cada evento
+    const ACTIONS = {
+      START: startGame,
+      RESTART: startGame,
+      ANSWER: (optionIndex) => recordAnswer(optionIndex),
+      TIMEOUT: () => recordAnswer(null),
+      NEXT: () => { context.index++ }
+    }
+
+    function send(event, payload) {
+      const nextState = MACHINE[state][event]
+      if (!nextState) return // evento no permitido en este estado
+
+      ACTIONS[event]?.(payload)
+      state = nextState
+
+      // Efectos al entrar en un estado
+      stopTimer()
+      if (state === 'question') startTimer()
+
+      render()
+    }
+
+    function startGame() {
+      context.questions = prepareQuestions()
+      context.index = 0
+      context.answers = []
+    }
+
+    function recordAnswer(optionIndex) {
+      const question = context.questions[context.index]
+      const selected = optionIndex === null ? null : question.options[optionIndex]
+      context.answers.push({
+        question,
+        selected,
+        isCorrect: Boolean(selected?.isCorrect),
+        timedOut: optionIndex === null
+      })
+    }
+
+    // ---------- TEMPORIZADOR ----------
+    let timerFrame = null
+
+    function startTimer() {
+      const deadline = performance.now() + TIME_PER_QUESTION
+
+      function tick(now) {
+        const remaining = Math.max(0, deadline - now)
+        const $timer = $app.querySelector('.timer')
+        if ($timer) {
+          $timer.querySelector('.timer-bar').style.transform = `scaleX(${remaining / TIME_PER_QUESTION})`
+          $timer.querySelector('span').textContent = `${Math.ceil(remaining / 1000)} s`
+          $timer.classList.toggle('urgent', remaining < 5000)
+        }
+        if (remaining === 0) {
+          send('TIMEOUT')
+          return
+        }
+        timerFrame = requestAnimationFrame(tick)
+      }
+
+      timerFrame = requestAnimationFrame(tick)
+    }
+
+    function stopTimer() {
+      cancelAnimationFrame(timerFrame)
+      timerFrame = null
+    }
+
+    // ---------- UTILIDADES DE RENDER ----------
+    function escapeHTML(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    // Convierte `texto` en <code>texto</code>
+    function inlineCode(text) {
+      return escapeHTML(text).replace(/`([^`]+)`/g, '<code>$1</code>')
+    }
+
+    // Resaltado de sintaxis mínimo con una sola expresión regular
+    function highlight(code) {
+      const TOKENS = /(\/\/.*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(const|let|var|function|return|async|await|for|if|else|new|import|from|export|typeof|null|undefined|true|false)\b|\b(\d+(?:\.\d+)?)\b|\b([a-zA-Z_$][\w$]*)(?=\()/g
+      let html = ''
+      let last = 0
+      for (const match of code.matchAll(TOKENS)) {
+        html += escapeHTML(code.slice(last, match.index))
+        const [text, comment, string, keyword, number, fn] = match
+        const type = comment ? 'com' : string ? 'str' : keyword ? 'kw' : number ? 'num' : fn ? 'fn' : ''
+        html += `<span class="${type}">${escapeHTML(text)}</span>`
+        last = match.index + text.length
+      }
+      return html + escapeHTML(code.slice(last))
+    }
+
+    function renderCode(code) {
+      return code ? `<pre><code>${highlight(code)}</code></pre>` : ''
+    }
+
+    // ---------- UN RENDER POR ESTADO ----------
+    function renderStart() {
+      const sample = QUESTIONS.find(question => question.code?.includes('Promise')) ?? QUESTIONS.find(question => question.code)
+      return `
+        <section class="start">
+          <div class="logo">JS</div>
+          <h1>¿Cuánto sabes de JavaScript?</h1>
+          <p>Coerción de tipos, closures, el event loop, hoisting… Pon a prueba tus conocimientos y aprende con la explicación de cada respuesta.</p>
+          <div class="pills">
+            <span class="pill">📚 ${QUESTIONS_PER_GAME} preguntas de ${QUESTIONS.length}</span>
+            <span class="pill">⏱️ ${TIME_PER_QUESTION / 1000} s por pregunta</span>
+            <span class="pill">⌨️ Responde con 1-4</span>
+          </div>
+          <button class="primary" data-event="START">Empezar el quiz →</button>
+          <div class="preview">
+            <p class="preview-title">¿Sabrías decir en qué orden se imprimen?</p>
+            ${renderCode(sample.code)}
+          </div>
+        </section>
+      `
+    }
+
+    function renderQuestion() {
+      const { questions, index, answers } = context
+      const question = questions[index]
+      const answer = state === 'answered' ? answers.at(-1) : null
+      const score = answers.filter(item => item.isCorrect).length
+      const progress = ((index + (answer ? 1 : 0)) / questions.length) * 100
+
+      const options = question.options.map((option, i) => {
+        let className = 'option'
+        if (answer) {
+          if (option.isCorrect) className += ' correct'
+          else if (option === answer.selected) className += ' wrong'
+          else className += ' dim'
+        }
+        return `
+          <button class="${className}" data-event="ANSWER" data-index="${i}" ${answer ? 'disabled' : ''}>
+            <kbd>${LETTERS[i]}</kbd> ${escapeHTML(option.text)}
+          </button>
+        `
+      }).join('')
+
+      const isLast = index === questions.length - 1
+      const feedback = answer
+        ? `
+          <div class="feedback">
+            <strong>${answer.isCorrect ? '✅ ¡Correcto!' : answer.timedOut ? '⏰ ¡Se acabó el tiempo!' : '❌ Incorrecto'}</strong>
+            <p class="explanation">${inlineCode(question.explanation)}</p>
+          </div>
+          <div class="actions">
+            <button class="primary" data-event="${isLast ? 'FINISH' : 'NEXT'}">
+              ${isLast ? 'Ver resultados' : 'Siguiente pregunta'} →
+            </button>
+          </div>
+        `
+        : ''
+
+      return `
+        <div class="topbar">
+          <span>Pregunta <strong>${index + 1}</strong> de ${questions.length}</span>
+          <span>Aciertos: <strong>${score}</strong></span>
+        </div>
+        <div class="progress"><div style="width: ${progress}%"></div></div>
+
+        <section class="card">
+          ${answer
+            ? ''
+            : `<div class="timer"><div class="timer-track"><div class="timer-bar"></div></div><span>${TIME_PER_QUESTION / 1000} s</span></div>`}
+          <h2>${inlineCode(question.question)}</h2>
+          ${renderCode(question.code)}
+          <div class="options">${options}</div>
+          ${feedback}
+        </section>
+      `
+    }
+
+    function renderResult() {
+      const total = context.questions.length
+      const mistakes = context.answers.filter(answer => !answer.isCorrect)
+      const score = total - mistakes.length
+      const percent = Math.round((score / total) * 100)
+      const message = percent === 100
+        ? '¡Perfecto! Eres un crack de JavaScript 🏆'
+        : percent >= 70
+          ? '¡Muy bien! Dominas JavaScript 💪'
+          : percent >= 40
+            ? 'No está mal, pero hay cosas por repasar 📚'
+            : 'JavaScript tiene sus trucos… ¡a seguir aprendiendo! 🌱'
+
+      const mistakesHTML = mistakes.map(({ question, selected, timedOut }) => `
+        <article class="card mistake">
+          <h2>${inlineCode(question.question)}</h2>
+          ${renderCode(question.code)}
+          <p class="answer-line bad">Tu respuesta: ${timedOut ? '<em>sin responder (tiempo agotado)</em>' : `<code>${escapeHTML(selected.text)}</code>`}</p>
+          <p class="answer-line good">Correcta: <code>${escapeHTML(question.options.find(option => option.isCorrect).text)}</code></p>
+          <p class="explanation">${inlineCode(question.explanation)}</p>
+        </article>
+      `).join('')
+
+      return `
+        <section class="result">
+          <div class="score-ring" style="--percent: ${percent}">
+            <div>${score}/${total}<small>${percent} %</small></div>
+          </div>
+          <h1>${message}</h1>
+          <p>${mistakes.length === 0 ? 'No has fallado ninguna.' : `Has fallado ${mistakes.length}. Aquí tienes por qué:`}</p>
+          <div class="actions">
+            <button class="primary" data-event="RESTART">Jugar otra vez</button>
+            <button class="secondary" data-event="HOME">Inicio</button>
+          </div>
+          ${mistakes.length ? `<div class="mistakes">${mistakesHTML}</div>` : ''}
+        </section>
+      `
+    }
+
+    const RENDERERS = {
+      start: renderStart,
+      question: renderQuestion,
+      answered: renderQuestion,
+      result: renderResult
+    }
+
+    function render() {
+      $app.innerHTML = RENDERERS[state]()
+      window.scrollTo({ top: 0 })
+      // Llevamos el foco al botón principal para poder seguir con Enter
+      $app.querySelector('.primary')?.focus({ preventScroll: true })
+    }
+
+    // ---------- EVENTOS ----------
+    // Un único listener (delegación de eventos): cada botón indica en
+    // data-event qué evento de la máquina de estados envía
+    $app.addEventListener('click', (event) => {
+      const $button = event.target.closest('[data-event]')
+      if (!$button || $button.disabled) return
+      const payload = $button.dataset.index === undefined ? undefined : Number($button.dataset.index)
+      send($button.dataset.event, payload)
+    })
+
+    window.addEventListener('keydown', (event) => {
+      if (state !== 'question') return
+      const index = ['1', '2', '3', '4'].indexOf(event.key)
+      const letterIndex = LETTERS.indexOf(event.key.toUpperCase())
+      const option = index !== -1 ? index : letterIndex
+      if (option !== -1 && option < context.questions[context.index].options.length) send('ANSWER', option)
+    })
+
+    render()
+  </script>
+</body>
+
+</html>

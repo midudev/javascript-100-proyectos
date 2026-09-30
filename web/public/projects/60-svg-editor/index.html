@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>60 - Editor con deshacer</title>
+  <style>
+    :root {
+      --bg: #f3f4f8;
+      --panel: #ffffff;
+      --line: #e3e5ee;
+      --text: #1e2130;
+      --muted: #7c8096;
+      --primary: #4f46e5;
+      --primary-soft: #eef0ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    .toolbar h1 {
+      margin: 0;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding-left: 10px;
+      border-left: 1px solid var(--line);
+    }
+
+    .group.actions {
+      margin-left: auto;
+    }
+
+    .group>span {
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .tool,
+    .action {
+      height: 36px;
+      min-width: 36px;
+      padding: 0 10px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      font-size: 16px;
+      white-space: nowrap;
+    }
+
+    .tool svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .tool:hover,
+    .action:hover:not(:disabled) {
+      background: var(--bg);
+    }
+
+    .tool[aria-pressed="true"] {
+      background: var(--primary-soft);
+      border-color: #c9ccff;
+      color: var(--primary);
+    }
+
+    .action:disabled {
+      opacity: .35;
+      cursor: default;
+    }
+
+    .action.primary {
+      background: var(--text);
+      color: white;
+      font-weight: 600;
+    }
+
+    .swatch {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, .15);
+      background: var(--color);
+    }
+
+    .swatch.none {
+      background: linear-gradient(135deg, white 45%, #ef4444 45% 55%, white 55%);
+    }
+
+    .swatch[aria-pressed="true"] {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    select {
+      font: inherit;
+      font-size: 13px;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: white;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      min-height: 0;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 0;
+      background-color: #fbfbfd;
+      background-image: radial-gradient(#d4d7e3 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    #canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+      overflow: visible;
+    }
+
+    #canvas.is-select {
+      cursor: default;
+    }
+
+    #canvas.is-select [data-id] {
+      cursor: move;
+    }
+
+    #canvas.is-select [data-id]:hover {
+      filter: drop-shadow(0 0 3px rgba(79, 70, 229, .6));
+    }
+
+    .selection {
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 1.5;
+      stroke-dasharray: 5 4;
+      pointer-events: none;
+    }
+
+    .handle {
+      fill: white;
+      stroke: var(--primary);
+      stroke-width: 1.5;
+      pointer-events: none;
+    }
+
+    .draft {
+      opacity: .6;
+    }
+
+    aside {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+    }
+
+    aside header {
+      padding: 14px 16px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    aside h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    aside header span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .history {
+      list-style: none;
+      margin: 0;
+      padding: 0 8px 8px;
+      overflow: auto;
+    }
+
+    .history button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 8px;
+      background: none;
+      color: var(--text);
+      font-size: 13px;
+      text-align: left;
+    }
+
+    .history button:hover {
+      background: var(--bg);
+    }
+
+    .history .index {
+      width: 22px;
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .history .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: var(--color);
+      border: 1px solid rgba(0, 0, 0, .15);
+    }
+
+    .history li.is-current button {
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .history li.is-undone button {
+      opacity: .4;
+      text-decoration: line-through;
+    }
+
+    .stacks {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+    }
+
+    .stacks strong {
+      color: var(--text);
+    }
+
+    kbd {
+      font-family: inherit;
+      font-size: 11px;
+      padding: 1px 5px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--bg);
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 200px;
+      }
+
+      aside {
+        border-left: none;
+        border-top: 1px solid var(--line);
+      }
+
+      .stacks {
+        display: none;
+      }
+
+      .toolbar h1 {
+        display: none;
+      }
+
+      .toolbar {
+        flex-wrap: wrap;
+        row-gap: 6px;
+        padding: 8px;
+      }
+
+      .group,
+      .group.actions {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="toolbar">
+    <h1>✏️ Editor SVG</h1>
+
+    <div class="group" role="group" aria-label="Herramientas">
+      <button class="tool" data-tool="select" title="Seleccionar y mover (V)" aria-label="Seleccionar">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 8-6 1.5L10 19z" /></svg>
+      </button>
+      <button class="tool" data-tool="rect" title="Rectángulo (R)" aria-label="Rectángulo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1" /></svg>
+      </button>
+      <button class="tool" data-tool="circle" title="Círculo (C)" aria-label="Círculo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8" /></svg>
+      </button>
+      <button class="tool" data-tool="line" title="Línea (L)" aria-label="Línea">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19L19 5" /></svg>
+      </button>
+    </div>
+
+    <div class="group" id="fill-colors" aria-label="Color de relleno"><span>Relleno</span></div>
+    <div class="group" id="stroke-colors" aria-label="Color de borde"><span>Borde</span></div>
+
+    <div class="group">
+      <span>Grosor</span>
+      <select id="stroke-width" aria-label="Grosor del borde">
+        <option value="0">0</option>
+        <option value="2">2</option>
+        <option value="4" selected>4</option>
+        <option value="8">8</option>
+        <option value="14">14</option>
+      </select>
+    </div>
+
+    <div class="group actions">
+      <button class="action" id="undo" title="Deshacer (Ctrl/Cmd + Z)" aria-label="Deshacer">↶</button>
+      <button class="action" id="redo" title="Rehacer (Ctrl/Cmd + Mayús + Z)" aria-label="Rehacer">↷</button>
+      <button class="action" id="duplicate" title="Duplicar (Ctrl/Cmd + D)" aria-label="Duplicar">⧉</button>
+      <button class="action" id="delete" title="Borrar (Supr)" aria-label="Borrar">🗑️</button>
+      <button class="action primary" id="export">⬇ SVG</button>
+    </div>
+  </nav>
+
+  <main>
+    <section class="stage">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620">
+        <g id="shapes"></g>
+        <g id="overlay"></g>
+      </svg>
+    </section>
+
+    <aside>
+      <header>
+        <h2>Historial</h2>
+        <span id="history-count"></span>
+      </header>
+      <ol class="history" id="history"></ol>
+      <div class="stacks">
+        <div>Pila deshacer: <strong id="undo-size">0</strong> · Pila rehacer: <strong id="redo-size">0</strong></div>
+        <div><kbd>V</kbd> <kbd>R</kbd> <kbd>C</kbd> <kbd>L</kbd> herramientas · <kbd>Mayús</kbd> proporción</div>
+        <div>Haz click en un paso para viajar en el tiempo ⏳</div>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module">
+    const SVG_NS = 'http://www.w3.org/2000/svg'
+    const FILL_COLORS = ['none', '#1e2130', '#ef4444', '#f59e0b', '#facc15', '#22c55e', '#3b82f6', '#8b5cf6', '#f8fafc']
+    const STROKE_COLORS = ['none', '#1e2130', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ffffff']
+    const NAMES = { rect: 'rectángulo', circle: 'círculo', line: 'línea' }
+    const MIN_SIZE = 4
+
+    const $ = selector => document.querySelector(selector)
+    const svg = $('#canvas')
+    const shapesLayer = $('#shapes')
+    const overlayLayer = $('#overlay')
+
+    // ---------- Estado del documento ----------
+    // El documento es solo un array de objetos. El SVG se genera a partir de él
+    const shapes = []
+    let nextId = 1
+    let selectedId = null
+    let tool = 'rect'
+    const style = { fill: '#3b82f6', stroke: '#1e2130', strokeWidth: 4 }
+
+    function findShape(id) {
+      return shapes.find(shape => shape.id === id)
+    }
+
+    function moveShape(shape, dx, dy) {
+      if (shape.type === 'rect') {
+        shape.x += dx
+        shape.y += dy
+      } else if (shape.type === 'circle') {
+        shape.cx += dx
+        shape.cy += dy
+      } else {
+        shape.x1 += dx
+        shape.y1 += dy
+        shape.x2 += dx
+        shape.y2 += dy
+      }
+    }
+
+    function cloneShape(shape) {
+      return { ...structuredClone(shape), id: nextId++ }
+    }
+
+    // ---------- Patrón Command ----------
+    // Cada operación que modifica el documento es un objeto con dos métodos:
+    // execute() la aplica y undo() la revierte. Como cada comando sabe
+    // deshacerse a sí mismo, deshacer y rehacer es tan simple como mover
+    // comandos entre dos pilas (LIFO: el último en entrar es el primero en salir)
+    class AddShapeCommand {
+      constructor(shape, label = `Añadir ${NAMES[shape.type]}`) {
+        this.shape = shape
+        this.label = label
+        this.icon = '➕'
+        this.color = shape.fill !== 'none' ? shape.fill : shape.stroke
+      }
+
+      execute() {
+        shapes.push(this.shape)
+      }
+
+      undo() {
+        shapes.splice(shapes.indexOf(this.shape), 1)
+      }
+    }
+
+    class DeleteShapeCommand {
+      constructor(shape) {
+        this.shape = shape
+        this.label = `Borrar ${NAMES[shape.type]}`
+        this.icon = '🗑️'
+        this.index = -1
+      }
+
+      execute() {
+        // Guardamos la posición para restaurar también el orden de capas
+        this.index = shapes.indexOf(this.shape)
+        shapes.splice(this.index, 1)
+      }
+
+      undo() {
+        shapes.splice(this.index, 0, this.shape)
+      }
+    }
+
+    class MoveShapeCommand {
+      constructor(shape, dx, dy) {
+        this.shape = shape
+        this.dx = dx
+        this.dy = dy
+        this.label = `Mover ${NAMES[shape.type]}`
+        this.icon = '✥'
+      }
+
+      execute() {
+        moveShape(this.shape, this.dx, this.dy)
+      }
+
+      undo() {
+        moveShape(this.shape, -this.dx, -this.dy)
+      }
+    }
+
+    class ChangeStyleCommand {
+      constructor(shape, property, value) {
+        const labels = { fill: 'Relleno', stroke: 'Borde', strokeWidth: 'Grosor' }
+        this.shape = shape
+        this.property = property
+        this.value = value
+        this.previous = shape[property]
+        this.label = `${labels[property]} de ${NAMES[shape.type]}`
+        this.icon = '🎨'
+        this.color = property === 'strokeWidth' ? null : value
+      }
+
+      execute() {
+        this.shape[this.property] = this.value
+      }
+
+      undo() {
+        this.shape[this.property] = this.previous
+      }
+    }
+
+    const history = {
+      undoStack: [],
+      redoStack: [],
+
+      execute(command) {
+        command.execute()
+        this.undoStack.push(command)
+        // Una acción nueva invalida el futuro: ya no se puede rehacer
+        this.redoStack.length = 0
+        update()
+      },
+
+      undo() {
+        const command = this.undoStack.pop()
+        if (!command) return
+        command.undo()
+        this.redoStack.push(command)
+        update()
+      },
+
+      redo() {
+        const command = this.redoStack.pop()
+        if (!command) return
+        command.execute()
+        this.undoStack.push(command)
+        update()
+      },
+
+      // Viajar a un punto concreto: deshacemos o rehacemos hasta que queden
+      // exactamente `count` comandos aplicados
+      goTo(count) {
+        while (this.undoStack.length > count) this.undo()
+        while (this.undoStack.length < count && this.redoStack.length > 0) this.redo()
+      }
+    }
+
+    // ---------- Renderizado ----------
+    function createShapeElement(shape, className = '') {
+      const element = document.createElementNS(SVG_NS, shape.type)
+      const attributes = {
+        rect: { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: 4 },
+        circle: { cx: shape.cx, cy: shape.cy, r: shape.r },
+        line: { x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2, 'stroke-linecap': 'round' }
+      }[shape.type]
+
+      Object.entries(attributes).forEach(([name, value]) => element.setAttribute(name, value))
+      element.setAttribute('fill', shape.type === 'line' ? 'none' : shape.fill)
+      element.setAttribute('stroke', shape.stroke)
+      element.setAttribute('stroke-width', shape.strokeWidth)
+      if (shape.id) element.dataset.id = shape.id
+      if (className) element.setAttribute('class', className)
+      return element
+    }
+
+    function renderShapes() {
+      shapesLayer.replaceChildren(...shapes.map(shape => createShapeElement(shape)))
+    }
+
+    function renderSelection() {
+      overlayLayer.replaceChildren()
+      const element = shapesLayer.querySelector(`[data-id="${selectedId}"]`)
+      if (!element) return
+
+      const shape = findShape(selectedId)
+      const padding = shape.strokeWidth / 2 + 6
+      const box = element.getBBox()
+      const x = box.x - padding
+      const y = box.y - padding
+      const width = box.width + padding * 2
+      const height = box.height + padding * 2
+
+      const outline = document.createElementNS(SVG_NS, 'rect')
+      Object.entries({ x, y, width, height, class: 'selection' }).forEach(([name, value]) => outline.setAttribute(name, value))
+      overlayLayer.append(outline)
+
+      for (const [hx, hy] of [[x, y], [x + width, y], [x, y + height], [x + width, y + height]]) {
+        const handle = document.createElementNS(SVG_NS, 'rect')
+        Object.entries({ x: hx - 4, y: hy - 4, width: 8, height: 8, rx: 2, class: 'handle' }).forEach(([name, value]) => handle.setAttribute(name, value))
+        overlayLayer.append(handle)
+      }
+    }
+
+    function renderHistory() {
+      const { undoStack, redoStack } = history
+      // Línea temporal: lo aplicado (pila deshacer) y después lo deshecho
+      // (pila rehacer al revés, porque su cima es lo próximo a rehacer)
+      const timeline = [...undoStack, ...redoStack.toReversed()]
+      const entries = [{ label: 'Documento vacío', icon: '📄' }, ...timeline]
+
+      $('#history').innerHTML = entries.map((command, index) => {
+        const state = index === undoStack.length ? 'is-current' : index > undoStack.length ? 'is-undone' : ''
+        const dot = command.color && command.color !== 'none' ? `<span class="dot" style="--color: ${command.color}"></span>` : ''
+        return `
+          <li class="${state}">
+            <button data-step="${index}">
+              <span class="index">${index}</span><span>${command.icon}</span><span>${command.label}</span>${dot}
+            </button>
+          </li>
+        `
+      }).join('')
+
+      $('#history').querySelector('.is-current')?.scrollIntoView({ block: 'nearest' })
+      $('#history-count').textContent = `${undoStack.length}/${timeline.length}`
+      $('#undo-size').textContent = undoStack.length
+      $('#redo-size').textContent = redoStack.length
+    }
+
+    function renderToolbar() {
+      const selected = findShape(selectedId)
+      const current = selected ?? style
+
+      document.querySelectorAll('[data-tool]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.tool === tool)
+      })
+      document.querySelectorAll('#fill-colors .swatch').forEach(swatch => {
+        swatch.setAttribute('aria-pressed', swatch.dataset.color === current.fill)
+        swatch.disabled = selected?.type === 'line'
+      })
+      document.querySelectorAll('#stroke-colors .swatch').forEach(swatch => {
+        swatch.setAttribute('aria-pressed', swatch.dataset.color === current.stroke)
+      })
+
+      $('#stroke-width').value = current.strokeWidth
+      $('#undo').disabled = history.undoStack.length === 0
+      $('#redo').disabled = history.redoStack.length === 0
+      $('#delete').disabled = !selected
+      $('#duplicate').disabled = !selected
+      svg.classList.toggle('is-select', tool === 'select')
+    }
+
+    function update() {
+      // Si deshacemos la creación de la forma seleccionada, ya no existe
+      if (selectedId && !findShape(selectedId)) selectedId = null
+      renderShapes()
+      renderSelection()
+      renderHistory()
+      renderToolbar()
+    }
+
+    // ---------- Interacción con el lienzo ----------
+    // Convierte coordenadas de pantalla a coordenadas del SVG
+    function toSvgPoint(event) {
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(svg.getScreenCTM().inverse())
+      // Redondeamos para que el SVG exportado tenga números limpios
+      return { x: Math.round(point.x), y: Math.round(point.y) }
+    }
+
+    let gesture = null
+
+    function draftGeometry(type, start, end, keepRatio) {
+      let dx = end.x - start.x
+      let dy = end.y - start.y
+
+      if (type === 'rect') {
+        if (keepRatio) {
+          const size = Math.max(Math.abs(dx), Math.abs(dy))
+          dx = Math.sign(dx || 1) * size
+          dy = Math.sign(dy || 1) * size
+        }
+        return { x: Math.min(start.x, start.x + dx), y: Math.min(start.y, start.y + dy), width: Math.abs(dx), height: Math.abs(dy) }
+      }
+
+      if (type === 'circle') {
+        return { cx: start.x, cy: start.y, r: Math.hypot(dx, dy) }
+      }
+
+      if (keepRatio) {
+        // Con Mayús la línea se ajusta a múltiplos de 45°
+        const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4)
+        const length = Math.hypot(dx, dy)
+        dx = Math.cos(angle) * length
+        dy = Math.sin(angle) * length
+      }
+      return { x1: start.x, y1: start.y, x2: start.x + dx, y2: start.y + dy }
+    }
+
+    function isBigEnough(shape) {
+      if (shape.type === 'rect') return shape.width >= MIN_SIZE && shape.height >= MIN_SIZE
+      if (shape.type === 'circle') return shape.r >= MIN_SIZE
+      return Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1) >= MIN_SIZE
+    }
+
+    svg.addEventListener('pointerdown', event => {
+      const point = toSvgPoint(event)
+      svg.setPointerCapture(event.pointerId)
+
+      if (tool === 'select') {
+        const target = event.target.closest('[data-id]')
+        selectedId = target ? Number(target.dataset.id) : null
+        update()
+        if (target) {
+          const shape = findShape(selectedId)
+          gesture = { type: 'move', start: point, shape, original: structuredClone(shape) }
+        }
+        return
+      }
+
+      const draft = { id: 0, type: tool, fill: style.fill, stroke: style.stroke, strokeWidth: style.strokeWidth }
+      gesture = { type: 'draw', start: point, draft }
+    })
+
+    svg.addEventListener('pointermove', event => {
+      if (!gesture) return
+      const point = toSvgPoint(event)
+
+      if (gesture.type === 'move') {
+        // Mientras arrastramos movemos la forma directamente (sin comandos)
+        // para no llenar el historial con cientos de pasos intermedios
+        const { shape, original, start } = gesture
+        Object.assign(shape, structuredClone(original))
+        moveShape(shape, point.x - start.x, point.y - start.y)
+        renderShapes()
+        renderSelection()
+        return
+      }
+
+      Object.assign(gesture.draft, draftGeometry(gesture.draft.type, gesture.start, point, event.shiftKey))
+      renderShapes()
+      shapesLayer.append(createShapeElement(gesture.draft, 'draft'))
+    })
+
+    function endGesture(event) {
+      if (!gesture) return
+      const current = gesture
+      gesture = null
+      const point = toSvgPoint(event)
+
+      if (current.type === 'move') {
+        const dx = point.x - current.start.x
+        const dy = point.y - current.start.y
+        // Devolvemos la forma a su sitio original y registramos UN solo
+        // comando con el desplazamiento total: así se deshace de una vez
+        Object.assign(current.shape, current.original)
+        if (Math.hypot(dx, dy) > 1) history.execute(new MoveShapeCommand(current.shape, dx, dy))
+        else update()
+        return
+      }
+
+      const shape = { ...current.draft, ...draftGeometry(current.draft.type, current.start, point, event.shiftKey), id: nextId++ }
+      if (isBigEnough(shape)) {
+        selectedId = shape.id
+        history.execute(new AddShapeCommand(shape))
+      } else {
+        update()
+      }
+    }
+
+    svg.addEventListener('pointerup', endGesture)
+    svg.addEventListener('pointercancel', endGesture)
+
+    // ---------- Acciones ----------
+    function setTool(name) {
+      tool = name
+      if (tool !== 'select') selectedId = null
+      update()
+    }
+
+    function applyStyle(property, value) {
+      const selected = findShape(selectedId)
+      style[property] = value
+      if (selected && selected[property] !== value && !(property === 'fill' && selected.type === 'line')) {
+        history.execute(new ChangeStyleCommand(selected, property, value))
+      } else {
+        renderToolbar()
+      }
+    }
+
+    function deleteSelected() {
+      const selected = findShape(selectedId)
+      if (selected) history.execute(new DeleteShapeCommand(selected))
+    }
+
+    function duplicateSelected() {
+      const selected = findShape(selectedId)
+      if (!selected) return
+      const copy = cloneShape(selected)
+      moveShape(copy, 20, 20)
+      selectedId = copy.id
+      history.execute(new AddShapeCommand(copy, `Duplicar ${NAMES[copy.type]}`))
+    }
+
+    function nudgeSelected(dx, dy) {
+      const selected = findShape(selectedId)
+      if (selected) history.execute(new MoveShapeCommand(selected, dx, dy))
+    }
+
+    // ---------- Exportar ----------
+    function exportSVG() {
+      if (shapes.length === 0) return
+      // Ajustamos el viewBox al contenido (más el grosor del borde)
+      const box = shapesLayer.getBBox()
+      const padding = Math.max(...shapes.map(shape => shape.strokeWidth)) + 10
+      const viewBox = [box.x - padding, box.y - padding, box.width + padding * 2, box.height + padding * 2].map(Math.round)
+
+      const content = shapes.map(shape => createShapeElement({ ...shape, id: 0 }).outerHTML).join('\n  ')
+      const source = `<svg xmlns="${SVG_NS}" viewBox="${viewBox.join(' ')}" width="${viewBox[2]}" height="${viewBox[3]}">\n  ${content}\n</svg>\n`
+
+      const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'dibujo.svg'
+      link.click()
+      URL.revokeObjectURL(url)
+    }
+
+    // ---------- Eventos de la interfaz ----------
+    function createSwatches(container, colors, property) {
+      colors.forEach(color => {
+        const swatch = document.createElement('button')
+        swatch.className = `swatch${color === 'none' ? ' none' : ''}`
+        swatch.style.setProperty('--color', color)
+        swatch.dataset.color = color
+        swatch.setAttribute('aria-label', color === 'none' ? 'Sin color' : color)
+        swatch.addEventListener('click', () => applyStyle(property, color))
+        container.append(swatch)
+      })
+    }
+
+    createSwatches($('#fill-colors'), FILL_COLORS, 'fill')
+    createSwatches($('#stroke-colors'), STROKE_COLORS, 'stroke')
+
+    document.querySelectorAll('[data-tool]').forEach(button => {
+      button.addEventListener('click', () => setTool(button.dataset.tool))
+    })
+
+    $('#stroke-width').addEventListener('change', event => applyStyle('strokeWidth', Number(event.target.value)))
+    $('#undo').addEventListener('click', () => history.undo())
+    $('#redo').addEventListener('click', () => history.redo())
+    $('#delete').addEventListener('click', deleteSelected)
+    $('#duplicate').addEventListener('click', duplicateSelected)
+    $('#export').addEventListener('click', exportSVG)
+
+    $('#history').addEventListener('click', event => {
+      const button = event.target.closest('[data-step]')
+      if (button) history.goTo(Number(button.dataset.step))
+    })
+
+    const TOOL_KEYS = { v: 'select', r: 'rect', c: 'circle', l: 'line' }
+
+    document.addEventListener('keydown', event => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return
+      const key = event.key.toLowerCase()
+      const mod = event.metaKey || event.ctrlKey
+
+      if (mod && key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) history.redo()
+        else history.undo()
+      } else if (mod && key === 'y') {
+        event.preventDefault()
+        history.redo()
+      } else if (mod && key === 'd') {
+        event.preventDefault()
+        duplicateSelected()
+      } else if (key === 'delete' || key === 'backspace') {
+        deleteSelected()
+      } else if (key.startsWith('arrow') && selectedId) {
+        event.preventDefault()
+        const step = event.shiftKey ? 10 : 1
+        const deltas = { arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] }
+        nudgeSelected(...deltas[key])
+      } else if (!mod && TOOL_KEYS[key]) {
+        setTool(TOOL_KEYS[key])
+      } else if (key === 'escape') {
+        selectedId = null
+        update()
+      }
+    })
+
+    // ---------- Dibujo de ejemplo ----------
+    // Lo creamos con comandos para que aparezca en el historial y se pueda deshacer
+    function seed() {
+      const add = shape => {
+        const full = { fill: 'none', stroke: '#1e2130', strokeWidth: 4, ...shape, id: nextId++ }
+        history.execute(new AddShapeCommand(full))
+        return full
+      }
+
+      add({ type: 'rect', x: 90, y: 250, width: 300, height: 260, fill: '#ef4444', strokeWidth: 0 })
+      const sun = add({ type: 'circle', cx: 560, cy: 190, r: 120, fill: '#3b82f6', strokeWidth: 0 })
+      add({ type: 'circle', cx: 300, cy: 150, r: 70, fill: '#facc15', strokeWidth: 0 })
+      add({ type: 'rect', x: 520, y: 360, width: 240, height: 70, fill: '#1e2130', strokeWidth: 0 })
+      add({ type: 'line', x1: 60, y1: 560, x2: 820, y2: 90, strokeWidth: 6 })
+      add({ type: 'circle', cx: 700, cy: 470, r: 40, fill: '#f8fafc', stroke: '#1e2130', strokeWidth: 8 })
+      add({ type: 'line', x1: 440, y1: 40, x2: 440, y2: 560, stroke: '#8b5cf6', strokeWidth: 14 })
+      history.execute(new MoveShapeCommand(sun, 40, 20))
+      history.execute(new ChangeStyleCommand(sun, 'fill', '#22c55e'))
+      history.undo()
+      selectedId = sun.id
+      update()
+    }
+
+    seed()
+    setTool('select')
+  </script>
+</body>
+
+</html>

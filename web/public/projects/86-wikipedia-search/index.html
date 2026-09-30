@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>86 - Buscador de Wikipedia</title>
+  <style>
+    :root {
+      --bg: #f6f6f3;
+      --card: #ffffff;
+      --text: #202122;
+      --muted: #6b6f76;
+      --border: #dcdde0;
+      --accent: #3366cc;
+      --accent-soft: #eaf1ff;
+      --ok: #1f9d55;
+      --aborted: #c9790b;
+      --error: #d33;
+      --serif: 'Linux Libertine', Georgia, 'Times New Roman', serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .layout {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 28px 20px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 28px;
+      align-items: start;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-family: var(--serif);
+      font-size: 30px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .06);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: 30px;
+    }
+
+    header p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ---------- Combobox ---------- */
+    .combobox {
+      position: relative;
+    }
+
+    .search-box {
+      position: relative;
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      translate: 0 -50%;
+      color: var(--muted);
+    }
+
+    #search {
+      width: 100%;
+      padding: 16px 48px;
+      font: inherit;
+      font-size: 18px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 6px 24px rgba(30, 40, 80, .06);
+    }
+
+    #search:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    #search[aria-expanded="true"] {
+      border-radius: 14px 14px 0 0;
+    }
+
+    .spinner {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      margin-top: -9px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        rotate: 1turn;
+      }
+    }
+
+    [role="listbox"] {
+      position: absolute;
+      z-index: 5;
+      left: 0;
+      right: 0;
+      top: 100%;
+      margin: 0;
+      padding: 6px;
+      list-style: none;
+      max-height: 420px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-top: 0;
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 18px 40px rgba(30, 40, 80, .14);
+    }
+
+    [role="option"] {
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    [role="option"][aria-selected="true"] {
+      background: var(--accent-soft);
+    }
+
+    .option-title {
+      font-weight: 600;
+    }
+
+    .option-snippet {
+      margin-top: 2px;
+      font-size: 13px;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    mark {
+      background: #fff1a8;
+      color: inherit;
+      border-radius: 3px;
+      padding: 0 1px;
+    }
+
+    .list-message {
+      padding: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ---------- Tarjeta de resumen ---------- */
+    .summary {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 22px;
+      padding: 22px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(30, 40, 80, .06);
+    }
+
+    .summary.no-image {
+      grid-template-columns: 1fr;
+    }
+
+    .summary img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      background: #f3f4f6;
+      border-radius: 12px;
+    }
+
+    .summary h2 {
+      margin: 0;
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .summary .description {
+      margin: 6px 0 12px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .summary .extract {
+      margin: 0 0 14px;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 7;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .summary a {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .summary a:hover {
+      text-decoration: underline;
+    }
+
+    .summary.loading {
+      opacity: .5;
+    }
+
+    .suggested {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .suggested button {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .suggested button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ---------- Panel de peticiones ---------- */
+    .network {
+      position: sticky;
+      top: 20px;
+      padding: 18px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    .network h2 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .counters {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .counter {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    .counter span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .counter strong {
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .counter.ok strong {
+      color: var(--ok);
+    }
+
+    .counter.aborted strong {
+      color: var(--aborted);
+    }
+
+    .delay {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+
+    .delay input {
+      accent-color: var(--accent);
+    }
+
+    .log {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 12.5px;
+    }
+
+    .log li {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: var(--bg);
+      animation: appear .2s ease-out;
+    }
+
+    .log li span:nth-child(2) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .log small {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .log .aborted span:nth-child(2) {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+
+    .log .error {
+      color: var(--error);
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        translate: 0 -4px;
+      }
+    }
+
+    .note {
+      margin: 12px 0 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    kbd {
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      font-size: 11px;
+      background: #fff;
+    }
+
+    @media (width < 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .network {
+        position: static;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .summary img {
+        max-height: 220px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const input = $('#search')
+    const listbox = $('#suggestions')
+    const spinner = $('.spinner')
+    const summary = $('.summary')
+    const delayInput = $('#delay')
+    const delayLabel = $('#delay-value')
+    const log = $('.log')
+
+    // CONSTANTES
+    const API_URL = 'https://es.wikipedia.org/w/api.php'
+    const SUMMARY_URL = 'https://es.wikipedia.org/api/rest_v1/page/summary/'
+    const MIN_QUERY_LENGTH = 2
+    const MAX_LOG_ENTRIES = 9
+    const INITIAL_ARTICLE = 'JavaScript'
+    const SUGGESTED = ['Madrid', 'Agujero negro', 'Frida Kahlo', 'Tortilla de patatas', 'Ada Lovelace', 'Machu Picchu']
+    const ACCENTS = { a: '[aáàäâ]', e: '[eéèëê]', i: '[iíìïî]', o: '[oóòöô]', u: '[uúùüû]', n: '[nñ]', c: '[cç]' }
+    const STATUS_ICONS = { pending: '⏳', ok: '✅', aborted: '🚫', error: '⚠️' }
+
+    // ESTADO
+    let results = []
+    let activeIndex = -1
+    let searchController = null
+    let summaryController = null
+    let requestId = 0
+    const stats = { keys: 0, requests: 0, aborted: 0, ok: 0 }
+    const entries = []
+
+    // ---------- Debounce ----------
+
+    // Debounce: cada vez que se llama, cancela el temporizador anterior y
+    // arranca uno nuevo. La función solo se ejecuta cuando el usuario deja
+    // de escribir durante `delay` ms. Así "javascript" no dispara 10 peticiones
+    function debounce (fn, getDelay) {
+      let timeoutId = null
+      const debounced = (...args) => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => fn(...args), getDelay())
+      }
+      // Permite descartar una ejecución pendiente (p. ej. al elegir un resultado)
+      debounced.cancel = () => clearTimeout(timeoutId)
+      return debounced
+    }
+
+    // ---------- Registro de peticiones ----------
+
+    function logRequest (label, type) {
+      const entry = { id: ++requestId, label, type, status: 'pending', start: performance.now(), duration: 0 }
+      entries.unshift(entry)
+      entries.length = Math.min(entries.length, MAX_LOG_ENTRIES)
+      stats.requests++
+      renderLog()
+      return entry
+    }
+
+    function finishRequest (entry, status) {
+      entry.status = status
+      entry.duration = performance.now() - entry.start
+      if (status === 'ok') stats.ok++
+      if (status === 'aborted') stats.aborted++
+      renderLog()
+    }
+
+    function renderLog () {
+      $('#keys').textContent = stats.keys
+      $('#requests').textContent = stats.requests
+      $('#ok').textContent = stats.ok
+      $('#aborted').textContent = stats.aborted
+
+      log.replaceChildren(...entries.map(entry => {
+        const item = document.createElement('li')
+        item.className = entry.status
+        item.title = entry.status === 'aborted' ? 'Cancelada con AbortController' : ''
+        const time = entry.status === 'pending' ? '…' : `${Math.round(entry.duration)} ms`
+        item.innerHTML = `<span>${STATUS_ICONS[entry.status]}</span><span></span><small>${time}</small>`
+        item.children[1].textContent = entry.type === 'summary' ? `📄 ${entry.label}` : `«${entry.label}»`
+        return item
+      }))
+    }
+
+    // ---------- Búsqueda ----------
+
+    async function search (query) {
+      // Cancelamos la petición anterior si aún no ha terminado. Sin esto
+      // podría pasar que la respuesta de "jav" llegue DESPUÉS que la de
+      // "javascript" y nos pise los resultados buenos (condición de carrera)
+      searchController?.abort()
+
+      if (query.length < MIN_QUERY_LENGTH) {
+        spinner.hidden = true
+        results = []
+        closeList()
+        return
+      }
+
+      // Un AbortController por petición: su `signal` se pasa a fetch y
+      // llamar a controller.abort() hace que fetch rechace con AbortError
+      const controller = new AbortController()
+      searchController = controller
+      const entry = logRequest(query, 'search')
+      spinner.hidden = false
+
+      const params = new URLSearchParams({
+        action: 'query',
+        list: 'search',
+        srsearch: query,
+        srlimit: '8',
+        srprop: 'snippet',
+        format: 'json',
+        origin: '*' // necesario para que la API permita CORS
+      })
+
+      try {
+        const response = await fetch(`${API_URL}?${params}`, { signal: controller.signal })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json()
+
+        finishRequest(entry, 'ok')
+        results = data.query?.search ?? []
+        renderResults(query)
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          finishRequest(entry, 'aborted')
+          return // no tocamos la interfaz: ya hay otra petición en marcha
+        }
+        finishRequest(entry, 'error')
+        results = []
+        renderMessage('⚠️ No se ha podido conectar con Wikipedia. Revisa tu conexión.')
+      } finally {
+        // Solo ocultamos el spinner si esta sigue siendo la petición actual
+        if (searchController === controller) spinner.hidden = true
+      }
+    }
+
+    const debouncedSearch = debounce(search, () => Number(delayInput.value))
+
+    // ---------- Resaltado seguro ----------
+
+    function escapeRegExp (text) {
+      return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    // Convierte "arbol" en "[aáàäâ]rb[oóòöô]l" para resaltar sin importar tildes
+    function toAccentInsensitive (word) {
+      const plain = word.normalize('NFD').replace(/\p{Diacritic}/gu, '')
+      return [...escapeRegExp(plain)].map(char => ACCENTS[char.toLowerCase()] ?? char).join('')
+    }
+
+    // En lugar de meter HTML con innerHTML (riesgo de XSS), partimos el texto
+    // con una expresión regular y creamos nodos <mark> para las coincidencias
+    function highlight (text, query) {
+      const fragment = document.createDocumentFragment()
+      const words = query.trim().split(/\s+/).filter(Boolean).map(toAccentInsensitive)
+      if (words.length === 0) {
+        fragment.append(text)
+        return fragment
+      }
+
+      // Con un grupo de captura, split() incluye las coincidencias en las
+      // posiciones impares del array resultante
+      const regex = new RegExp(`(${words.join('|')})`, 'gi')
+      text.split(regex).forEach((part, index) => {
+        if (!part) return
+        if (index % 2 === 1) {
+          const mark = document.createElement('mark')
+          mark.textContent = part
+          fragment.append(mark)
+        } else {
+          fragment.append(part)
+        }
+      })
+      return fragment
+    }
+
+    // La API devuelve el extracto con etiquetas HTML. DOMParser las
+    // interpreta SIN ejecutar scripts y nos quedamos solo con el texto
+    function stripHtml (html) {
+      return new DOMParser().parseFromString(html, 'text/html').body.textContent
+    }
+
+    // ---------- Lista de sugerencias (patrón combobox ARIA) ----------
+
+    function renderResults (query) {
+      if (results.length === 0) {
+        renderMessage(`Sin resultados para «${query}»`)
+        return
+      }
+
+      listbox.replaceChildren(...results.map((result, index) => {
+        const option = document.createElement('li')
+        option.id = `option-${index}`
+        option.setAttribute('role', 'option')
+        option.setAttribute('aria-selected', 'false')
+
+        const title = document.createElement('div')
+        title.className = 'option-title'
+        title.append(highlight(result.title, query))
+
+        const snippet = document.createElement('div')
+        snippet.className = 'option-snippet'
+        snippet.append(highlight(stripHtml(result.snippet), query))
+
+        option.append(title, snippet)
+        // mousedown en lugar de click: se dispara antes del blur del input
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault()
+          chooseResult(index)
+        })
+        option.addEventListener('mousemove', () => {
+          if (activeIndex !== index) setActive(index)
+        })
+        return option
+      }))
+
+      activeIndex = -1
+      openList()
+    }
+
+    function renderMessage (message) {
+      const item = document.createElement('li')
+      item.className = 'list-message'
+      item.textContent = message
+      listbox.replaceChildren(item)
+      activeIndex = -1
+      openList()
+    }
+
+    function openList () {
+      listbox.hidden = false
+      input.setAttribute('aria-expanded', 'true')
+    }
+
+    function closeList () {
+      listbox.hidden = true
+      input.setAttribute('aria-expanded', 'false')
+      setActive(-1)
+    }
+
+    // El foco real se queda SIEMPRE en el input. Con aria-activedescendant
+    // le decimos al lector de pantalla qué opción está "activa"
+    function setActive (index) {
+      activeIndex = index
+      const options = listbox.querySelectorAll('[role="option"]')
+      options.forEach((option, i) => option.setAttribute('aria-selected', String(i === index)))
+
+      if (index >= 0 && options[index]) {
+        input.setAttribute('aria-activedescendant', options[index].id)
+        options[index].scrollIntoView({ block: 'nearest' })
+      } else {
+        input.removeAttribute('aria-activedescendant')
+      }
+    }
+
+    function handleKeydown (event) {
+      const isOpen = !listbox.hidden && results.length > 0
+
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault()
+          if (!results.length) return
+          if (!isOpen) openList()
+          setActive((activeIndex + 1) % results.length)
+          break
+        case 'ArrowUp':
+          event.preventDefault()
+          if (!results.length) return
+          if (!isOpen) openList()
+          setActive(activeIndex <= 0 ? results.length - 1 : activeIndex - 1)
+          break
+        case 'Enter':
+          if (!isOpen) return
+          event.preventDefault()
+          chooseResult(Math.max(activeIndex, 0))
+          break
+        case 'Escape':
+          // Primer Esc: cierra la lista. Segundo Esc: borra el texto
+          if (!listbox.hidden) {
+            closeList()
+          } else {
+            input.value = ''
+            searchController?.abort()
+            results = []
+          }
+          break
+      }
+    }
+
+    function chooseResult (index) {
+      const result = results[index]
+      if (!result) return
+      // Si quedaba una búsqueda pendiente, la descartamos para que no
+      // vuelva a abrir la lista después de elegir
+      debouncedSearch.cancel()
+      searchController?.abort()
+      input.value = result.title
+      closeList()
+      showSummary(result.title)
+    }
+
+    // ---------- Tarjeta de resumen ----------
+
+    async function showSummary (title) {
+      summaryController?.abort()
+      const controller = new AbortController()
+      summaryController = controller
+      const entry = logRequest(title, 'summary')
+      summary.classList.add('loading')
+
+      try {
+        // Los títulos usan guiones bajos en lugar de espacios en las URLs
+        const path = encodeURIComponent(title.replaceAll(' ', '_'))
+        const response = await fetch(`${SUMMARY_URL}${path}`, { signal: controller.signal })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json()
+        finishRequest(entry, 'ok')
+        renderSummary(data)
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          finishRequest(entry, 'aborted')
+          return
+        }
+        finishRequest(entry, 'error')
+        renderSummary({ title, description: 'No se ha podido cargar el resumen', extract: 'Inténtalo de nuevo en unos segundos.' })
+      } finally {
+        if (summaryController === controller) summary.classList.remove('loading')
+      }
+    }
+
+    function renderSummary (data) {
+      const image = summary.querySelector('img')
+      const thumbnail = data.thumbnail?.source
+
+      summary.classList.toggle('no-image', !thumbnail)
+      image.hidden = !thumbnail
+      if (thumbnail) {
+        image.src = thumbnail
+        image.alt = data.title
+      }
+
+      summary.querySelector('h2').textContent = data.title
+      summary.querySelector('.description').textContent = data.type === 'disambiguation'
+        ? 'Página de desambiguación'
+        : data.description ?? ''
+      summary.querySelector('.extract').textContent = data.extract ?? ''
+
+      const link = summary.querySelector('a')
+      const url = data.content_urls?.desktop?.page
+      link.hidden = !url
+      if (url) link.href = url
+    }
+
+    // ---------- Eventos ----------
+
+    input.addEventListener('input', () => {
+      stats.keys++
+      renderLog()
+      debouncedSearch(input.value.trim())
+    })
+    input.addEventListener('keydown', handleKeydown)
+    input.addEventListener('blur', closeList)
+    input.addEventListener('focus', () => {
+      if (results.length && input.value.trim().length >= MIN_QUERY_LENGTH) openList()
+    })
+
+    delayInput.addEventListener('input', () => {
+      delayLabel.textContent = `${delayInput.value} ms`
+    })
+
+    $('#reset').addEventListener('click', () => {
+      Object.keys(stats).forEach(key => { stats[key] = 0 })
+      entries.length = 0
+      renderLog()
+    })
+
+    $('.suggested').append(...SUGGESTED.map(title => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = title
+      button.addEventListener('click', () => {
+        debouncedSearch.cancel()
+        searchController?.abort()
+        input.value = title
+        results = []
+        closeList()
+        showSummary(title)
+      })
+      return button
+    }))
+
+    delayLabel.textContent = `${delayInput.value} ms`
+    input.value = INITIAL_ARTICLE
+    showSummary(INITIAL_ARTICLE)
+  </script>
+</head>
+
+<body>
+  <div class="layout">
+    <header>
+      <div class="logo" aria-hidden="true">W</div>
+      <div>
+        <h1>Buscador de Wikipedia</h1>
+        <p>Autocompletado con debounce y AbortController sobre la API de es.wikipedia.org</p>
+      </div>
+    </header>
+
+    <main>
+      <div class="combobox">
+        <div class="search-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input id="search" type="search" role="combobox" autocomplete="off" spellcheck="false"
+            aria-label="Buscar en Wikipedia" aria-autocomplete="list" aria-expanded="false"
+            aria-controls="suggestions" placeholder="Busca cualquier cosa… (p. ej. «Madrid»)">
+          <span class="spinner" hidden></span>
+        </div>
+        <ul id="suggestions" role="listbox" aria-label="Sugerencias" hidden></ul>
+      </div>
+
+      <article class="summary no-image" aria-live="polite">
+        <img alt="" hidden>
+        <div>
+          <h2>Cargando…</h2>
+          <p class="description"></p>
+          <p class="extract"></p>
+          <a href="#" target="_blank" rel="noopener" hidden>Leer en Wikipedia →</a>
+        </div>
+      </article>
+
+      <div class="suggested">
+        <span>Prueba con:</span>
+      </div>
+    </main>
+
+    <aside class="network">
+      <h2>Peticiones de red</h2>
+
+      <div class="counters">
+        <div class="counter"><span>Pulsaciones</span><strong id="keys">0</strong></div>
+        <div class="counter"><span>Peticiones</span><strong id="requests">0</strong></div>
+        <div class="counter ok"><span>Completadas</span><strong id="ok">0</strong></div>
+        <div class="counter aborted"><span>Canceladas</span><strong id="aborted">0</strong></div>
+      </div>
+
+      <label class="delay">
+        <span>Debounce: <strong id="delay-value"></strong></span>
+        <input id="delay" type="range" min="0" max="1000" step="50" value="300">
+      </label>
+
+      <ol class="log" aria-label="Últimas peticiones"></ol>
+
+      <p class="note">
+        Pon el debounce a 0 ms y escribe rápido: verás cómo se cancelan las peticiones anteriores.
+        Usa <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> y <kbd>Esc</kbd> en las sugerencias.
+        <button id="reset" type="button" style="all: unset; color: var(--accent); cursor: pointer">Reiniciar contadores</button>
+      </p>
+    </aside>
+  </div>
+</body>
+
+</html>

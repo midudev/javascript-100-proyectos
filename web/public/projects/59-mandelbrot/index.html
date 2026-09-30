@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>59 - Fractal de Mandelbrot</title>
+  <style>
+    :root {
+      --panel: rgba(8, 10, 20, .72);
+      --line: rgba(255, 255, 255, .12);
+      --text: #eef0ff;
+      --muted: #9aa0c3;
+      --accent: #ff9d3c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #000;
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas.is-dragging {
+      cursor: grabbing;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 2;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, .4);
+    }
+
+    .controls {
+      top: 16px;
+      left: 16px;
+      width: 270px;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .hint {
+      margin: -8px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    label .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    label output {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    select {
+      width: 100%;
+      font: inherit;
+      font-size: 14px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, .4);
+      color: var(--text);
+    }
+
+    select option {
+      background: #111;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr;
+      gap: 6px;
+    }
+
+    button {
+      font: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .06);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, .14);
+    }
+
+    .info {
+      right: 16px;
+      bottom: 16px;
+      padding: 12px 16px;
+      min-width: 260px;
+      font-size: 12px;
+      display: grid;
+      gap: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .info div {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .info dt {
+      color: var(--muted);
+    }
+
+    .info dd {
+      margin: 0;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    .info dl {
+      margin: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .progress {
+      height: 3px;
+      border-radius: 3px;
+      background: var(--line);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+      transition: width .1s;
+    }
+
+    .warning {
+      color: #ffcf6e;
+      display: none;
+    }
+
+    .warning.is-visible {
+      display: block;
+    }
+
+    .toggle {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .controls {
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+      }
+
+      .controls.is-collapsed>*:not(.toggle, h1) {
+        display: none;
+      }
+
+      .toggle {
+        display: block;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 4px 10px;
+      }
+
+      .info {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas></canvas>
+
+  <section class="panel controls is-collapsed">
+    <h1>Fractal de <span>Mandelbrot</span></h1>
+    <button class="toggle" aria-label="Mostrar controles">⚙</button>
+    <p class="hint">Rueda o click para hacer zoom (Mayús + click para alejar). Arrastra para moverte.</p>
+
+    <label>
+      <span class="row">Iteraciones máximas <output id="iterations-value"></output></span>
+      <input id="iterations" type="range" min="50" max="3000" step="10" value="200">
+    </label>
+    <label class="check"><input id="auto-iterations" type="checkbox" checked> Aumentar al hacer zoom</label>
+
+    <label>
+      Paleta
+      <select id="palette">
+        <option value="fuego">🔥 Fuego</option>
+        <option value="clasica">🌊 Clásica</option>
+        <option value="neon">💜 Neón</option>
+        <option value="hielo">❄️ Hielo</option>
+        <option value="grises">⚪ Grises</option>
+      </select>
+    </label>
+
+    <label>
+      Lugares para visitar
+      <select id="places">
+        <option value="">Elige un destino…</option>
+        <option value="-0.7453,0.1127,0.0065">🐴 Valle de los caballitos de mar</option>
+        <option value="0.2849,0.011,0.012">🐘 Valle de los elefantes</option>
+        <option value="-0.7746806106269039,-0.1374168856037867,0.000002">🌀 Espiral</option>
+        <option value="-0.761574,-0.0847596,0.00015">🌌 Galaxia</option>
+        <option value="-0.10109636,0.95628651,0.0000009">⚡ Rayos</option>
+        <option value="-1.7548776,0,0.1">🔁 Mini Mandelbrot</option>
+      </select>
+    </label>
+
+    <div class="buttons">
+      <button id="zoom-out" aria-label="Alejar">−</button>
+      <button id="zoom-in" aria-label="Acercar">+</button>
+      <button id="reset">⟲ Reiniciar</button>
+    </div>
+  </section>
+
+  <aside class="panel info" aria-live="off">
+    <dl>
+      <div><dt>Centro</dt><dd id="center"></dd></div>
+      <div><dt>Cursor</dt><dd id="cursor">—</dd></div>
+      <div><dt>Zoom</dt><dd id="zoom"></dd></div>
+      <div><dt>Render</dt><dd id="time">—</dd></div>
+    </dl>
+    <span class="warning" id="warning">⚠️ Límite de precisión de los números de 64 bits</span>
+    <div class="progress"><span id="progress"></span></div>
+  </aside>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const context = canvas.getContext('2d')
+    const $ = selector => document.querySelector(selector)
+
+    const BAND_HEIGHT = 8
+    const WORKER_COUNT = Math.min(navigator.hardwareConcurrency || 4, 8)
+    const INITIAL_VIEW = { centerX: -0.75, centerY: 0, width: 3.4, height: 2.6 }
+    // Por debajo de esta escala los números de coma flotante (64 bits) ya no
+    // distinguen píxeles vecinos y la imagen se "pixela"
+    const MIN_SCALE = 5e-16
+    const ZOOM_STEP = 2
+
+    // Vista actual: centro en el plano complejo y cuántas unidades mide un píxel
+    const view = { centerX: 0, centerY: 0, scale: 1 }
+    let initialScale = 1
+    let jobId = 0
+    let bandsDone = 0
+    let bandCount = 0
+    let renderStart = 0
+
+    // Guardamos la última imagen completa para previsualizar zoom y arrastre
+    // al instante mientras los workers calculan la nueva
+    const snapshot = document.createElement('canvas')
+    let snapshotView = null
+
+    // ---------- Workers ----------
+    // Creamos varios workers con el mismo archivo para repartir el trabajo
+    // entre los núcleos del procesador. Cada uno calcula franjas alternas
+    const workers = Array.from({ length: WORKER_COUNT }, () => {
+      const worker = new Worker('./worker.js')
+      worker.addEventListener('message', handleBand)
+      worker.addEventListener('error', event => console.error('Error en el worker', event.message))
+      return worker
+    })
+
+    function handleBand({ data }) {
+      // Si la respuesta es de un render antiguo (ya hemos movido la vista), la ignoramos
+      if (data.jobId !== jobId) return
+
+      const pixels = new Uint8ClampedArray(data.buffer)
+      context.putImageData(new ImageData(pixels, canvas.width, data.rows), 0, data.startY)
+
+      bandsDone++
+      $('#progress').style.width = `${(bandsDone / bandCount) * 100}%`
+
+      if (bandsDone === bandCount) {
+        $('#time').textContent = `${Math.round(performance.now() - renderStart)} ms`
+        setTimeout(() => { $('#progress').style.width = '0' }, 300)
+        saveSnapshot()
+      }
+    }
+
+    // Dividimos la imagen en franjas horizontales. Cada franja se pinta en
+    // cuanto llega, así vemos el fractal aparecer poco a poco en lugar de
+    // esperar a que se calcule la imagen entera
+    function render() {
+      jobId++
+      bandsDone = 0
+      bandCount = Math.ceil(canvas.height / BAND_HEIGHT)
+      renderStart = performance.now()
+      $('#time').textContent = 'calculando…'
+
+      workers.forEach((worker, index) => {
+        worker.postMessage({
+          type: 'render',
+          jobId,
+          width: canvas.width,
+          height: canvas.height,
+          centerX: view.centerX,
+          centerY: view.centerY,
+          scale: view.scale,
+          maxIterations: Number($('#iterations').value),
+          palette: $('#palette').value,
+          bandHeight: BAND_HEIGHT,
+          bandCount,
+          bandStart: index,
+          bandStep: WORKER_COUNT
+        })
+      })
+
+      updateInfo()
+    }
+
+    // ---------- Vista previa instantánea ----------
+    function saveSnapshot() {
+      snapshot.width = canvas.width
+      snapshot.height = canvas.height
+      snapshot.getContext('2d').drawImage(canvas, 0, 0)
+      snapshotView = { ...view }
+    }
+
+    // Dibujamos la última imagen completa escalada y desplazada para que
+    // coincida con la nueva vista. Es aproximada, pero da feedback inmediato
+    function drawPreview() {
+      if (!snapshotView) return
+      const k = snapshotView.scale / view.scale
+      const tx = (snapshotView.centerX - view.centerX) / view.scale - (canvas.width / 2) * k + canvas.width / 2
+      const ty = -(snapshotView.centerY - view.centerY) / view.scale - (canvas.height / 2) * k + canvas.height / 2
+
+      context.fillStyle = '#000'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.setTransform(k, 0, 0, k, tx, ty)
+      context.drawImage(snapshot, 0, 0)
+      context.setTransform(1, 0, 0, 1, 0, 0)
+    }
+
+    // ---------- Coordenadas ----------
+    function toCanvasPoint(event) {
+      const rect = canvas.getBoundingClientRect()
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      }
+    }
+
+    function toComplex({ x, y }) {
+      return {
+        re: view.centerX + (x - canvas.width / 2) * view.scale,
+        im: view.centerY - (y - canvas.height / 2) * view.scale
+      }
+    }
+
+    // Zoom centrado en un punto: el punto del plano complejo que está bajo
+    // el puntero debe seguir bajo el puntero después de cambiar la escala
+    function zoomAt(point, factor) {
+      const before = toComplex(point)
+      view.scale = Math.max(view.scale / factor, MIN_SCALE)
+      const after = toComplex(point)
+      view.centerX += before.re - after.re
+      view.centerY += before.im - after.im
+      updateAutoIterations()
+    }
+
+    function updateAutoIterations() {
+      if (!$('#auto-iterations').checked) return
+      // A más zoom, más detalle y más iteraciones necesarias para verlo
+      const zoom = initialScale / view.scale
+      const iterations = Math.round(200 + 90 * Math.log2(Math.max(zoom, 1)))
+      $('#iterations').value = Math.min(iterations, 3000)
+      $('#iterations-value').textContent = $('#iterations').value
+    }
+
+    let renderTimeout
+    function scheduleRender(delay = 60) {
+      drawPreview()
+      updateInfo()
+      clearTimeout(renderTimeout)
+      renderTimeout = setTimeout(render, delay)
+    }
+
+    // ---------- Información ----------
+    const zoomFormat = new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 })
+
+    function digitsFor(scale) {
+      return Math.min(16, Math.max(4, Math.ceil(-Math.log10(scale)) + 1))
+    }
+
+    function formatComplex(re, im) {
+      const digits = digitsFor(view.scale)
+      const sign = im < 0 ? '−' : '+'
+      return `${re.toFixed(digits).replace('-', '−')} ${sign} ${Math.abs(im).toFixed(digits)}i`
+    }
+
+    function updateInfo() {
+      $('#center').textContent = formatComplex(view.centerX, view.centerY)
+      $('#zoom').textContent = `×${zoomFormat.format(initialScale / view.scale)}`
+      $('#iterations-value').textContent = $('#iterations').value
+      $('#warning').classList.toggle('is-visible', view.scale <= MIN_SCALE * 4)
+    }
+
+    // ---------- Tamaño ----------
+    function resize() {
+      // Limitamos la densidad de píxeles: en pantallas retina el cálculo
+      // se multiplicaría por 4 sin una mejora visual tan grande
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      canvas.width = Math.floor(window.innerWidth * dpr)
+      canvas.height = Math.floor(window.innerHeight * dpr)
+      snapshotView = null
+    }
+
+    function reset() {
+      view.centerX = INITIAL_VIEW.centerX
+      view.centerY = INITIAL_VIEW.centerY
+      view.scale = Math.max(INITIAL_VIEW.width / canvas.width, INITIAL_VIEW.height / canvas.height)
+      initialScale = view.scale
+      $('#places').value = ''
+      updateAutoIterations()
+      scheduleRender(0)
+    }
+
+    // ---------- Interacción: arrastrar, click y pellizco ----------
+    const pointers = new Map()
+    let dragStart = null
+    let hasDragged = false
+    let pinchDistance = 0
+
+    function getPinch() {
+      const [a, b] = [...pointers.values()]
+      return {
+        distance: Math.hypot(a.x - b.x, a.y - b.y),
+        center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      }
+    }
+
+    canvas.addEventListener('pointerdown', event => {
+      canvas.setPointerCapture(event.pointerId)
+      pointers.set(event.pointerId, toCanvasPoint(event))
+      hasDragged = false
+      dragStart = toCanvasPoint(event)
+      if (pointers.size === 2) pinchDistance = getPinch().distance
+    })
+
+    canvas.addEventListener('pointermove', event => {
+      const point = toCanvasPoint(event)
+      const { re, im } = toComplex(point)
+      $('#cursor').textContent = formatComplex(re, im)
+
+      if (!pointers.has(event.pointerId)) return
+      const previous = pointers.get(event.pointerId)
+      pointers.set(event.pointerId, point)
+
+      if (pointers.size === 2) {
+        // Pellizco con dos dedos: zoom según cuánto cambia la distancia
+        const { distance, center } = getPinch()
+        zoomAt(center, distance / pinchDistance)
+        pinchDistance = distance
+        hasDragged = true
+        scheduleRender(150)
+        return
+      }
+
+      if (!hasDragged && Math.hypot(point.x - dragStart.x, point.y - dragStart.y) < 5) return
+      hasDragged = true
+      canvas.classList.add('is-dragging')
+
+      // Arrastrar mueve el centro en sentido contrario al puntero
+      view.centerX -= (point.x - previous.x) * view.scale
+      view.centerY += (point.y - previous.y) * view.scale
+      drawPreview()
+      updateInfo()
+    })
+
+    function endPointer(event) {
+      if (!pointers.has(event.pointerId)) return
+      pointers.delete(event.pointerId)
+      canvas.classList.remove('is-dragging')
+
+      if (pointers.size > 0) return
+      if (hasDragged) {
+        scheduleRender(0)
+      } else if (event.type === 'pointerup') {
+        const factor = event.shiftKey || event.altKey ? 1 / ZOOM_STEP : ZOOM_STEP
+        zoomAt(toCanvasPoint(event), factor)
+        scheduleRender(0)
+      }
+    }
+
+    canvas.addEventListener('pointerup', endPointer)
+    canvas.addEventListener('pointercancel', endPointer)
+
+    canvas.addEventListener('wheel', event => {
+      event.preventDefault()
+      // Math.exp da un zoom suave tanto con ratón como con trackpad
+      zoomAt(toCanvasPoint(event), Math.exp(-event.deltaY * 0.0015))
+      scheduleRender(120)
+    }, { passive: false })
+
+    // ---------- Controles ----------
+    function zoomCenter(factor) {
+      zoomAt({ x: canvas.width / 2, y: canvas.height / 2 }, factor)
+      scheduleRender(0)
+    }
+
+    $('#zoom-in').addEventListener('click', () => zoomCenter(ZOOM_STEP))
+    $('#zoom-out').addEventListener('click', () => zoomCenter(1 / ZOOM_STEP))
+    $('#reset').addEventListener('click', reset)
+
+    $('#iterations').addEventListener('input', () => {
+      $('#auto-iterations').checked = false
+      updateInfo()
+      scheduleRender(150)
+    })
+
+    $('#auto-iterations').addEventListener('change', () => {
+      updateAutoIterations()
+      scheduleRender(0)
+    })
+
+    $('#palette').addEventListener('change', () => {
+      snapshotView = null
+      render()
+    })
+
+    $('#places').addEventListener('change', event => {
+      if (!event.target.value) return
+      const [centerX, centerY, width] = event.target.value.split(',').map(Number)
+      view.centerX = centerX
+      view.centerY = centerY
+      view.scale = width / canvas.width
+      snapshotView = null
+      updateAutoIterations()
+      render()
+    })
+
+    $('.toggle').addEventListener('click', () => {
+      $('.controls').classList.toggle('is-collapsed')
+    })
+
+    document.addEventListener('keydown', event => {
+      if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) return
+      const PAN = 80
+      const actions = {
+        '+': () => zoomCenter(ZOOM_STEP),
+        '-': () => zoomCenter(1 / ZOOM_STEP),
+        'r': reset,
+        'ArrowLeft': () => { view.centerX -= PAN * view.scale; scheduleRender() },
+        'ArrowRight': () => { view.centerX += PAN * view.scale; scheduleRender() },
+        'ArrowUp': () => { view.centerY += PAN * view.scale; scheduleRender() },
+        'ArrowDown': () => { view.centerY -= PAN * view.scale; scheduleRender() }
+      }
+      actions[event.key]?.()
+    })
+
+    let resizeTimeout
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(() => {
+        // Si no se ha tocado la vista inicial, la recalculamos para el nuevo
+        // tamaño. Si no, mantenemos el mismo ancho visible del plano complejo
+        const isInitialView = view.scale === initialScale &&
+          view.centerX === INITIAL_VIEW.centerX && view.centerY === INITIAL_VIEW.centerY
+        const visibleWidth = view.scale * canvas.width
+        resize()
+        if (isInitialView) return reset()
+
+        view.scale = visibleWidth / canvas.width
+        initialScale = Math.max(INITIAL_VIEW.width / canvas.width, INITIAL_VIEW.height / canvas.height)
+        render()
+      }, 150)
+    })
+
+    resize()
+    reset()
+  </script>
+</body>
+
+</html>

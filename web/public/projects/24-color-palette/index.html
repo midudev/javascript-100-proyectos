@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>24 - Generador de paletas</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bar-height: 64px;
+      color-scheme: light;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: #f6f6f9;
+      color: #16161d;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      height: var(--bar-height);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 20px;
+      background: #fff;
+      border-bottom: 1px solid #e6e6ee;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: conic-gradient(#ff5f6d, #ffc371, #47e891, #3aa8ff, #a855f7, #ff5f6d);
+    }
+
+    .hint {
+      color: #6b6b7b;
+      font-size: 14px;
+    }
+
+    kbd {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 2px 8px;
+      border: 1px solid #d6d6e0;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #fafafe;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    select,
+    .actions button {
+      font: inherit;
+      font-size: 14px;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid #dcdce6;
+      background: #fff;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .actions button.primary {
+      background: #16161d;
+      border-color: #16161d;
+      color: #fff;
+    }
+
+    .actions button:hover {
+      filter: brightness(0.95);
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .color {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      /* La transición hace que el cambio de paleta sea suave */
+      transition: background-color .35s ease, flex .3s ease;
+      color: var(--text);
+    }
+
+    .color:hover {
+      flex: 1.15;
+    }
+
+    .hex {
+      font-size: clamp(20px, 2.6vw, 34px);
+      font-weight: 800;
+      letter-spacing: .02em;
+      background: none;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    .hex:hover {
+      background: color-mix(in srgb, var(--text) 12%, transparent);
+    }
+
+    .meta {
+      font-size: 13px;
+      opacity: .75;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 1px 8px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tools {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .color:hover .tools,
+    .color.locked .tools {
+      opacity: 1;
+    }
+
+    /* En pantallas táctiles no hay hover: mostramos siempre los botones */
+    @media (hover: none) {
+      .tools {
+        opacity: 1;
+      }
+    }
+
+    .tools button {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .tools button:hover {
+      background: color-mix(in srgb, var(--text) 14%, transparent);
+    }
+
+    .tools svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .toast {
+      position: fixed;
+      top: calc(var(--bar-height) + 16px);
+      left: 50%;
+      translate: -50% -20px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: #16161d;
+      color: #fff;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, translate .2s;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      translate: -50% 0;
+    }
+
+    @media (max-width: 420px) {
+      h1 {
+        display: none;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .hint {
+        display: none;
+      }
+
+      header {
+        padding: 0 12px;
+      }
+
+      h1 span {
+        display: none;
+      }
+
+      select,
+      .actions button {
+        padding: 0 10px;
+      }
+
+      select {
+        max-width: 130px;
+      }
+
+      main {
+        flex-direction: column;
+      }
+
+      .color {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 0 16px;
+      }
+
+      .color:hover {
+        flex: 1;
+      }
+
+      .meta {
+        display: none;
+      }
+
+      .tools {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1><i class="logo"></i><span>Paletas</span></h1>
+    <p class="hint">Pulsa <kbd>espacio</kbd> para generar · clic en el código para copiar</p>
+    <div class="actions">
+      <select id="harmony" aria-label="Tipo de armonía">
+        <option value="random">Armonía aleatoria</option>
+        <option value="analogous">Análogos</option>
+        <option value="complementary">Complementarios</option>
+        <option value="triad">Tríada</option>
+        <option value="monochromatic">Monocromática</option>
+      </select>
+      <button id="share" title="Copiar enlace a esta paleta">Compartir</button>
+      <button id="generate" class="primary">Generar</button>
+    </div>
+  </header>
+
+  <main id="palette"></main>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <template id="color-template">
+    <section class="color">
+      <button class="hex" title="Copiar código HEX"></button>
+      <p class="meta"></p>
+      <div class="tools">
+        <button class="lock" title="Bloquear color"></button>
+        <button class="copy" title="Copiar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <rect x="9" y="9" width="12" height="12" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
+      </div>
+    </section>
+  </template>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const COLUMNS = 5
+    // Paleta inicial bonita para cuando no hay nada en la URL
+    const DEFAULT_PALETTE = ['264653', '2a9d8f', 'e9c46a', 'f4a261', 'e76f51']
+    const HARMONIES = ['analogous', 'complementary', 'triad', 'monochromatic']
+    const HEX_REGEX = /^[0-9a-f]{6}$/i
+
+    const ICON_LOCKED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+    const ICON_UNLOCKED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>'
+
+    const $palette = $('#palette')
+    const $harmony = $('#harmony')
+    const $toast = $('#toast')
+
+    // Estado: cada columna tiene su color (en HEX) y si está bloqueada
+    let palette = []
+
+    /* ---------- Conversión de colores ---------- */
+
+    // El modelo HSL (tono, saturación, luminosidad) es ideal para generar
+    // armonías: los colores armónicos son simplemente giros en el círculo
+    // cromático (el tono, de 0 a 360 grados).
+    // Para pintarlos necesitamos pasarlos a RGB/HEX. Esta es la fórmula
+    // estándar (la misma que usa CSS): calcula cada canal (r, g, b) según
+    // en qué sector del círculo cae el tono.
+    function hslToRgb(h, s, l) {
+      s /= 100
+      l /= 100
+      const a = s * Math.min(l, 1 - l)
+      const channel = (n) => {
+        const k = (n + h / 30) % 12
+        return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+      }
+      return [channel(0), channel(8), channel(4)].map(value => Math.round(value * 255))
+    }
+
+    function rgbToHex([r, g, b]) {
+      return [r, g, b].map(value => value.toString(16).padStart(2, '0')).join('')
+    }
+
+    function hexToRgb(hex) {
+      const value = parseInt(hex, 16)
+      return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+    }
+
+    // Conversión inversa, la usamos para mostrar el HSL y para tomar
+    // el tono de un color bloqueado como base de la siguiente paleta
+    function rgbToHsl([r, g, b]) {
+      r /= 255
+      g /= 255
+      b /= 255
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      const delta = max - min
+      const l = (max + min) / 2
+      let h = 0
+      let s = 0
+
+      if (delta !== 0) {
+        s = delta / (1 - Math.abs(2 * l - 1))
+        if (max === r) h = ((g - b) / delta) % 6
+        else if (max === g) h = (b - r) / delta + 2
+        else h = (r - g) / delta + 4
+        h = Math.round(h * 60)
+        if (h < 0) h += 360
+      }
+
+      return [h, Math.round(s * 100), Math.round(l * 100)]
+    }
+
+    function hslToHex(h, s, l) {
+      return rgbToHex(hslToRgb(h, s, l))
+    }
+
+    /* ---------- Contraste WCAG ---------- */
+
+    // Luminancia relativa según WCAG: primero "deshacemos" la corrección
+    // gamma de sRGB y después ponderamos cada canal según la sensibilidad
+    // del ojo humano (vemos mucho más el verde que el azul).
+    function luminance(hex) {
+      const [r, g, b] = hexToRgb(hex).map(value => {
+        const c = value / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    function contrastRatio(lumA, lumB) {
+      const [light, dark] = lumA > lumB ? [lumA, lumB] : [lumB, lumA]
+      return (light + 0.05) / (dark + 0.05)
+    }
+
+    // Elegimos texto blanco o negro: el que tenga MÁS contraste con el fondo
+    function getReadableText(hex) {
+      const lum = luminance(hex)
+      const withBlack = contrastRatio(lum, 0)
+      const withWhite = contrastRatio(lum, 1)
+      return withBlack > withWhite
+        ? { color: '#000000', ratio: withBlack }
+        : { color: '#ffffff', ratio: withWhite }
+    }
+
+    function wcagLevel(ratio) {
+      if (ratio >= 7) return 'AAA'
+      if (ratio >= 4.5) return 'AA'
+      return 'AA grande'
+    }
+
+    /* ---------- Generación armónica ---------- */
+
+    const random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+    const wrapHue = (hue) => ((hue % 360) + 360) % 360
+
+    // Cada armonía devuelve una lista de desplazamientos de tono respecto
+    // al tono base y una luminosidad para cada columna
+    function getHarmonyHues(type, base) {
+      switch (type) {
+        case 'analogous':
+          // Vecinos en el círculo cromático (±30º): paletas tranquilas
+          return [-40, -20, 0, 20, 40].map(offset => base + offset)
+        case 'complementary':
+          // El opuesto (180º) da el máximo contraste de tono
+          return [base, base, base + 180, base + 180, base + 15]
+        case 'triad':
+          // Tres tonos equidistantes (cada 120º)
+          return [base, base + 120, base + 240, base, base + 120]
+        case 'monochromatic':
+        default:
+          // Un único tono, solo cambian saturación y luminosidad
+          return Array(COLUMNS).fill(base)
+      }
+    }
+
+    function generatePalette() {
+      const selected = $harmony.value
+      const type = selected === 'random'
+        ? HARMONIES[random(0, HARMONIES.length - 1)]
+        : selected
+
+      // Si hay colores bloqueados usamos el tono del primero como base,
+      // así la nueva paleta sigue siendo armónica con lo que te gusta
+      const firstLocked = palette.find(color => color.locked)
+      const base = firstLocked
+        ? rgbToHsl(hexToRgb(firstLocked.hex))[0]
+        : random(0, 359)
+
+      const hues = getHarmonyHues(type, base)
+      const saturation = random(45, 80)
+      // Repartimos la luminosidad para tener colores claros y oscuros
+      const lightStart = random(22, 35)
+      const lightStep = random(10, 14)
+
+      const generated = hues.map((hue, index) => {
+        const s = Math.min(95, saturation + random(-12, 12))
+        const l = Math.min(92, lightStart + lightStep * index + random(-4, 4))
+        return hslToHex(wrapHue(hue), s, l)
+      })
+
+      palette = generated.map((hex, index) => {
+        const current = palette[index]
+        return current?.locked ? current : { hex, locked: false }
+      })
+
+      render()
+      saveToUrl()
+    }
+
+    /* ---------- URL como estado ---------- */
+
+    // Guardamos la paleta en el hash (#264653-2a9d8f-...). Así cualquier
+    // URL es una paleta que se puede compartir, sin servidor ni base de datos.
+    // Usamos replaceState para no llenar el historial con cada paleta.
+    function saveToUrl() {
+      const hash = palette.map(color => color.hex).join('-')
+      history.replaceState(null, '', `#${hash}`)
+    }
+
+    function readFromUrl() {
+      const codes = location.hash.slice(1).split('-')
+      const isValid = codes.length === COLUMNS && codes.every(code => HEX_REGEX.test(code))
+      return isValid ? codes.map(code => code.toLowerCase()) : null
+    }
+
+    function loadPalette(codes) {
+      palette = codes.map((hex, index) => ({
+        hex,
+        locked: palette[index]?.locked ?? false
+      }))
+      render()
+    }
+
+    /* ---------- Portapapeles ---------- */
+
+    async function copyText(text) {
+      // navigator.clipboard solo funciona en contextos seguros (https o
+      // localhost) y puede estar bloqueado dentro de un iframe
+      try {
+        await navigator.clipboard.writeText(text)
+        showToast(`¡Copiado ${text}!`)
+      } catch {
+        showToast('No se ha podido copiar 😢')
+      }
+    }
+
+    let toastTimeout
+    function showToast(message) {
+      $toast.textContent = message
+      $toast.classList.add('visible')
+      clearTimeout(toastTimeout)
+      toastTimeout = setTimeout(() => $toast.classList.remove('visible'), 1500)
+    }
+
+    /* ---------- Render ---------- */
+
+    function createColumns() {
+      const template = $('#color-template')
+      for (let index = 0; index < COLUMNS; index++) {
+        const column = template.content.firstElementChild.cloneNode(true)
+        column.dataset.index = index
+        $palette.append(column)
+      }
+    }
+
+    function render() {
+      palette.forEach(({ hex, locked }, index) => {
+        const column = $palette.children[index]
+        const { color, ratio } = getReadableText(hex)
+        const [h, s, l] = rgbToHsl(hexToRgb(hex))
+
+        column.style.backgroundColor = `#${hex}`
+        column.style.setProperty('--text', color)
+        column.classList.toggle('locked', locked)
+
+        column.querySelector('.hex').textContent = hex.toUpperCase()
+        column.querySelector('.meta').innerHTML = `hsl(${h} ${s}% ${l}%)<br>
+          <span class="badge" title="Contraste del texto">${ratio.toFixed(1)}:1 · ${wcagLevel(ratio)}</span>`
+
+        const lockButton = column.querySelector('.lock')
+        lockButton.innerHTML = locked ? ICON_LOCKED : ICON_UNLOCKED
+        lockButton.title = locked ? 'Desbloquear color' : 'Bloquear color'
+      })
+    }
+
+    /* ---------- Eventos ---------- */
+
+    // Un único listener para todas las columnas (delegación de eventos)
+    $palette.addEventListener('click', (event) => {
+      const column = event.target.closest('.color')
+      if (!column) return
+      const color = palette[column.dataset.index]
+
+      if (event.target.closest('.lock')) {
+        color.locked = !color.locked
+        render()
+      } else if (event.target.closest('.hex, .copy')) {
+        copyText(`#${color.hex.toUpperCase()}`)
+      }
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.code !== 'Space') return
+      // No generamos si el foco está en un control (ej: el select)
+      if (event.target.closest('select, input, textarea')) return
+      event.preventDefault()
+      generatePalette()
+    })
+
+    $('#generate').addEventListener('click', (event) => {
+      event.currentTarget.blur()
+      generatePalette()
+    })
+
+    $('#share').addEventListener('click', () => copyText(location.href))
+
+    $harmony.addEventListener('change', () => {
+      $harmony.blur()
+      generatePalette()
+    })
+
+    // Si alguien pega otra URL con paleta en la misma pestaña
+    window.addEventListener('hashchange', () => {
+      const codes = readFromUrl()
+      if (codes) loadPalette(codes)
+    })
+
+    /* ---------- Inicio ---------- */
+
+    createColumns()
+    loadPalette(readFromUrl() ?? DEFAULT_PALETTE)
+    saveToUrl()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>91 - Calendario</title>
+  <style>
+    :root {
+      --bg: #eef1f8;
+      --card: #ffffff;
+      --cell: #f7f8fc;
+      --cell-hover: #eef0fb;
+      --text: #1d2033;
+      --muted: #7a7f99;
+      --line: #e3e6f2;
+      --accent: #4f46e5;
+      --accent-soft: #e7e6ff;
+      --holiday: #e11d48;
+      --holiday-soft: #ffe4ea;
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 10% 0%, #dfe4ff 0, transparent 40%),
+        radial-gradient(circle at 100% 100%, #ffe6f1 0, transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 20px;
+      height: 100dvh;
+      padding: 20px;
+    }
+
+    .calendar,
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 20px;
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: 0 10px 40px -20px rgb(40 50 110 / 35%);
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 2.6vw, 2rem);
+      letter-spacing: -0.02em;
+    }
+
+    .summary {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .nav {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav button {
+      min-width: 40px;
+      height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .nav button:hover {
+      background: var(--cell-hover);
+      border-color: #cfd3ee;
+    }
+
+    .nav .icon {
+      padding: 0;
+      font-size: 1.3rem;
+    }
+
+    .weekdays,
+    .days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .weekdays {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .weekdays .narrow {
+      display: none;
+    }
+
+    .days {
+      flex: 1;
+      grid-template-rows: repeat(6, minmax(0, 1fr));
+      min-height: 0;
+    }
+
+    .day {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      min-height: 0;
+      padding: 6px;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      background: var(--cell);
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .day:hover {
+      background: var(--cell-hover);
+    }
+
+    .day:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .day.is-weekend {
+      background: #f1f2f8;
+    }
+
+    .day.is-other-month {
+      opacity: 0.45;
+    }
+
+    .day.is-selected {
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    .day-number {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .day.is-holiday .day-number {
+      color: var(--holiday);
+    }
+
+    .day.is-today .day-number {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .day-holiday {
+      overflow: hidden;
+      color: var(--holiday);
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .chip {
+      overflow: hidden;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--color) 14%, white);
+      color: color-mix(in srgb, var(--color) 80%, black);
+      font-size: 0.72rem;
+      font-weight: 500;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      border-left: 3px solid var(--color);
+    }
+
+    .more {
+      padding-left: 4px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .dots {
+      display: none;
+      gap: 3px;
+    }
+
+    .dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color);
+    }
+
+    /* Panel lateral */
+    .panel {
+      gap: 14px;
+      overflow: auto;
+    }
+
+    .panel-weekday {
+      margin: 0;
+      color: var(--accent);
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .relative {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .holiday-badge {
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: var(--holiday-soft);
+      color: var(--holiday);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .event-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .event {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--color) 9%, white);
+      border-left: 4px solid var(--color);
+      animation: pop 0.2s ease-out;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+    }
+
+    .event-time {
+      min-width: 44px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .event-title {
+      flex: 1;
+      overflow-wrap: anywhere;
+      font-weight: 500;
+    }
+
+    .event-delete {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .event-delete:hover {
+      background: rgb(0 0 0 / 6%);
+      color: var(--holiday);
+    }
+
+    .empty {
+      margin: 0;
+      padding: 18px;
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .event-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .event-form input[type='text'],
+    .event-form input[type='time'] {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--cell);
+    }
+
+    .event-form input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-row input[type='time'] {
+      width: 120px;
+    }
+
+    .colors {
+      display: flex;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .colors label {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--color);
+      cursor: pointer;
+    }
+
+    .colors input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .colors label:has(input:checked) {
+      box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color);
+    }
+
+    .add-button {
+      height: 44px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+
+    .add-button:hover {
+      filter: brightness(1.1);
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    @media (width < 820px) {
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100dvh;
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .calendar {
+        height: 70dvh;
+        min-height: 420px;
+        padding: 14px;
+      }
+
+      .weekdays .short {
+        display: none;
+      }
+
+      .weekdays .narrow {
+        display: inline;
+      }
+
+      .days {
+        gap: 4px;
+      }
+
+      .day {
+        align-items: center;
+        padding: 4px 2px;
+      }
+
+      .day-holiday,
+      .chip,
+      .more {
+        display: none;
+      }
+
+      .dots {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="calendar" aria-label="Calendario mensual">
+      <header class="calendar-header">
+        <div>
+          <h1 id="month-title"></h1>
+          <p class="summary" id="month-summary"></p>
+        </div>
+        <nav class="nav">
+          <button class="icon" id="prev-month" aria-label="Mes anterior">‹</button>
+          <button id="today-button">Hoy</button>
+          <button class="icon" id="next-month" aria-label="Mes siguiente">›</button>
+        </nav>
+      </header>
+      <div class="weekdays" id="weekdays"></div>
+      <div class="days" id="days"></div>
+    </section>
+
+    <aside class="panel" aria-live="polite">
+      <div>
+        <p class="panel-weekday" id="selected-weekday"></p>
+        <h2 id="selected-date"></h2>
+        <p class="relative" id="selected-relative"></p>
+      </div>
+      <p class="holiday-badge" id="holiday-badge" hidden></p>
+      <ul class="event-list" id="event-list"></ul>
+
+      <form class="event-form" id="event-form">
+        <input type="text" name="title" placeholder="Nuevo evento…" maxlength="60" required autocomplete="off">
+        <div class="form-row">
+          <input type="time" name="time" aria-label="Hora">
+          <fieldset class="colors" id="colors" aria-label="Color"></fieldset>
+        </div>
+        <button class="add-button">Añadir evento</button>
+        <p class="hint">Usa las flechas del teclado para moverte entre días</p>
+      </form>
+    </aside>
+  </main>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const LOCALE = 'es'
+    const STORAGE_KEY = 'calendar-events'
+    const TOTAL_CELLS = 42 // 6 semanas: así la altura del calendario no cambia entre meses
+    const MAX_VISIBLE_EVENTS = 2
+    const MS_PER_DAY = 24 * 60 * 60 * 1000
+    const COLORS = ['#4f46e5', '#059669', '#ea580c', '#db2777', '#0891b2']
+
+    // Festivos nacionales de España que caen siempre el mismo día (clave MM-DD)
+    const FIXED_HOLIDAYS = {
+      '01-01': 'Año Nuevo',
+      '01-06': 'Epifanía del Señor',
+      '05-01': 'Fiesta del Trabajo',
+      '08-15': 'Asunción de la Virgen',
+      '10-12': 'Fiesta Nacional de España',
+      '11-01': 'Todos los Santos',
+      '12-06': 'Día de la Constitución',
+      '12-08': 'Inmaculada Concepción',
+      '12-25': 'Navidad'
+    }
+
+    // Intl.DateTimeFormat nos da los nombres de meses y días ya traducidos,
+    // sin tener que escribir arrays a mano con 'enero', 'febrero'...
+    const monthFormatter = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' })
+    const dateFormatter = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' })
+    const weekdayFormatter = new Intl.DateTimeFormat(LOCALE, { weekday: 'long' })
+    const relativeFormatter = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' })
+
+    const monthTitle = $('#month-title')
+    const monthSummary = $('#month-summary')
+    const weekdaysContainer = $('#weekdays')
+    const daysContainer = $('#days')
+    const eventList = $('#event-list')
+    const eventForm = $('#event-form')
+    const holidayBadge = $('#holiday-badge')
+
+    const holidaysCache = new Map()
+    let events = loadEvents()
+    let selectedDate = startOfDay(new Date())
+    let viewYear = selectedDate.getFullYear()
+    let viewMonth = selectedDate.getMonth()
+
+    function startOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    }
+
+    function addDays(date, amount) {
+      // El constructor de Date corrige solo los desbordamientos: el día 32 de enero es el 1 de febrero
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount)
+    }
+
+    function toDateKey(date) {
+      // ¡Cuidado! No usamos date.toISOString().slice(0, 10) porque toISOString convierte a UTC.
+      // En España (UTC+1 / UTC+2) el 15 de marzo a las 00:30 en UTC todavía es 14 de marzo,
+      // así que el evento se guardaría en el día anterior. Montamos la clave con la hora LOCAL.
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    function fromDateKey(key) {
+      // Y al revés: new Date('2026-03-15') se interpreta como medianoche UTC.
+      // Con el constructor (año, mes, día) la fecha se crea en la zona horaria local
+      const [year, month, day] = key.split('-').map(Number)
+      return new Date(year, month - 1, day)
+    }
+
+    function capitalize(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1)
+    }
+
+    function plural(count, singular, pluralForm) {
+      return `${count} ${count === 1 ? singular : pluralForm}`
+    }
+
+    function escapeHTML(text) {
+      return text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    function getEasterSunday(year) {
+      // Algoritmo de Meeus/Jones/Butcher para el domingo de Pascua (calendario gregoriano)
+      const a = year % 19
+      const b = Math.floor(year / 100)
+      const c = year % 100
+      const d = Math.floor(b / 4)
+      const e = b % 4
+      const f = Math.floor((b + 8) / 25)
+      const g = Math.floor((b - f + 1) / 3)
+      const h = (19 * a + b - d - g + 15) % 30
+      const i = Math.floor(c / 4)
+      const k = c % 4
+      const l = (32 + 2 * e + 2 * i - h - k) % 7
+      const m = Math.floor((a + 11 * h + 22 * l) / 451)
+      const month = Math.floor((h + l - 7 * m + 114) / 31)
+      const day = ((h + l - 7 * m + 114) % 31) + 1
+      return new Date(year, month - 1, day)
+    }
+
+    function getHolidays(year) {
+      if (holidaysCache.has(year)) return holidaysCache.get(year)
+
+      const holidays = new Map()
+      for (const [monthDay, name] of Object.entries(FIXED_HOLIDAYS)) {
+        holidays.set(`${year}-${monthDay}`, name)
+      }
+      // Extra: el Viernes Santo es festivo nacional pero cambia cada año (2 días antes de Pascua)
+      holidays.set(toDateKey(addDays(getEasterSunday(year), -2)), 'Viernes Santo')
+
+      holidaysCache.set(year, holidays)
+      return holidays
+    }
+
+    function getHoliday(date) {
+      return getHolidays(date.getFullYear()).get(toDateKey(date))
+    }
+
+    function loadEvents() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) return JSON.parse(saved)
+      } catch {
+        // Si localStorage no está disponible o el JSON está roto, empezamos con ejemplos
+      }
+      return createSampleEvents()
+    }
+
+    function saveEvents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
+      } catch {
+        // Modo privado o almacenamiento lleno: la app sigue funcionando en memoria
+      }
+    }
+
+    function createId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+    }
+
+    function createSampleEvents() {
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = today.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const samples = [
+        [0, '10:30', 'Café con el equipo', 1],
+        [0, '18:00', 'Directo en Twitch', 3],
+        [2, '09:00', 'Revisión de código', 0],
+        [-3, '20:00', 'Cena de cumpleaños 🎂', 3],
+        [5, '19:30', 'Partido de pádel', 1],
+        [9, '', 'Entrega del proyecto 🚀', 2],
+        [-8, '16:00', 'Clase de JavaScript', 0],
+        [-12, '11:00', 'Dentista', 4],
+        [13, '08:00', 'Vuelo a Barcelona ✈️', 4]
+      ]
+
+      const sampleEvents = {}
+      for (const [offset, time, title, colorIndex] of samples) {
+        // Repartimos los ejemplos dentro del mes actual (si nos pasamos, damos la vuelta)
+        const day = ((today.getDate() - 1 + offset) % daysInMonth + daysInMonth) % daysInMonth + 1
+        const key = toDateKey(new Date(year, month, day))
+        sampleEvents[key] ??= []
+        sampleEvents[key].push({ id: createId(), title, time, color: COLORS[colorIndex] })
+      }
+      return sampleEvents
+    }
+
+    function getEvents(date) {
+      const list = events[toDateKey(date)] ?? []
+      // Los eventos sin hora ('Todo el día') van primero y el resto, ordenados por hora
+      return [...list].sort((a, b) => a.time.localeCompare(b.time))
+    }
+
+    function renderWeekdays() {
+      // El 5 de enero de 2026 fue lunes: generamos los 7 nombres a partir de ahí
+      const firstMonday = new Date(2026, 0, 5)
+      const shortFormatter = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' })
+      const narrowFormatter = new Intl.DateTimeFormat(LOCALE, { weekday: 'narrow' })
+
+      weekdaysContainer.innerHTML = Array.from({ length: 7 }, (_, index) => {
+        const date = addDays(firstMonday, index)
+        const short = shortFormatter.format(date).replace('.', '')
+        return `<span><span class="short">${short}</span><span class="narrow">${narrowFormatter.format(date)}</span></span>`
+      }).join('')
+    }
+
+    function getMonthCells(year, month) {
+      const firstDayOfMonth = new Date(year, month, 1)
+      // getDay() devuelve 0 = domingo, 1 = lunes... 6 = sábado.
+      // Nuestra semana empieza en lunes, así que lo desplazamos: lunes = 0 ... domingo = 6
+      const offset = (firstDayOfMonth.getDay() + 6) % 7
+      // Truco clásico: el "día 0" del mes siguiente es el último día de este mes
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const daysInPreviousMonth = new Date(year, month, 0).getDate()
+
+      const cells = []
+
+      // 1. Últimos días del mes anterior para rellenar la primera semana
+      for (let index = offset - 1; index >= 0; index--) {
+        cells.push({ date: new Date(year, month - 1, daysInPreviousMonth - index), isCurrentMonth: false })
+      }
+
+      // 2. Los días del mes que estamos viendo
+      for (let day = 1; day <= daysInMonth; day++) {
+        cells.push({ date: new Date(year, month, day), isCurrentMonth: true })
+      }
+
+      // 3. Primeros días del mes siguiente hasta completar las 6 semanas
+      let nextDay = 1
+      while (cells.length < TOTAL_CELLS) {
+        cells.push({ date: new Date(year, month + 1, nextDay++), isCurrentMonth: false })
+      }
+
+      return { cells, daysInMonth }
+    }
+
+    function renderDay({ date, isCurrentMonth }, todayKey, selectedKey) {
+      const key = toDateKey(date)
+      const holiday = getHoliday(date)
+      const dayEvents = getEvents(date)
+      const weekdayIndex = (date.getDay() + 6) % 7
+
+      const classes = ['day']
+      if (!isCurrentMonth) classes.push('is-other-month')
+      if (weekdayIndex >= 5) classes.push('is-weekend')
+      if (holiday) classes.push('is-holiday')
+      if (key === todayKey) classes.push('is-today')
+      if (key === selectedKey) classes.push('is-selected')
+
+      const visible = dayEvents.slice(0, MAX_VISIBLE_EVENTS)
+      const hidden = dayEvents.length - visible.length
+
+      const chips = visible.map(event => `
+        <span class="chip" style="--color: ${event.color}">${event.time ? `${event.time} ` : ''}${escapeHTML(event.title)}</span>
+      `).join('')
+      const dots = dayEvents.slice(0, 4).map(event => `<span style="--color: ${event.color}"></span>`).join('')
+      const label = `${dateFormatter.format(date)}${holiday ? `, ${holiday}` : ''}, ${plural(dayEvents.length, 'evento', 'eventos')}`
+
+      return `
+        <button class="${classes.join(' ')}" data-date="${key}" aria-label="${label}" tabindex="${key === selectedKey ? 0 : -1}">
+          <span class="day-number">${date.getDate()}</span>
+          ${holiday ? `<span class="day-holiday">${holiday}</span>` : ''}
+          ${chips}
+          ${hidden > 0 ? `<span class="more">+${hidden} más</span>` : ''}
+          ${dots ? `<span class="dots">${dots}</span>` : ''}
+        </button>
+      `
+    }
+
+    function renderCalendar() {
+      const { cells, daysInMonth } = getMonthCells(viewYear, viewMonth)
+      const todayKey = toDateKey(new Date())
+      const selectedKey = toDateKey(selectedDate)
+
+      monthTitle.textContent = capitalize(monthFormatter.format(new Date(viewYear, viewMonth, 1)))
+      daysContainer.innerHTML = cells.map(cell => renderDay(cell, todayKey, selectedKey)).join('')
+
+      const monthCells = cells.filter(cell => cell.isCurrentMonth)
+      const eventCount = monthCells.reduce((total, cell) => total + getEvents(cell.date).length, 0)
+      const holidayCount = monthCells.filter(cell => getHoliday(cell.date)).length
+      monthSummary.textContent = `${daysInMonth} días · ${plural(eventCount, 'evento', 'eventos')} · ${plural(holidayCount, 'festivo', 'festivos')}`
+    }
+
+    function getRelativeDay(date) {
+      // Math.round absorbe los días de 23 o 25 horas de los cambios de horario de verano
+      const diff = Math.round((startOfDay(date) - startOfDay(new Date())) / MS_PER_DAY)
+      return capitalize(relativeFormatter.format(diff, 'day'))
+    }
+
+    function renderPanel() {
+      $('#selected-weekday').textContent = weekdayFormatter.format(selectedDate)
+      $('#selected-date').textContent = dateFormatter.format(selectedDate)
+      $('#selected-relative').textContent = getRelativeDay(selectedDate)
+
+      const holiday = getHoliday(selectedDate)
+      holidayBadge.hidden = !holiday
+      holidayBadge.textContent = holiday ? `🎉 Festivo nacional: ${holiday}` : ''
+
+      const dayEvents = getEvents(selectedDate)
+      if (dayEvents.length === 0) {
+        eventList.innerHTML = '<li class="empty">No hay eventos este día.<br>¡Añade el primero!</li>'
+        return
+      }
+
+      eventList.innerHTML = dayEvents.map(event => `
+        <li class="event" style="--color: ${event.color}">
+          <span class="event-time">${event.time || 'Todo el día'}</span>
+          <span class="event-title">${escapeHTML(event.title)}</span>
+          <button class="event-delete" data-id="${event.id}" aria-label="Eliminar ${escapeHTML(event.title)}">×</button>
+        </li>
+      `).join('')
+    }
+
+    function render() {
+      renderCalendar()
+      renderPanel()
+    }
+
+    function selectDate(date, { focus = false } = {}) {
+      selectedDate = startOfDay(date)
+      // Si el día elegido es de otro mes, movemos la vista a ese mes
+      viewYear = selectedDate.getFullYear()
+      viewMonth = selectedDate.getMonth()
+      render()
+      if (focus) daysContainer.querySelector(`[data-date="${toDateKey(selectedDate)}"]`)?.focus()
+    }
+
+    function changeMonth(amount) {
+      const target = new Date(viewYear, viewMonth + amount, 1)
+      // Mantenemos el mismo número de día si existe (31 de enero -> 28/29 de febrero)
+      const daysInTarget = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+      selectDate(new Date(target.getFullYear(), target.getMonth(), Math.min(selectedDate.getDate(), daysInTarget)))
+    }
+
+    function addEvent({ title, time, color }) {
+      const key = toDateKey(selectedDate)
+      events[key] ??= []
+      events[key].push({ id: createId(), title, time, color })
+      saveEvents()
+      render()
+    }
+
+    function deleteEvent(id) {
+      const key = toDateKey(selectedDate)
+      events[key] = (events[key] ?? []).filter(event => event.id !== id)
+      if (events[key].length === 0) delete events[key]
+      saveEvents()
+      render()
+    }
+
+    function renderColorPicker() {
+      $('#colors').innerHTML = COLORS.map((color, index) => `
+        <label style="--color: ${color}" title="Color ${index + 1}">
+          <input type="radio" name="color" value="${color}" ${index === 0 ? 'checked' : ''} aria-label="Color ${index + 1}">
+        </label>
+      `).join('')
+    }
+
+    $('#prev-month').addEventListener('click', () => changeMonth(-1))
+    $('#next-month').addEventListener('click', () => changeMonth(1))
+    $('#today-button').addEventListener('click', () => selectDate(new Date()))
+
+    daysContainer.addEventListener('click', event => {
+      const day = event.target.closest('.day')
+      if (day) selectDate(fromDateKey(day.dataset.date), { focus: true })
+    })
+
+    eventList.addEventListener('click', event => {
+      const button = event.target.closest('.event-delete')
+      if (button) deleteEvent(button.dataset.id)
+    })
+
+    eventForm.addEventListener('submit', event => {
+      event.preventDefault()
+      const data = new FormData(eventForm)
+      const title = data.get('title').trim()
+      if (!title) return
+
+      addEvent({ title, time: data.get('time'), color: data.get('color') })
+      eventForm.elements.title.value = ''
+      eventForm.elements.time.value = ''
+    })
+
+    document.addEventListener('keydown', event => {
+      if (event.target.closest('input, textarea')) return
+
+      const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+      if (event.key in moves) {
+        event.preventDefault()
+        selectDate(addDays(selectedDate, moves[event.key]), { focus: true })
+      } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+        event.preventDefault()
+        changeMonth(event.key === 'PageUp' ? -1 : 1)
+      }
+    })
+
+    renderWeekdays()
+    renderColorPicker()
+    render()
+  </script>
+</body>
+
+</html>

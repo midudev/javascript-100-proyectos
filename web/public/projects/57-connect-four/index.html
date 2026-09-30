@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>57 - Conecta 4</title>
+  <style>
+    :root {
+      --bg: #eef2fb;
+      --text: #1b2340;
+      --muted: #6b7394;
+      --board: #2f5bea;
+      --board-dark: #2146c7;
+      --hole: #eef2fb;
+      --red: #ef4444;
+      --red-dark: #b91c1c;
+      --yellow: #facc15;
+      --yellow-dark: #ca8a04;
+      --gap: 8px;
+      /* Tamaño de cada celda: se adapta al ancho y al alto de la pantalla */
+      --cell: min(calc((100vw - 32px - 6 * var(--gap) - 32px) / 7), calc((100dvh - 270px) / 7), 76px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 50% 0%, #fff, var(--bg) 60%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    main {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -.02em;
+    }
+
+    h1 span {
+      color: var(--board);
+    }
+
+    .segmented {
+      display: flex;
+      background: #dde4f5;
+      border-radius: 12px;
+      padding: 3px;
+    }
+
+    .segmented button {
+      border: none;
+      background: none;
+      padding: 7px 12px;
+      border-radius: 9px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: white;
+      color: var(--text);
+      box-shadow: 0 2px 6px rgba(30, 50, 120, .12);
+    }
+
+    select {
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #d3daee;
+      background: white;
+      color: var(--text);
+    }
+
+    select[hidden] {
+      display: none;
+    }
+
+    .scoreboard {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 16px;
+      width: calc(7 * var(--cell) + 8 * var(--gap));
+      min-width: min(100%, 340px);
+    }
+
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      background: white;
+      box-shadow: 0 2px 10px rgba(30, 50, 120, .08);
+      border: 2px solid transparent;
+      transition: border-color .2s, transform .2s;
+    }
+
+    .player.is-active {
+      border-color: var(--color);
+      transform: translateY(-2px);
+    }
+
+    .player:last-child {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+
+    .player .chip {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color);
+      box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .2);
+      flex-shrink: 0;
+    }
+
+    .player .name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player strong {
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status {
+      margin: 0;
+      font-weight: 700;
+      font-size: 15px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .game {
+      display: grid;
+      gap: 4px;
+    }
+
+    /* Fila superior con la ficha de vista previa */
+    .preview {
+      position: relative;
+      height: var(--cell);
+      margin: 0 var(--gap);
+    }
+
+    .preview .piece {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translateX(calc(var(--col) * (var(--cell) + var(--gap))));
+      transition: transform .15s ease, opacity .2s;
+    }
+
+    .preview.is-hidden .piece {
+      opacity: 0;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(7, var(--cell));
+      gap: var(--gap);
+      padding: var(--gap);
+      background: linear-gradient(180deg, var(--board), var(--board-dark));
+      border-radius: 20px;
+      box-shadow: 0 18px 40px rgba(33, 70, 199, .35), inset 0 2px 0 rgba(255, 255, 255, .25);
+    }
+
+    .column {
+      display: grid;
+      grid-template-rows: repeat(6, var(--cell));
+      gap: var(--gap);
+      padding: 0;
+      border: none;
+      background: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .column:hover:not(:disabled),
+    .column.is-focused {
+      background: rgba(255, 255, 255, .12);
+    }
+
+    .column:disabled {
+      cursor: default;
+    }
+
+    .column:focus-visible {
+      outline: 3px solid white;
+    }
+
+    .cell {
+      position: relative;
+      border-radius: 50%;
+      background: var(--hole);
+      box-shadow: inset 0 4px 6px rgba(20, 40, 110, .35);
+    }
+
+    .piece {
+      display: block;
+      width: var(--cell);
+      height: var(--cell);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .45), transparent 40%), var(--color);
+      box-shadow: inset 0 0 0 calc(var(--cell) * .09) var(--color-dark), inset 0 -4px 6px rgba(0, 0, 0, .2);
+    }
+
+    .piece.p1 {
+      --color: var(--red);
+      --color-dark: var(--red-dark);
+    }
+
+    .piece.p2 {
+      --color: var(--yellow);
+      --color-dark: var(--yellow-dark);
+    }
+
+    .cell .piece {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      /* --fall indica cuántas celdas tiene que caer la ficha (lo calcula JS).
+         La duración y la distancia de la animación dependen de ese valor */
+      --duration: calc(160ms + var(--fall) * 55ms);
+      animation:
+        drop var(--duration) cubic-bezier(.55, 0, 1, .45),
+        bounce .25s var(--duration) ease-out;
+    }
+
+    @keyframes drop {
+      from {
+        transform: translateY(calc(var(--fall) * -1 * (var(--cell) + var(--gap)) - var(--gap)));
+      }
+
+      to {
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes bounce {
+      40% {
+        transform: translateY(-9%);
+      }
+    }
+
+    .board.is-over .piece:not(.is-winner) {
+      opacity: .35;
+      transition: opacity .4s .3s;
+    }
+
+    .cell .piece.is-winner {
+      animation: pulse .9s .4s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse {
+      to {
+        transform: scale(.82);
+        box-shadow: inset 0 0 0 calc(var(--cell) * .09) var(--color-dark), 0 0 0 4px white, 0 0 18px 6px var(--color);
+      }
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .actions button {
+      font: inherit;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      border: none;
+      background: var(--text);
+      color: white;
+      cursor: pointer;
+    }
+
+    .actions button.is-highlight {
+      background: var(--board);
+      animation: wiggle 1s ease-in-out infinite;
+    }
+
+    @keyframes wiggle {
+      50% {
+        transform: scale(1.06);
+      }
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    kbd {
+      font-family: inherit;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: white;
+      border: 1px solid #d3daee;
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --gap: 5px;
+      }
+
+      .hint {
+        display: none;
+      }
+
+      .scoreboard {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .status {
+        grid-row: 2;
+        grid-column: span 2;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>Conecta <span>4</span></h1>
+      <div class="segmented" role="group" aria-label="Modo de juego">
+        <button data-mode="ai" aria-pressed="true">🤖 Contra la IA</button>
+        <button data-mode="pvp" aria-pressed="false">👥 2 jugadores</button>
+      </div>
+      <select id="difficulty" aria-label="Dificultad">
+        <option value="1">Fácil</option>
+        <option value="4" selected>Normal</option>
+        <option value="6">Difícil</option>
+      </select>
+    </header>
+
+    <section class="scoreboard">
+      <div class="player" data-player="1" style="--color: var(--red)">
+        <span class="chip"></span>
+        <span class="name">Tú</span>
+        <strong class="score">0</strong>
+      </div>
+      <p class="status" aria-live="polite"></p>
+      <div class="player" data-player="2" style="--color: var(--yellow)">
+        <span class="chip"></span>
+        <span class="name">IA</span>
+        <strong class="score">0</strong>
+      </div>
+    </section>
+
+    <div class="game">
+      <div class="preview">
+        <span class="piece p1"></span>
+      </div>
+      <div class="board"></div>
+    </div>
+
+    <div class="actions">
+      <button id="restart">Nueva partida</button>
+      <span class="hint"><kbd>←</kbd> <kbd>→</kbd> mover · <kbd>↓</kbd> soltar · <kbd>1</kbd>-<kbd>7</kbd> columna</span>
+    </div>
+  </main>
+
+  <script type="module">
+    const ROWS = 6
+    const COLUMNS = 7
+    const EMPTY = 0
+    const PLAYER_1 = 1
+    const PLAYER_2 = 2
+    const HUMAN = PLAYER_1
+    const AI = PLAYER_2
+    const WIN_SCORE = 1_000_000
+    // Explorar primero las columnas centrales hace que la poda alfa-beta
+    // descarte muchas más ramas (las jugadas centrales suelen ser mejores)
+    const COLUMN_ORDER = [3, 2, 4, 1, 5, 0, 6]
+    // Las 4 direcciones posibles de una línea: horizontal, vertical y las dos diagonales
+    const DIRECTIONS = [[0, 1], [1, 0], [1, 1], [1, -1]]
+
+    const boardElement = document.querySelector('.board')
+    const previewElement = document.querySelector('.preview')
+    const previewPiece = previewElement.querySelector('.piece')
+    const statusElement = document.querySelector('.status')
+    const restartButton = document.querySelector('#restart')
+    const difficultySelect = document.querySelector('#difficulty')
+
+    const state = {
+      board: [],
+      current: PLAYER_1,
+      starter: PLAYER_1,
+      mode: 'ai',
+      isOver: false,
+      isLocked: false,
+      gameId: 0,
+      focusedColumn: 3,
+      scores: { [PLAYER_1]: 0, [PLAYER_2]: 0 }
+    }
+
+    // ---------- Lógica del tablero (matriz de 6 filas x 7 columnas) ----------
+    // board[fila][columna]; la fila 0 es la de arriba
+    function createBoard() {
+      return Array.from({ length: ROWS }, () => Array(COLUMNS).fill(EMPTY))
+    }
+
+    function isInside(row, column) {
+      return row >= 0 && row < ROWS && column >= 0 && column < COLUMNS
+    }
+
+    // La ficha "cae": buscamos la fila vacía más baja de la columna
+    function getAvailableRow(board, column) {
+      for (let row = ROWS - 1; row >= 0; row--) {
+        if (board[row][column] === EMPTY) return row
+      }
+      return -1
+    }
+
+    function getValidColumns(board) {
+      return COLUMN_ORDER.filter(column => board[0][column] === EMPTY)
+    }
+
+    // Detección de victoria: no hace falta revisar todo el tablero. Solo la
+    // última ficha puede haber formado una línea, así que desde ella contamos
+    // fichas iguales hacia un lado y hacia el contrario en cada dirección.
+    // Si juntando ambos lados (más la propia ficha) hay 4 o más, ¡victoria!
+    function findWinningLine(board, row, column) {
+      const player = board[row][column]
+      if (player === EMPTY) return null
+
+      for (const [dRow, dColumn] of DIRECTIONS) {
+        const line = [[row, column]]
+
+        for (const sign of [1, -1]) {
+          let r = row + dRow * sign
+          let c = column + dColumn * sign
+          while (isInside(r, c) && board[r][c] === player) {
+            line.push([r, c])
+            r += dRow * sign
+            c += dColumn * sign
+          }
+        }
+
+        if (line.length >= 4) return line
+      }
+
+      return null
+    }
+
+    // ---------- IA: minimax con poda alfa-beta ----------
+    // Puntuamos cada "ventana" de 4 casillas consecutivas del tablero
+    function scoreWindow(window, player) {
+      const opponent = player === PLAYER_1 ? PLAYER_2 : PLAYER_1
+      const mine = window.filter(cell => cell === player).length
+      const theirs = window.filter(cell => cell === opponent).length
+      const empty = 4 - mine - theirs
+
+      if (mine === 3 && empty === 1) return 6
+      if (mine === 2 && empty === 2) return 2
+      if (theirs === 3 && empty === 1) return -5
+      if (theirs === 2 && empty === 2) return -1
+      return 0
+    }
+
+    function evaluate(board, player) {
+      let score = 0
+
+      // Las fichas en la columna central participan en más líneas posibles
+      for (let row = 0; row < ROWS; row++) {
+        if (board[row][3] === player) score += 3
+      }
+
+      for (let row = 0; row < ROWS; row++) {
+        for (let column = 0; column < COLUMNS; column++) {
+          for (const [dRow, dColumn] of DIRECTIONS) {
+            const endRow = row + dRow * 3
+            const endColumn = column + dColumn * 3
+            if (!isInside(endRow, endColumn)) continue
+            const window = [0, 1, 2, 3].map(i => board[row + dRow * i][column + dColumn * i])
+            score += scoreWindow(window, player)
+          }
+        }
+      }
+
+      return score
+    }
+
+    function minimax(board, depth, alpha, beta, isMaximizing, lastMove) {
+      // Si la jugada anterior ganó, gana quien la hizo. Sumamos la profundidad
+      // para preferir las victorias rápidas y retrasar las derrotas
+      if (lastMove && findWinningLine(board, lastMove.row, lastMove.column)) {
+        return { score: isMaximizing ? -(WIN_SCORE + depth) : WIN_SCORE + depth }
+      }
+
+      const columns = getValidColumns(board)
+      if (columns.length === 0) return { score: 0 }
+      if (depth === 0) return { score: evaluate(board, AI) }
+
+      let best = { score: isMaximizing ? -Infinity : Infinity, column: columns[0] }
+
+      for (const column of columns) {
+        const row = getAvailableRow(board, column)
+        board[row][column] = isMaximizing ? AI : HUMAN // hacemos la jugada...
+        const { score } = minimax(board, depth - 1, alpha, beta, !isMaximizing, { row, column })
+        board[row][column] = EMPTY // ...y la deshacemos (más rápido que copiar el tablero)
+
+        if (isMaximizing ? score > best.score : score < best.score) {
+          best = { score, column }
+        }
+
+        if (isMaximizing) alpha = Math.max(alpha, score)
+        else beta = Math.min(beta, score)
+        if (alpha >= beta) break // el rival nunca permitiría llegar aquí
+      }
+
+      return best
+    }
+
+    function chooseAIColumn() {
+      const depth = Number(difficultySelect.value)
+      const { column } = minimax(state.board, depth, -Infinity, Infinity, true, null)
+      return column
+    }
+
+    // ---------- Renderizado ----------
+    function createBoardElement() {
+      boardElement.innerHTML = ''
+
+      for (let column = 0; column < COLUMNS; column++) {
+        const button = document.createElement('button')
+        button.className = 'column'
+        button.dataset.column = column
+        button.setAttribute('aria-label', `Columna ${column + 1}`)
+
+        for (let row = 0; row < ROWS; row++) {
+          const cell = document.createElement('span')
+          cell.className = 'cell'
+          cell.dataset.row = row
+          button.append(cell)
+        }
+
+        boardElement.append(button)
+      }
+    }
+
+    function getCell(row, column) {
+      return boardElement.children[column].children[row]
+    }
+
+    function renderPiece(row, column, player) {
+      const piece = document.createElement('span')
+      piece.className = `piece p${player}`
+      // La distancia de caída depende de la fila destino: la pasamos a CSS
+      // con una custom property y la animación la usa en su translateY
+      piece.style.setProperty('--fall', row + 1)
+
+      getCell(row, column).append(piece)
+    }
+
+    function playerName(player) {
+      if (state.mode === 'pvp') return player === PLAYER_1 ? 'Rojo' : 'Amarillo'
+      return player === HUMAN ? 'Tú' : 'IA 🤖'
+    }
+
+    function renderStatus(message) {
+      const turnMessage = state.mode === 'pvp'
+        ? `Turno de ${playerName(state.current)}`
+        : state.current === AI ? 'La IA está pensando…' : 'Tu turno'
+      statusElement.textContent = message ?? turnMessage
+
+      document.querySelectorAll('.player').forEach(element => {
+        const player = Number(element.dataset.player)
+        element.querySelector('.name').textContent = playerName(player)
+        element.querySelector('.score').textContent = state.scores[player]
+        element.classList.toggle('is-active', !state.isOver && player === state.current)
+      })
+    }
+
+    function renderPreview() {
+      const isHumanTurn = !(state.mode === 'ai' && state.current === AI)
+      previewPiece.className = `piece p${state.current}`
+      previewPiece.style.setProperty('--col', state.focusedColumn)
+      previewElement.classList.toggle('is-hidden', state.isOver || state.isLocked || !isHumanTurn)
+
+      boardElement.querySelectorAll('.column').forEach((button, column) => {
+        button.disabled = state.isOver || state.isLocked || !isHumanTurn || state.board[0][column] !== EMPTY
+        button.classList.toggle('is-focused', column === state.focusedColumn && !button.disabled)
+      })
+    }
+
+    // ---------- Flujo de la partida ----------
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+    async function dropPiece(column) {
+      if (state.isOver || state.isLocked) return
+      const row = getAvailableRow(state.board, column)
+      if (row === -1) return
+
+      const player = state.current
+      const { gameId } = state
+      state.board[row][column] = player
+      state.isLocked = true
+      renderPiece(row, column, player)
+      renderPreview()
+
+      // Esperamos a que termine la animación de caída. Si mientras tanto
+      // se ha empezado otra partida, esta continuación ya no vale
+      await sleep(260 + (row + 1) * 55)
+      if (gameId !== state.gameId) return
+      state.isLocked = false
+
+      const winningLine = findWinningLine(state.board, row, column)
+      if (winningLine) return endGame(player, winningLine)
+      if (getValidColumns(state.board).length === 0) return endGame(null)
+
+      state.current = player === PLAYER_1 ? PLAYER_2 : PLAYER_1
+      nextTurn()
+    }
+
+    async function nextTurn() {
+      renderStatus()
+      renderPreview()
+
+      if (state.mode === 'ai' && state.current === AI && !state.isOver) {
+        const { gameId } = state
+        state.isLocked = true
+        renderPreview()
+        // Una pequeña pausa para que parezca que piensa (y dejar pintar la UI)
+        await sleep(350)
+        if (gameId !== state.gameId) return
+        const column = chooseAIColumn()
+        state.isLocked = false
+        dropPiece(column)
+      }
+    }
+
+    function endGame(winner, line = []) {
+      state.isOver = true
+      boardElement.classList.add('is-over')
+
+      line.forEach(([row, column]) => {
+        getCell(row, column).querySelector('.piece').classList.add('is-winner')
+      })
+
+      if (winner) {
+        state.scores[winner]++
+        const message = state.mode === 'ai'
+          ? (winner === HUMAN ? '¡Has ganado! 🎉' : 'Gana la IA 🤖')
+          : `¡Gana ${playerName(winner)}! 🎉`
+        renderStatus(message)
+      } else {
+        renderStatus('¡Empate! 🤝')
+      }
+
+      restartButton.textContent = 'Jugar otra vez'
+      restartButton.classList.add('is-highlight')
+      renderPreview()
+    }
+
+    function newGame({ alternate = true } = {}) {
+      // Alternamos quién empieza en cada partida
+      if (alternate && state.board.length > 0) {
+        state.starter = state.starter === PLAYER_1 ? PLAYER_2 : PLAYER_1
+      }
+
+      state.gameId++
+      state.board = createBoard()
+      state.current = state.starter
+      state.isOver = false
+      state.isLocked = false
+
+      boardElement.classList.remove('is-over')
+      restartButton.textContent = 'Nueva partida'
+      restartButton.classList.remove('is-highlight')
+      createBoardElement()
+      nextTurn()
+    }
+
+    function setMode(mode) {
+      state.mode = mode
+      state.scores = { [PLAYER_1]: 0, [PLAYER_2]: 0 }
+      state.starter = PLAYER_1
+      state.board = []
+      difficultySelect.hidden = mode !== 'ai'
+
+      document.querySelectorAll('[data-mode]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.mode === mode)
+      })
+
+      newGame({ alternate: false })
+    }
+
+    // ---------- Eventos ----------
+    boardElement.addEventListener('click', event => {
+      const column = event.target.closest('.column')
+      if (!column || column.disabled) return
+      dropPiece(Number(column.dataset.column))
+    })
+
+    boardElement.addEventListener('pointerover', event => {
+      const column = event.target.closest('.column')
+      if (!column) return
+      state.focusedColumn = Number(column.dataset.column)
+      renderPreview()
+    })
+
+    document.addEventListener('keydown', event => {
+      if (event.target instanceof HTMLSelectElement) return
+      const number = Number(event.key)
+
+      if (number >= 1 && number <= COLUMNS) {
+        state.focusedColumn = number - 1
+        dropPiece(state.focusedColumn)
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const delta = event.key === 'ArrowLeft' ? -1 : 1
+        state.focusedColumn = (state.focusedColumn + delta + COLUMNS) % COLUMNS
+        renderPreview()
+      } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
+        event.preventDefault()
+        dropPiece(state.focusedColumn)
+      } else {
+        return
+      }
+
+      // Evita que el tablero reciba doble acción si una columna tiene el foco
+      document.activeElement?.blur()
+    })
+
+    document.querySelectorAll('[data-mode]').forEach(button => {
+      button.addEventListener('click', () => setMode(button.dataset.mode))
+    })
+
+    restartButton.addEventListener('click', () => newGame())
+
+    setMode('ai')
+  </script>
+</body>
+
+</html>
