@@ -1,0 +1,10 @@
+{
+  "headers": [
+    {
+      "source": "/projects/:project/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, indexifembedded" }
+      ]
+    }
+  ]
+}
