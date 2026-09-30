@@ -217,6 +217,12 @@
       translate: -50% 0;
     }
 
+    @media (max-width: 420px) {
+      h1 {
+        display: none;
+      }
+    }
+
     @media (max-width: 760px) {
       .hint {
         display: none;
@@ -228,6 +234,15 @@
 
       h1 span {
         display: none;
+      }
+
+      select,
+      .actions button {
+        padding: 0 10px;
+      }
+
+      select {
+        max-width: 130px;
       }
 
       main {

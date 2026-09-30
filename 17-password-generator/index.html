@@ -423,17 +423,22 @@
       return { password: words.join(separator), bits, formula }
     }
 
+    function plural(value, unit) {
+      const rounded = Math.round(value)
+      return `${rounded} ${unit}${rounded === 1 ? '' : 's'}`
+    }
+
     function formatCrackTime(bits) {
       // De media, un atacante encuentra la clave tras probar la mitad de combinaciones
       const seconds = 2 ** (bits - 1) / GUESSES_PER_SECOND
 
       if (seconds < 1) return 'al instante'
-      if (seconds < 60) return `${Math.round(seconds)} segundos`
-      if (seconds < 3600) return `${Math.round(seconds / 60)} minutos`
-      if (seconds < 86_400) return `${Math.round(seconds / 3600)} horas`
+      if (seconds < 60) return plural(seconds, 'segundo')
+      if (seconds < 3600) return plural(seconds / 60, 'minuto')
+      if (seconds < 86_400) return plural(seconds / 3600, 'hora')
 
       const years = seconds / SECONDS_PER_YEAR
-      if (years < 1) return `${Math.round(seconds / 86_400)} días`
+      if (years < 1) return plural(seconds / 86_400, 'día')
       if (years > UNIVERSE_AGE_YEARS) return 'más que la edad del universo 🌌'
 
       const formatter = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
@@ -594,8 +599,8 @@
 
       <section id="passphrase-options" class="options" hidden>
         <div class="range">
-          <label for="words">Palabras <output id="words-output">5</output></label>
-          <input id="words" type="range" min="3" max="10" value="5">
+          <label for="words">Palabras <output id="words-output">6</output></label>
+          <input id="words" type="range" min="3" max="10" value="6">
         </div>
         <div class="checks">
           <label class="check"><input id="capitalize" type="checkbox" checked> Primera letra en mayúscula</label>

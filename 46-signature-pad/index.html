@@ -72,10 +72,19 @@
       background: white;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
+      line-height: 20px;
+      white-space: nowrap;
     }
 
     .chip strong {
       color: var(--text);
+    }
+
+    /* Ancho fijo para que la cabecera no "salte" al cambiar el texto mientras firmas */
+    #device,
+    #pressure {
+      display: inline-block;
+      min-width: 5.6em;
     }
 
     .toolbar {
@@ -268,6 +277,9 @@
       .actions button {
         flex: 1;
         justify-content: center;
+        padding: 8px 6px;
+        font-size: 13px;
+        white-space: nowrap;
       }
     }
   </style>

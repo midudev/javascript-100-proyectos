@@ -1121,7 +1121,8 @@
     $('#play-again').addEventListener('click', newGame)
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'r' || event.key === 'R') rotate()
+      // Ignoramos la repetición automática al mantener la tecla pulsada
+      if ((event.key === 'r' || event.key === 'R') && !event.repeat) rotate()
       if (event.key === 'Escape') {
         cancelSelection()
         render()

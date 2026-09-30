@@ -165,6 +165,17 @@
       opacity: 1;
     }
 
+    /* Si la imagen no carga, mostramos un platillo volante */
+    .card figure.broken::after {
+      content: '🛸';
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 64px;
+      opacity: .5;
+    }
+
     .status {
       position: absolute;
       top: 10px;
@@ -284,7 +295,7 @@
 
     const API_URL = 'https://rickandmortyapi.com/api/character'
     const SKELETON_COUNT = 8
-    const MAX_RETRIES = 3
+    const MAX_RETRIES = 4
     const STATUS_LABELS = { Alive: 'Vivo', Dead: 'Muerto', unknown: 'Desconocido' }
     const GENDER_LABELS = { Male: 'Masculino', Female: 'Femenino', Genderless: 'Sin género', unknown: 'Desconocido' }
 
@@ -344,6 +355,7 @@
       const img = item.querySelector('img')
       img.alt = name
       img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
+      img.addEventListener('error', () => img.parentElement.classList.add('broken'), { once: true })
       img.src = image
       item.querySelector('h2').textContent = name
       item.querySelector('.species').textContent = `${species} · ${GENDER_LABELS[gender] ?? gender}`
@@ -358,8 +370,9 @@
 
     const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-    // Las APIs públicas a veces fallan puntualmente (o limitan peticiones).
-    // Reintentamos un par de veces esperando un poco más cada vez
+    // Las APIs públicas a veces fallan o limitan las peticiones si haces
+    // muchas seguidas (error 429). Reintentamos esperando cada vez el doble
+    // (exponential backoff) para darle un respiro al servidor
     async function fetchJSON(url, { signal, retries = MAX_RETRIES } = {}) {
       try {
         const response = await fetch(url, { signal })
@@ -367,7 +380,7 @@
         return await response.json()
       } catch (error) {
         if (signal?.aborted || retries === 0) throw error
-        await wait(1000 * 2 ** (MAX_RETRIES - retries)) // 1s, 2s, 4s…
+        await wait(1500 * 2 ** (MAX_RETRIES - retries)) // 1.5s, 3s, 6s, 12s
         return fetchJSON(url, { signal, retries: retries - 1 })
       }
     }

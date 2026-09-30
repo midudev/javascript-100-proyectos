@@ -24,6 +24,7 @@
       margin: 0;
       min-height: 100dvh;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       place-items: center;
       background:
         radial-gradient(circle at 0% 0%, #e0e7ff, transparent 45%),
@@ -34,7 +35,8 @@
     }
 
     main {
-      width: min(100%, 640px);
+      width: 100%;
+      max-width: 640px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -89,6 +91,7 @@
 
     .stat {
       flex: 1;
+      min-width: 0;
       padding: 8px 12px;
       border-radius: 12px;
       background: var(--surface);
@@ -222,6 +225,21 @@
     }
 
     /* --- Victoria --- */
+    @media (max-width: 480px) {
+      .stat {
+        padding: 8px 4px;
+      }
+
+      .stat small {
+        font-size: 0.55rem;
+        letter-spacing: 0;
+      }
+
+      .stat strong {
+        font-size: 1rem;
+      }
+    }
+
     dialog {
       border: 0;
       border-radius: 20px;

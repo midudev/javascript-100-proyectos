@@ -419,7 +419,8 @@
         // Flotando suavemente mientras esperamos al jugador
         bird.y = WORLD_HEIGHT * 0.42 + Math.sin(time / 300) * 8
         bird.angle = 0
-        updateScenery(dt)
+        // Solo se mueven las nubes: el suelo y las tuberías esperan al jugador
+        cloudOffset += SCROLL_SPEED * 0.12 * dt
       } else if (state === STATES.PLAYING) {
         updateScenery(dt)
         updatePipes(dt)

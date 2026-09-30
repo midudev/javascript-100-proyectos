@@ -150,6 +150,25 @@
       animation: blink 1.1s steps(2, start) infinite;
     }
 
+    /* En pantallas pequeñas la pista es bajita: compactamos los menús */
+    @media (width < 600px) {
+      .overlay {
+        gap: 6px;
+      }
+
+      .overlay h1 {
+        font-size: 30px;
+      }
+
+      .overlay .blink {
+        display: none;
+      }
+
+      .overlay button {
+        padding: 6px 12px;
+      }
+    }
+
     @keyframes blink {
       to {
         visibility: hidden;
