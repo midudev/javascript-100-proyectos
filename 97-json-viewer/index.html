@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>97 - Visor de JSON</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #121826;
+      --panel-2: #0f1522;
+      --line: #232c3d;
+      --text: #e5e9f0;
+      --muted: #7c879b;
+      --accent: #7c9cff;
+      --key: #c4a7ff;
+      --string: #8fe0a6;
+      --number: #ffb86b;
+      --boolean: #6cc4ff;
+      --null: #8b93a7;
+      --error: #ff6b7a;
+      --ok: #4ade80;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 14px;
+      height: 100dvh;
+      padding: 16px;
+    }
+
+    .top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0 auto 0 0;
+      font-size: 1.3rem;
+      letter-spacing: -0.02em;
+    }
+
+    h1 span {
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel);
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn:hover {
+      border-color: #3a4760;
+      background: #182032;
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      background: var(--accent);
+      color: #0b0f17;
+      font-weight: 600;
+    }
+
+    .url-form {
+      display: flex;
+      gap: 6px;
+    }
+
+    .field {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel-2);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .field:focus {
+      border-color: var(--accent);
+    }
+
+    .url-form .field {
+      width: 300px;
+    }
+
+    .panes {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar .spacer {
+      flex: 1;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .check input {
+      accent-color: var(--accent);
+    }
+
+    .status {
+      margin: 0;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .status.is-valid b {
+      color: var(--ok);
+    }
+
+    .status.is-invalid b {
+      color: var(--error);
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      background: var(--panel-2);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.55;
+      white-space: pre;
+      tab-size: 2;
+      resize: none;
+      outline: none;
+    }
+
+    .error-box {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgb(255 107 122 / 8%);
+      font-size: 0.85rem;
+    }
+
+    .error-box[hidden] {
+      display: none;
+    }
+
+    .error-box strong {
+      color: var(--error);
+    }
+
+    .error-box pre {
+      margin: 8px 0;
+      padding: 8px 10px;
+      overflow-x: auto;
+      border-radius: 8px;
+      background: rgb(0 0 0 / 30%);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .error-box .caret {
+      color: var(--error);
+      font-weight: 700;
+    }
+
+    .error-box .btn {
+      height: 28px;
+    }
+
+    /* ---------- Árbol ---------- */
+    .search {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .match-count {
+      min-width: 48px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tree {
+      flex: 1;
+      padding: 10px 6px 20px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.7;
+      transition: opacity 0.2s;
+    }
+
+    .tree.is-stale {
+      opacity: 0.35;
+    }
+
+    .tree details>.children {
+      margin-left: 9px;
+      padding-left: 12px;
+      border-left: 1px dashed var(--line);
+    }
+
+    .row {
+      display: flex;
+      gap: 6px;
+      padding: 0 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .row:hover {
+      background: #1a2233;
+    }
+
+    .row.is-selected {
+      background: rgb(124 156 255 / 18%);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+
+    summary.row {
+      list-style: none;
+    }
+
+    summary.row::-webkit-details-marker {
+      display: none;
+    }
+
+    summary.row::before {
+      content: '▸';
+      width: 12px;
+      color: var(--muted);
+      transition: transform 0.15s;
+    }
+
+    details[open]>summary.row::before {
+      transform: rotate(90deg);
+    }
+
+    .leaf {
+      padding-left: 26px;
+    }
+
+    .key {
+      color: var(--key);
+    }
+
+    .key.index {
+      color: var(--muted);
+    }
+
+    .colon,
+    .meta {
+      color: var(--muted);
+    }
+
+    .meta {
+      font-size: 0.78rem;
+    }
+
+    .value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .value.string {
+      color: var(--string);
+    }
+
+    .value.number {
+      color: var(--number);
+    }
+
+    .value.boolean {
+      color: var(--boolean);
+    }
+
+    .value.null {
+      color: var(--null);
+      font-style: italic;
+    }
+
+    mark {
+      border-radius: 3px;
+      background: #facc15;
+      color: #111;
+    }
+
+    .row.is-current-match {
+      outline: 1px solid #facc15;
+    }
+
+    .path-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .path-bar code {
+      flex: 1;
+      overflow: hidden;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .path-bar small {
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .empty {
+      padding: 20px;
+      color: var(--muted);
+      font-family: system-ui, sans-serif;
+    }
+
+    .drop-hint {
+      position: fixed;
+      inset: 10px;
+      display: grid;
+      place-items: center;
+      border: 2px dashed var(--accent);
+      border-radius: 18px;
+      background: rgb(11 15 23 / 85%);
+      font-size: 1.3rem;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .drop-hint[hidden] {
+      display: none;
+    }
+
+    @media (width < 900px) {
+      body {
+        height: auto;
+      }
+
+      .app {
+        height: auto;
+        min-height: 100dvh;
+      }
+
+      .panes {
+        grid-template-columns: 1fr;
+      }
+
+      .pane {
+        height: 70dvh;
+      }
+
+      .url-form {
+        width: 100%;
+      }
+
+      .url-form .field {
+        flex: 1;
+        width: auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header class="top">
+      <h1><span>{ }</span> Visor de JSON</h1>
+      <label class="btn">📂 Abrir archivo
+        <input type="file" id="file-input" accept=".json,application/json,text/plain" hidden>
+      </label>
+      <form class="url-form" id="url-form">
+        <input class="field" type="url" name="url" placeholder="https://…" value="https://jsonplaceholder.typicode.com/users" aria-label="URL del JSON">
+        <button class="btn primary" id="url-button">Cargar URL</button>
+      </form>
+    </header>
+
+    <div class="panes">
+      <section class="pane" aria-label="Editor">
+        <div class="toolbar">
+          <button class="btn" id="format-button">✨ Formatear</button>
+          <button class="btn" id="minify-button">🗜️ Minificar</button>
+          <label class="check"><input type="checkbox" id="sort-keys"> Ordenar claves</label>
+        </div>
+        <p class="status" id="status"></p>
+        <div class="error-box" id="error-box" hidden></div>
+        <textarea id="input" spellcheck="false" aria-label="JSON"></textarea>
+      </section>
+
+      <section class="pane" aria-label="Árbol">
+        <div class="toolbar">
+          <input class="field search" id="search" type="search" placeholder="Buscar claves o valores…  ( / )" aria-label="Buscar">
+          <span class="match-count" id="match-count"></span>
+          <button class="btn" id="expand-all">Expandir todo</button>
+          <button class="btn" id="collapse-all">Contraer todo</button>
+        </div>
+        <div class="tree" id="tree"></div>
+        <div class="path-bar">
+          <code id="path">Haz click en un nodo para ver su ruta</code>
+          <small id="path-type"></small>
+          <button class="btn" id="copy-path">📋 Copiar ruta</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="drop-hint" id="drop-hint" hidden>Suelta el archivo JSON aquí</div>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const ROOT_NAME = 'data'
+    const OPEN_DEPTH = 2 // niveles que se muestran desplegados al cargar
+    const INITIAL_PATH = 'data.users[3].name'
+
+    const SAMPLE = {
+      app: 'Visor de JSON',
+      version: 2.1,
+      publicada: true,
+      patrocinador: null,
+      tags: ['json', 'árbol', 'recursividad'],
+      users: [
+        { id: 1, name: 'Ada Lovelace', email: 'ada@example.com', admin: true, skills: ['matemáticas', 'algoritmos'] },
+        { id: 2, name: 'Alan Turing', email: 'alan@example.com', admin: false, skills: ['criptografía'] },
+        { id: 3, name: 'Grace Hopper', email: 'grace@example.com', admin: false, address: { city: 'Nueva York', zip: '10001' } },
+        { id: 4, name: 'Margaret Hamilton', email: 'margaret@example.com', admin: true, skills: ['Apolo 11', 'software'] }
+      ],
+      config: {
+        tema: 'oscuro',
+        idioma: 'es',
+        atajos: { buscar: '/', formatear: 'Ctrl+S' },
+        'clave con espacios': 'en la ruta se accede con corchetes'
+      }
+    }
+
+    const input = $('#input')
+    const tree = $('#tree')
+    const statusBar = $('#status')
+    const errorBox = $('#error-box')
+    const searchInput = $('#search')
+
+    const byteFormatter = new Intl.NumberFormat('es', { style: 'unit', unit: 'byte' })
+    const kilobyteFormatter = new Intl.NumberFormat('es', { style: 'unit', unit: 'kilobyte', maximumFractionDigits: 1 })
+    let data = null
+    let isValid = false
+    let stats = { nodes: 0, depth: 0 }
+    let matches = []
+    let currentMatch = -1
+    let selectedPath = null
+    let debounceTimeout = null
+
+    // ---------- Utilidades ----------
+
+    function escapeHTML(text) {
+      return text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    function getType(value) {
+      if (value === null) return 'null'
+      if (Array.isArray(value)) return 'array'
+      return typeof value // 'object', 'string', 'number' o 'boolean'
+    }
+
+    function getChildPath(parentPath, key, isArrayIndex) {
+      if (isArrayIndex) return `${parentPath}[${key}]`
+      // Si la clave es un identificador válido usamos la notación de punto (data.users);
+      // si tiene espacios, guiones, etc. necesitamos corchetes (data["clave con espacios"])
+      return /^[A-Za-z_$][\w$]*$/.test(key)
+        ? `${parentPath}.${key}`
+        : `${parentPath}[${JSON.stringify(key)}]`
+    }
+
+    function plural(count, singular, pluralForm) {
+      return `${count} ${count === 1 ? singular : pluralForm}`
+    }
+
+    // ---------- Errores de parseo con línea y columna ----------
+
+    function positionToLineColumn(text, position) {
+      const lines = text.slice(0, position).split('\n')
+      return { line: lines.length, column: lines.at(-1).length + 1 }
+    }
+
+    function getErrorLocation(message, text) {
+      // Cada navegador describe el error a su manera:
+      //   Chrome:  "... in JSON at position 42 (line 3 column 5)"
+      //   Firefox: "... at line 3 column 5 of the JSON data"
+      //   Safari:  no indica la posición
+      const lineColumn = message.match(/line (\d+) column (\d+)/i)
+      if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) }
+
+      const position = message.match(/position (\d+)/i)
+      if (position) return positionToLineColumn(text, Number(position[1]))
+
+      // Si el mensaje no dice dónde está el fallo, lo buscamos nosotros
+      const index = findErrorIndex(text)
+      return index === null ? null : positionToLineColumn(text, index)
+    }
+
+    function findErrorIndex(text) {
+      // Mini analizador de JSON (descenso recursivo) que no construye nada:
+      // solo recorre el texto siguiendo la gramática y devuelve el índice donde deja de cumplirla
+      const LITERAL = /true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y
+      let i = 0
+
+      const fail = () => { throw i }
+      const skipSpaces = () => { while (' \t\n\r'.includes(text[i] ?? 'x')) i++ }
+      const expect = char => {
+        if (text[i] !== char) fail()
+        i++
+      }
+
+      function parseString() {
+        expect('"')
+        while (text[i] !== '"') {
+          if (i >= text.length || text.charCodeAt(i) < 0x20) fail()
+          if (text[i] !== '\\') {
+            i++
+            continue
+          }
+          i++ // barra invertida: comprobamos la secuencia de escape
+          if (text[i] === 'u' && /^[\da-f]{4}$/i.test(text.slice(i + 1, i + 5))) i += 5
+          else if ('"\\/bfnrt'.includes(text[i] ?? 'x')) i++
+          else fail()
+        }
+        i++
+      }
+
+      function parseValue() {
+        skipSpaces()
+        if (text[i] === '{') {
+          i++
+          skipSpaces()
+          if (text[i] === '}') i++
+          else {
+            while (true) {
+              skipSpaces()
+              parseString()
+              skipSpaces()
+              expect(':')
+              parseValue()
+              if (text[i] !== ',') break
+              i++
+            }
+            expect('}')
+          }
+        } else if (text[i] === '[') {
+          i++
+          skipSpaces()
+          if (text[i] === ']') i++
+          else {
+            while (true) {
+              parseValue()
+              if (text[i] !== ',') break
+              i++
+            }
+            expect(']')
+          }
+        } else if (text[i] === '"') {
+          parseString()
+        } else {
+          LITERAL.lastIndex = i
+          const literal = LITERAL.exec(text)
+          if (!literal) fail()
+          i += literal[0].length
+        }
+        skipSpaces()
+      }
+
+      try {
+        parseValue()
+        if (i < text.length) fail()
+        return null
+      } catch (index) {
+        return index
+      }
+    }
+
+    function lineColumnToOffset(text, { line, column }) {
+      const lines = text.split('\n')
+      const before = lines.slice(0, line - 1).reduce((total, current) => total + current.length + 1, 0)
+      return before + column - 1
+    }
+
+    function renderError(error, text) {
+      const location = getErrorLocation(error.message, text)
+      // Quitamos del mensaje la parte de la posición y la copia del texto que añade Chrome
+      const message = error.message
+        .replace(/\s+(in JSON\s+)?at (position|line) .*$/i, '')
+        .replace(/,\s*".*" is not valid JSON$/s, '')
+
+      let frame = ''
+      if (location) {
+        // Mostramos la línea del error con sus vecinas y una flecha bajo la columna
+        const lines = text.split('\n')
+        const from = Math.max(0, location.line - 2)
+        const to = Math.min(lines.length, location.line + 1)
+        const width = String(to).length
+        frame = lines.slice(from, to).map((line, index) => {
+          const number = from + index + 1
+          const gutter = `${String(number).padStart(width)} │ `
+          const code = `${gutter}${escapeHTML(line)}`
+          if (number !== location.line) return code
+          const caret = `${' '.repeat(width)} │ ${' '.repeat(Math.max(0, location.column - 1))}<span class="caret">^</span>`
+          return `${code}\n${caret}`
+        }).join('\n')
+      }
+
+      errorBox.hidden = false
+      errorBox.innerHTML = `
+        <strong>JSON no válido${location ? ` · línea ${location.line}, columna ${location.column}` : ''}</strong>
+        ${frame ? `<pre>${frame}</pre>` : ''}
+        <p>${escapeHTML(message)}</p>
+        ${location ? '<button class="btn" id="goto-error">Ir al error</button>' : ''}
+      `
+      $('#goto-error')?.addEventListener('click', () => {
+        const offset = lineColumnToOffset(text, location)
+        input.focus()
+        input.setSelectionRange(offset, offset + 1)
+      })
+
+      statusBar.className = 'status is-invalid'
+      statusBar.innerHTML = '<b>✗ JSON no válido</b> · el árbol muestra la última versión correcta'
+      tree.classList.add('is-stale')
+    }
+
+    // ---------- Renderizado recursivo del árbol ----------
+
+    function createKeyHTML(key, isIndex) {
+      return `<span class="key ${isIndex ? 'index' : ''}">${escapeHTML(String(key))}</span><span class="colon">:</span>`
+    }
+
+    function createNode(key, value, path, depth, isIndex = false) {
+      stats.nodes++
+      stats.depth = Math.max(stats.depth, depth)
+      const type = getType(value)
+
+      // Caso base de la recursión: valores primitivos (string, number, boolean, null)
+      if (type !== 'object' && type !== 'array') {
+        const row = document.createElement('div')
+        row.className = 'row leaf'
+        row.dataset.path = path
+        row.dataset.type = type
+        const text = type === 'string' ? JSON.stringify(value) : String(value)
+        row.innerHTML = `${createKeyHTML(key, isIndex)}<span class="value ${type}">${escapeHTML(text)}</span>`
+        return row
+      }
+
+      // Caso recursivo: objetos y arrays. <details>/<summary> nos da el plegado gratis,
+      // accesible con teclado y sin escribir JavaScript para abrir o cerrar
+      const entries = type === 'array' ? value.map((item, index) => [index, item]) : Object.entries(value)
+      const details = document.createElement('details')
+      details.open = depth < OPEN_DEPTH
+
+      const summary = document.createElement('summary')
+      summary.className = 'row'
+      summary.dataset.path = path
+      summary.dataset.type = type
+      const meta = type === 'array'
+        ? `[ ${plural(entries.length, 'elemento', 'elementos')} ]`
+        : `{ ${plural(entries.length, 'clave', 'claves')} }`
+      summary.innerHTML = `${createKeyHTML(key, isIndex)}<span class="meta">${meta}</span>`
+
+      const children = document.createElement('div')
+      children.className = 'children'
+      for (const [childKey, childValue] of entries) {
+        // La función se llama a sí misma para cada hijo, sin importar lo profundo que sea el JSON
+        children.append(createNode(childKey, childValue, getChildPath(path, childKey, type === 'array'), depth + 1, type === 'array'))
+      }
+
+      details.append(summary, children)
+      return details
+    }
+
+    function renderTree() {
+      stats = { nodes: 0, depth: 0 }
+      tree.classList.remove('is-stale')
+      tree.replaceChildren(createNode(ROOT_NAME, data, ROOT_NAME, 0))
+      if (selectedPath) selectPath(selectedPath)
+    }
+
+    // ---------- Parseo y estado ----------
+
+    function update() {
+      const text = input.value
+      if (text.trim() === '') {
+        data = null
+        isValid = false
+        errorBox.hidden = true
+        statusBar.className = 'status'
+        statusBar.textContent = 'Pega un JSON, abre un archivo o carga una URL'
+        tree.innerHTML = '<p class="empty">El árbol aparecerá aquí</p>'
+        return
+      }
+
+      try {
+        data = JSON.parse(text)
+        isValid = true
+      } catch (error) {
+        isValid = false
+        renderError(error, text)
+        return
+      }
+
+      errorBox.hidden = true
+      renderTree()
+      // Blob cuenta los bytes reales en UTF-8 (una "á" ocupa 2 bytes aunque .length diga 1)
+      const bytes = new Blob([text]).size
+      const size = bytes < 1024 ? byteFormatter.format(bytes) : kilobyteFormatter.format(bytes / 1024)
+      statusBar.className = 'status is-valid'
+      statusBar.innerHTML = `<b>✓ JSON válido</b> · ${size} · ${plural(stats.nodes, 'nodo', 'nodos')} · profundidad ${stats.depth}`
+      applySearch()
+    }
+
+    function setInput(text) {
+      input.value = text
+      update()
+    }
+
+    function sortKeysReplacer(key, value) {
+      // JSON.stringify llama al replacer con CADA valor, de fuera hacia dentro.
+      // Si devolvemos una copia del objeto con las claves ya ordenadas, se serializa en ese orden.
+      // (Ojo: en JS las claves numéricas como "2" o "10" siempre van primero, en orden numérico)
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      }
+      return value
+    }
+
+    function stringify(spaces) {
+      // Con un JSON no válido no tocamos el texto: el usuario perdería lo que está escribiendo
+      if (!isValid) return
+      const replacer = $('#sort-keys').checked ? sortKeysReplacer : null
+      setInput(JSON.stringify(data, replacer, spaces))
+    }
+
+    // ---------- Búsqueda ----------
+
+    function highlight(element, query) {
+      const text = element.textContent
+      const lower = text.toLowerCase()
+      if (!lower.includes(query)) return false
+
+      const parts = []
+      let index = 0
+      let found
+      while ((found = lower.indexOf(query, index)) !== -1) {
+        parts.push(escapeHTML(text.slice(index, found)), `<mark>${escapeHTML(text.slice(found, found + query.length))}</mark>`)
+        index = found + query.length
+      }
+      parts.push(escapeHTML(text.slice(index)))
+      element.innerHTML = parts.join('')
+      return true
+    }
+
+    function applySearch() {
+      // Quitamos los resaltados anteriores (un mismo elemento puede tener varios <mark>)
+      const highlighted = new Set([...tree.querySelectorAll('mark')].map(mark => mark.parentElement))
+      highlighted.forEach(element => { element.textContent = element.textContent })
+      tree.querySelector('.is-current-match')?.classList.remove('is-current-match')
+
+      const query = searchInput.value.trim().toLowerCase()
+      matches = []
+      currentMatch = -1
+
+      if (query) {
+        for (const element of tree.querySelectorAll('.key, .value')) {
+          if (!highlight(element, query)) continue
+          const row = element.closest('.row')
+          if (matches.at(-1) !== row) matches.push(row)
+
+          // Abrimos todos los <details> antepasados para que el resultado quede a la vista
+          openAncestors(row)
+        }
+      }
+
+      $('#match-count').textContent = query ? `${matches.length ? 1 : 0}/${matches.length}` : ''
+      if (matches.length > 0) goToMatch(0)
+    }
+
+    function goToMatch(index) {
+      tree.querySelector('.is-current-match')?.classList.remove('is-current-match')
+      currentMatch = (index + matches.length) % matches.length
+      const row = matches[currentMatch]
+      row.classList.add('is-current-match')
+      row.scrollIntoView({ block: 'nearest' })
+      $('#match-count').textContent = `${currentMatch + 1}/${matches.length}`
+    }
+
+    // ---------- Selección y ruta ----------
+
+    function selectRow(row) {
+      tree.querySelector('.row.is-selected')?.classList.remove('is-selected')
+      row.classList.add('is-selected')
+      selectedPath = row.dataset.path
+      $('#path').textContent = selectedPath
+      $('#path-type').textContent = row.dataset.type
+    }
+
+    function openAncestors(row) {
+      let parent = row.parentElement.closest('details')
+      while (parent) {
+        parent.open = true
+        parent = parent.parentElement.closest('details')
+      }
+    }
+
+    function selectPath(path) {
+      const row = [...tree.querySelectorAll('.row')].find(element => element.dataset.path === path)
+      if (!row) return
+      openAncestors(row)
+      selectRow(row)
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text)
+      } catch {
+        // Plan B: dentro de un iframe la API del portapapeles puede estar bloqueada
+        const helper = document.createElement('textarea')
+        helper.value = text
+        document.body.append(helper)
+        helper.select()
+        document.execCommand('copy')
+        helper.remove()
+      }
+    }
+
+    // ---------- Carga de archivos y URLs ----------
+
+    async function loadFile(file) {
+      if (!file) return
+      setInput(await file.text())
+    }
+
+    async function loadURL(url) {
+      const button = $('#url-button')
+      button.disabled = true
+      button.textContent = 'Cargando…'
+      try {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`El servidor respondió ${response.status}`)
+        const text = await response.text()
+        // Si viene minificado lo formateamos para que se pueda leer en el editor
+        try {
+          setInput(JSON.stringify(JSON.parse(text), null, 2))
+        } catch {
+          setInput(text)
+        }
+      } catch (error) {
+        const reason = error instanceof TypeError ? 'No se pudo descargar (¿sin conexión o la web no permite CORS?)' : error.message
+        errorBox.hidden = false
+        errorBox.innerHTML = `<strong>Error al cargar la URL</strong><p>${escapeHTML(reason)}</p>`
+      } finally {
+        button.disabled = false
+        button.textContent = 'Cargar URL'
+      }
+    }
+
+    // ---------- Eventos ----------
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimeout)
+      debounceTimeout = setTimeout(update, 250)
+    })
+
+    input.addEventListener('keydown', event => {
+      // Tab inserta dos espacios en vez de saltar al siguiente control
+      if (event.key === 'Tab' && !event.shiftKey) {
+        event.preventDefault()
+        input.setRangeText('  ', input.selectionStart, input.selectionEnd, 'end')
+        input.dispatchEvent(new Event('input'))
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        stringify(2)
+      }
+    })
+
+    $('#format-button').addEventListener('click', () => stringify(2))
+    $('#minify-button').addEventListener('click', () => stringify())
+    $('#sort-keys').addEventListener('change', () => stringify(2))
+
+    $('#expand-all').addEventListener('click', () => {
+      tree.querySelectorAll('details').forEach(details => { details.open = true })
+    })
+
+    $('#collapse-all').addEventListener('click', () => {
+      tree.querySelectorAll('details').forEach(details => { details.open = false })
+      const root = tree.querySelector('details')
+      if (root) root.open = true
+    })
+
+    tree.addEventListener('click', event => {
+      const row = event.target.closest('.row')
+      if (row) selectRow(row)
+    })
+
+    searchInput.addEventListener('input', applySearch)
+    searchInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && matches.length > 0) {
+        event.preventDefault()
+        goToMatch(currentMatch + (event.shiftKey ? -1 : 1))
+      }
+    })
+
+    $('#copy-path').addEventListener('click', async event => {
+      if (!selectedPath) return
+      const button = event.currentTarget
+      await copyText(selectedPath)
+      button.textContent = '✅ ¡Copiada!'
+      setTimeout(() => { button.textContent = '📋 Copiar ruta' }, 1400)
+    })
+
+    $('#file-input').addEventListener('change', event => loadFile(event.target.files[0]))
+
+    $('#url-form').addEventListener('submit', event => {
+      event.preventDefault()
+      const url = new FormData(event.target).get('url').trim()
+      if (url) loadURL(url)
+    })
+
+    // Arrastrar y soltar un archivo en cualquier parte de la página
+    const dropHint = $('#drop-hint')
+    document.addEventListener('dragover', event => {
+      event.preventDefault()
+      dropHint.hidden = false
+    })
+    document.addEventListener('dragleave', event => {
+      if (!event.relatedTarget) dropHint.hidden = true
+    })
+    document.addEventListener('drop', event => {
+      event.preventDefault()
+      dropHint.hidden = true
+      loadFile(event.dataTransfer.files[0])
+    })
+
+    document.addEventListener('keydown', event => {
+      if (event.key === '/' && !event.target.closest?.('input, textarea')) {
+        event.preventDefault()
+        searchInput.focus()
+      }
+    })
+
+    selectedPath = INITIAL_PATH
+    setInput(JSON.stringify(SAMPLE, null, 2))
+  </script>
+</body>
+
+</html>

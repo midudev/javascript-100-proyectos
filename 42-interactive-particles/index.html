@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>42 - Partículas interactivas</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    body {
+      background: #07070d;
+      color: #eef0ff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      /* Evita que el navegador haga scroll o zoom al arrastrar el dedo */
+      touch-action: none;
+    }
+
+    .controls {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      translate: -50% 0;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: max-content;
+      max-width: calc(100vw - 32px);
+      padding: 8px;
+      border: 1px solid rgb(255 255 255 / .1);
+      border-radius: 16px;
+      background: rgb(20 20 35 / .6);
+      backdrop-filter: blur(10px);
+    }
+
+    .controls input[type='text'] {
+      width: 220px;
+      max-width: 60vw;
+      padding: 10px 14px;
+      border: 1px solid rgb(255 255 255 / .12);
+      border-radius: 10px;
+      background: rgb(0 0 0 / .35);
+      color: inherit;
+      font: inherit;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .controls input[type='text']:focus {
+      border-color: #8b7bff;
+    }
+
+    .controls label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .controls input[type='checkbox'] {
+      accent-color: #8b7bff;
+    }
+
+    .hint {
+      position: fixed;
+      top: 88px;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      color: rgb(238 240 255 / .5);
+      font-size: 13px;
+      text-align: center;
+      pointer-events: none;
+      width: max-content;
+      max-width: calc(100vw - 32px);
+    }
+
+    .count {
+      position: fixed;
+      right: 20px;
+      bottom: 16px;
+      margin: 0;
+      color: rgb(238 240 255 / .4);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <form class="controls" id="form">
+    <input type="text" id="text" value="JavaScript" maxlength="14" aria-label="Texto" autocomplete="off" spellcheck="false">
+    <label><input type="checkbox" id="links"> Conexiones</label>
+  </form>
+  <p class="hint">Mueve el ratón o el dedo sobre las letras · haz clic para una explosión</p>
+  <p class="count" id="count"></p>
+
+  <script type="module">
+    const $canvas = document.querySelector('#canvas')
+    const ctx = $canvas.getContext('2d')
+    const $text = document.querySelector('#text')
+    const $links = document.querySelector('#links')
+    const $count = document.querySelector('#count')
+
+    // Constantes de la física (por frame). Juega con ellas para ver cómo cambia
+    const SPRING = 0.045 // rigidez del muelle que devuelve cada partícula a su sitio
+    const FRICTION = 0.86 // cuánta velocidad se conserva en cada frame (1 = sin rozamiento)
+    const REPEL_FORCE = 6
+    const BLAST_FORCE = 38
+    const MAX_PARTICLES = 6000
+    const TEXT_GRADIENT = ['#7c5cff', '#00d4ff', '#2ee6a6', '#ffd23f', '#ff5fa2']
+
+    // ---------- VECTORES ----------
+    // Un vector 2D representa una posición, una velocidad o una fuerza.
+    // Los métodos modifican el propio vector (en vez de crear uno nuevo)
+    // para no generar miles de objetos por frame que el recolector de
+    // basura tendría que limpiar
+    class Vector {
+      constructor(x = 0, y = 0) {
+        this.x = x
+        this.y = y
+      }
+
+      set(x, y) {
+        this.x = x
+        this.y = y
+        return this
+      }
+
+      add(vector) {
+        this.x += vector.x
+        this.y += vector.y
+        return this
+      }
+
+      scale(factor) {
+        this.x *= factor
+        this.y *= factor
+        return this
+      }
+
+      length() {
+        return Math.hypot(this.x, this.y)
+      }
+    }
+
+    const force = new Vector() // vector auxiliar reutilizado en cada cálculo
+
+    // ---------- PARTÍCULA ----------
+    class Particle {
+      constructor(x, y) {
+        this.position = new Vector(x, y)
+        this.velocity = new Vector()
+        this.origin = new Vector(x, y) // el sitio al que quiere volver
+        this.color = '#fff'
+      }
+
+      setTarget(x, y, color) {
+        this.origin.set(x, y)
+        this.color = color
+      }
+
+      push(fromX, fromY, radius, strength) {
+        // Vector que va DESDE el puntero HACIA la partícula
+        force.set(this.position.x - fromX, this.position.y - fromY)
+        const distance = force.length()
+        if (distance === 0 || distance > radius) return
+        // Cuanto más cerca del puntero, más fuerte el empujón (de 0 a 1)
+        const intensity = (1 - distance / radius) * strength
+        // Normalizamos (dividimos entre la longitud) para quedarnos solo con
+        // la DIRECCIÓN y la multiplicamos por la intensidad
+        this.velocity.add(force.scale(intensity / distance))
+      }
+
+      update() {
+        // Muelle (ley de Hooke): la fuerza es proporcional a lo lejos que
+        // está la partícula de su origen. Lejos = tira fuerte; cerca = suave
+        force.set(this.origin.x - this.position.x, this.origin.y - this.position.y)
+        this.velocity.add(force.scale(SPRING))
+
+        // Fricción: sin ella la partícula oscilaría para siempre alrededor
+        // de su origen, como un muelle ideal
+        this.velocity.scale(FRICTION)
+        this.position.add(this.velocity)
+      }
+
+      draw(size) {
+        ctx.fillStyle = this.color
+        ctx.fillRect(this.position.x - size / 2, this.position.y - size / 2, size, size)
+      }
+    }
+
+    // ---------- ESTADO ----------
+    let particles = []
+    let width = 0
+    let height = 0
+    let gap = 5
+    const pointer = { x: 0, y: 0, active: false, radius: 90 }
+
+    // ---------- TEXTO -> PUNTOS ----------
+    // Dibujamos el texto en un canvas oculto y leemos sus píxeles con
+    // getImageData: cada píxel no transparente es un posible destino
+    function sampleText(text) {
+      const offscreen = document.createElement('canvas')
+      offscreen.width = width
+      offscreen.height = height
+      const off = offscreen.getContext('2d', { willReadFrequently: true })
+
+      // Buscamos el tamaño de fuente que hace que el texto quepa en pantalla
+      const fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+      let fontSize = Math.min(height * 0.32, 260)
+      off.font = `900 ${fontSize}px ${fontFamily}`
+      const measured = off.measureText(text).width
+      if (measured > width * 0.9) fontSize *= (width * 0.9) / measured
+      off.font = `900 ${fontSize}px ${fontFamily}`
+      off.textAlign = 'center'
+      off.textBaseline = 'middle'
+
+      // Rellenamos con un degradado: cada partícula copiará el color de su píxel
+      const gradient = off.createLinearGradient(width * 0.1, 0, width * 0.9, 0)
+      TEXT_GRADIENT.forEach((color, i) => gradient.addColorStop(i / (TEXT_GRADIENT.length - 1), color))
+      off.fillStyle = gradient
+      off.fillText(text, width / 2, height * 0.54)
+
+      const { data } = off.getImageData(0, 0, width, height)
+      const points = []
+      // No usamos todos los píxeles (serían cientos de miles): saltamos de "gap" en "gap"
+      for (let y = 0; y < height; y += gap) {
+        for (let x = 0; x < width; x += gap) {
+          const index = (y * width + x) * 4
+          const alpha = data[index + 3]
+          if (alpha > 128) {
+            points.push({ x, y, color: `rgb(${data[index]} ${data[index + 1]} ${data[index + 2]})` })
+          }
+        }
+      }
+      return points.slice(0, MAX_PARTICLES)
+    }
+
+    function buildText(text) {
+      const points = sampleText(text.trim() || ' ')
+
+      // Mezclamos los puntos para que, al cambiar de texto, cada partícula
+      // viaje a un sitio aleatorio y el efecto de transición sea más vistoso
+      for (let i = points.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        const temp = points[i]
+        points[i] = points[j]
+        points[j] = temp
+      }
+
+      // Reutilizamos las partículas existentes y creamos o quitamos las que falten
+      points.forEach((point, i) => {
+        particles[i] ??= new Particle(Math.random() * width, Math.random() * height)
+        particles[i].setTarget(point.x, point.y, point.color)
+      })
+      particles.length = points.length
+      $count.textContent = `${particles.length.toLocaleString('es-ES')} partículas`
+    }
+
+    // ---------- CONEXIONES ENTRE PARTÍCULAS CERCANAS ----------
+    // Comparar cada partícula con todas las demás sería O(n²): con 3.000
+    // partículas, 9 millones de comparaciones por frame. Usamos una rejilla
+    // espacial: solo comparamos con las partículas de las celdas vecinas
+    function drawLinks() {
+      const linkDistance = gap * 1.5
+      const columns = Math.ceil(width / linkDistance) + 1
+      const grid = new Map()
+
+      particles.forEach((particle, i) => {
+        const key = Math.floor(particle.position.x / linkDistance) + Math.floor(particle.position.y / linkDistance) * columns
+        if (!grid.has(key)) grid.set(key, [])
+        grid.get(key).push(i)
+      })
+
+      ctx.beginPath()
+      particles.forEach((a, i) => {
+        const cx = Math.floor(a.position.x / linkDistance)
+        const cy = Math.floor(a.position.y / linkDistance)
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const bucket = grid.get(cx + dx + (cy + dy) * columns)
+            if (!bucket) continue
+            for (const j of bucket) {
+              if (j <= i) continue // cada pareja solo una vez
+              const b = particles[j]
+              const distance = Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y)
+              if (distance < linkDistance) {
+                ctx.moveTo(a.position.x, a.position.y)
+                ctx.lineTo(b.position.x, b.position.y)
+              }
+            }
+          }
+        }
+      })
+      ctx.strokeStyle = 'rgb(170 180 255 / .35)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+    }
+
+    // ---------- BUCLE ----------
+    function animate() {
+      ctx.fillStyle = '#07070d'
+      ctx.fillRect(0, 0, width, height)
+
+      // Primero actualizamos la física de todas y después dibujamos
+      for (const particle of particles) {
+        if (pointer.active) particle.push(pointer.x, pointer.y, pointer.radius, REPEL_FORCE)
+        particle.update()
+      }
+
+      const showLinks = $links.checked
+      if (showLinks) drawLinks()
+
+      const size = Math.max(1.5, gap * (showLinks ? 0.4 : 0.62))
+      for (const particle of particles) particle.draw(size)
+
+      requestAnimationFrame(animate)
+    }
+
+    // ---------- TAMAÑO Y devicePixelRatio ----------
+    // En pantallas retina 1 píxel CSS = 2 (o 3) píxeles físicos. Si el canvas
+    // midiera solo innerWidth píxeles se vería borroso: lo hacemos más grande
+    // y escalamos el contexto para seguir dibujando en píxeles CSS
+    function resize() {
+      const dpr = window.devicePixelRatio || 1
+      width = window.innerWidth
+      height = window.innerHeight
+      $canvas.width = Math.round(width * dpr)
+      $canvas.height = Math.round(height * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      gap = Math.max(3, Math.min(6, Math.round(Math.min(width, height * 1.6) / 220)))
+      pointer.radius = Math.max(60, Math.min(width, height) * 0.14)
+      buildText($text.value)
+    }
+
+    // ---------- EVENTOS ----------
+    function updatePointer(event) {
+      pointer.x = event.clientX
+      pointer.y = event.clientY
+      pointer.active = true
+    }
+
+    $canvas.addEventListener('pointermove', updatePointer)
+    $canvas.addEventListener('pointerdown', (event) => {
+      updatePointer(event)
+      // Explosión: un empujón muy fuerte con un radio grande
+      for (const particle of particles) particle.push(event.clientX, event.clientY, pointer.radius * 3, BLAST_FORCE)
+    })
+    $canvas.addEventListener('pointerleave', () => { pointer.active = false })
+    $canvas.addEventListener('pointerup', (event) => {
+      if (event.pointerType === 'touch') pointer.active = false
+    })
+
+    let textTimeout = null
+    $text.addEventListener('input', () => {
+      clearTimeout(textTimeout)
+      textTimeout = setTimeout(() => buildText($text.value), 150)
+    })
+    document.querySelector('#form').addEventListener('submit', event => event.preventDefault())
+
+    let resizeTimeout = null
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(resize, 150)
+    })
+
+    resize()
+    // Al empezar colocamos las partículas ya en su sitio para que el texto
+    // se vea desde el primer frame
+    for (const particle of particles) particle.position.set(particle.origin.x, particle.origin.y)
+    ctx.fillStyle = '#07070d'
+    ctx.fillRect(0, 0, width, height)
+    requestAnimationFrame(animate)
+  </script>
+</body>
+
+</html>

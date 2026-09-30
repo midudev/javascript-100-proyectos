@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>38 - Web Components</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #f6f7fb;
+      --card: #fff;
+      --text: #1e1b3a;
+      --muted: #6b6a85;
+      --border: #e4e4f0;
+      --accent: #6d28d9;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100dvh;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 90% 0, #ede9fe 0, transparent 35%),
+        radial-gradient(circle at 0 100%, #e0f2fe 0, transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 24px 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 32px);
+      letter-spacing: -.5px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    code {
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    header code {
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: #ede9fe;
+      color: var(--accent);
+      font-size: .9em;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 8px 24px 32px;
+    }
+
+    .column {
+      display: grid;
+      align-content: start;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .card {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgb(30 27 58 / .05);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 14px 18px 0;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 16px;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      color: var(--accent);
+    }
+
+    .card-header span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .demo {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      min-height: 120px;
+      padding: 16px 18px;
+    }
+
+    .log {
+      width: 100%;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      min-height: 1.4em;
+    }
+
+    .log strong {
+      color: var(--text);
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 18px;
+      overflow-x: auto;
+      background: #1e1b3a;
+      color: #e4e4f0;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+
+    .t-tag {
+      color: #f472b6;
+    }
+
+    .t-attr {
+      color: #a5b4fc;
+    }
+
+    .t-value {
+      color: #86efac;
+    }
+
+    /* ::part permite estilar desde FUERA un elemento del Shadow DOM
+       que el componente ha expuesto con el atributo part="header" */
+    user-card::part(header) {
+      background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    }
+
+    user-card[variant='dark']::part(header) {
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+      width: 100%;
+      max-width: 340px;
+    }
+
+    form label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .demo button {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .demo button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .stars {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+    }
+
+    .countdown-slot {
+      display: grid;
+      place-items: center;
+      min-height: 76px;
+    }
+
+    @media (width < 860px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 8px 16px 32px;
+      }
+
+      header {
+        padding: 20px 16px 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🧩 Web Components</h1>
+    <p>Una mini librería de elementos HTML propios hecha con <code>customElements</code>, <code>Shadow DOM</code> y <code>&lt;slot&gt;</code>. Sin frameworks.</p>
+  </header>
+
+  <main>
+    <div class="column">
+      <article class="card">
+        <div class="card-header">
+          <h2>&lt;star-rating&gt;</h2>
+          <span>atributos observados · evento change</span>
+        </div>
+        <div class="demo">
+          <div class="stars" data-code>
+            <star-rating value="3"></star-rating>
+            <star-rating value="4" max="6" style="--star-color: #ef4444"></star-rating>
+          </div>
+          <p class="log" id="rating-log">Haz clic en una estrella (o usa las flechas)</p>
+        </div>
+        <pre><code></code></pre>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <h2>&lt;toggle-switch&gt;</h2>
+          <span>ElementInternals · formularios</span>
+        </div>
+        <div class="demo">
+          <form id="settings" data-code>
+            <label><toggle-switch name="newsletter" checked></toggle-switch> Recibir la newsletter</label>
+            <label><toggle-switch name="modo-oscuro" value="si"></toggle-switch> Modo oscuro</label>
+            <div class="buttons">
+              <button class="primary">Enviar</button>
+              <button type="reset">Reset</button>
+            </div>
+          </form>
+          <p class="log" id="form-log">Pulsa «Enviar» para ver el FormData</p>
+        </div>
+        <pre><code></code></pre>
+      </article>
+    </div>
+
+    <div class="column">
+      <article class="card">
+        <div class="card-header">
+          <h2>&lt;user-card&gt;</h2>
+          <span>slots con nombre · :host · ::part</span>
+        </div>
+        <div class="demo" data-code>
+          <user-card>
+            <span slot="avatar">👩‍💻</span>
+            <span slot="name">Ada Lovelace</span>
+            <span slot="role">Matemática</span>
+            Escribió el primer algoritmo para una máquina.
+          </user-card>
+          <user-card variant="dark">
+            <span slot="name">Alan Turing</span>
+            <span slot="role">Informático</span>
+            Padre de la computación moderna.
+          </user-card>
+        </div>
+        <pre><code></code></pre>
+      </article>
+
+      <article class="card">
+        <div class="card-header">
+          <h2>&lt;count-down&gt;</h2>
+          <span>connectedCallback · disconnectedCallback</span>
+        </div>
+        <div class="demo">
+          <div class="countdown-slot" id="countdown-slot" data-code>
+            <count-down></count-down>
+          </div>
+          <div class="buttons">
+            <button id="toggle-countdown">Quitar del DOM</button>
+          </div>
+          <p class="log" id="countdown-log"></p>
+        </div>
+        <pre><code></code></pre>
+      </article>
+    </div>
+  </main>
+
+  <script type="module">
+    // =====================================================================
+    // CICLO DE VIDA DE UN CUSTOM ELEMENT
+    //  constructor()              -> se crea la instancia. Aquí se crea el
+    //                                Shadow DOM, pero NO se deben leer hijos
+    //                                ni atributos (puede que aún no existan)
+    //  connectedCallback()        -> el elemento se inserta en el documento
+    //  disconnectedCallback()     -> se quita del documento: hora de limpiar
+    //                                (intervalos, listeners globales...)
+    //  attributeChangedCallback() -> cambia un atributo de observedAttributes
+    //  adoptedCallback()          -> se mueve a otro documento (poco común)
+    // =====================================================================
+
+    // ---------- <star-rating> ----------
+    class StarRating extends HTMLElement {
+      // Solo los atributos de esta lista disparan attributeChangedCallback
+      static observedAttributes = ['value', 'max']
+
+      constructor() {
+        super()
+        // mode: 'open' permite acceder desde fuera con element.shadowRoot
+        this.attachShadow({ mode: 'open' })
+        this.hoverValue = 0
+      }
+
+      get value() {
+        return Number(this.getAttribute('value')) || 0
+      }
+
+      set value(newValue) {
+        // Reflejamos la propiedad en el atributo: una sola fuente de verdad
+        this.setAttribute('value', newValue)
+      }
+
+      get max() {
+        return Number(this.getAttribute('max')) || 5
+      }
+
+      connectedCallback() {
+        this.render()
+      }
+
+      attributeChangedCallback(name, oldValue, newValue) {
+        if (oldValue !== newValue) this.render()
+      }
+
+      select(value) {
+        const clamped = Math.max(0, Math.min(this.max, value))
+        if (clamped === this.value) return
+        this.value = clamped
+        // Evento personalizado. composed: true lo deja salir del Shadow DOM
+        this.dispatchEvent(new CustomEvent('change', {
+          detail: { value: clamped },
+          bubbles: true,
+          composed: true
+        }))
+      }
+
+      render() {
+        const shown = this.hoverValue || this.value
+        this.shadowRoot.innerHTML = `
+          <style>
+            :host {
+              display: inline-flex;
+              gap: 2px;
+              /* Las custom properties SÍ atraviesan el Shadow DOM:
+                 son la forma de permitir que te personalicen el componente */
+              color: var(--star-color, #f59e0b);
+            }
+            button {
+              padding: 0 2px;
+              border: 0;
+              background: none;
+              color: #d4d4e0;
+              font-size: 34px;
+              line-height: 1;
+              cursor: pointer;
+              transition: transform .15s, color .15s;
+            }
+            button.on { color: inherit; }
+            button:hover { transform: scale(1.2); }
+            button:focus-visible { outline: 2px solid currentColor; border-radius: 6px; }
+          </style>
+          ${Array.from({ length: this.max }, (_, i) => `
+            <button class="${i < shown ? 'on' : ''}" data-value="${i + 1}"
+              aria-label="${i + 1} de ${this.max}" aria-pressed="${i < this.value}">★</button>
+          `).join('')}
+        `
+
+        this.shadowRoot.querySelectorAll('button').forEach(($button) => {
+          const value = Number($button.dataset.value)
+          $button.addEventListener('click', () => this.select(value))
+          $button.addEventListener('mouseenter', () => this.preview(value))
+          $button.addEventListener('mouseleave', () => this.preview(0))
+          $button.addEventListener('keydown', (event) => this.handleKey(event))
+        })
+      }
+
+      preview(value) {
+        this.hoverValue = value
+        this.shadowRoot.querySelectorAll('button').forEach(($button, i) => {
+          $button.classList.toggle('on', i < (value || this.value))
+        })
+      }
+
+      handleKey(event) {
+        const delta = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[event.key]
+        if (!delta) return
+        event.preventDefault()
+        this.select(this.value + delta)
+        this.shadowRoot.querySelectorAll('button')[Math.max(0, this.value - 1)]?.focus()
+      }
+    }
+
+    // ---------- <user-card> ----------
+    const userCardTemplate = document.createElement('template')
+    userCardTemplate.innerHTML = `
+      <style>
+        /* :host es el propio elemento <user-card> visto desde dentro */
+        :host {
+          display: block;
+          width: 220px;
+          overflow: hidden;
+          border: 1px solid #e4e4f0;
+          border-radius: 14px;
+          background: #fff;
+          font-family: inherit;
+          transition: transform .2s, box-shadow .2s;
+        }
+        :host(:hover) {
+          transform: translateY(-3px);
+          box-shadow: 0 12px 24px rgb(30 27 58 / .1);
+        }
+        /* :host([atributo]) aplica estilos según un atributo del elemento */
+        :host([variant="dark"]) {
+          background: #1e1b3a;
+          border-color: #1e1b3a;
+          color: #f4f4ff;
+        }
+        header {
+          height: 54px;
+          background: #c4b5fd;
+        }
+        .avatar {
+          display: grid;
+          place-content: center;
+          width: 60px;
+          height: 60px;
+          margin: -30px auto 0;
+          border: 4px solid #fff;
+          border-radius: 50%;
+          background: #f4f4ff;
+          font-size: 30px;
+        }
+        :host([variant="dark"]) .avatar { border-color: #1e1b3a; background: #2e2a55; }
+        .body { padding: 8px 14px 16px; text-align: center; }
+        /* Estos estilos NO afectan al resto de la página: están encapsulados */
+        h3 { margin: 4px 0 0; font-size: 16px; }
+        .role { font-size: 12px; color: #8b5cf6; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        :host([variant="dark"]) .role { color: #38bdf8; }
+        p { margin: 8px 0 0; font-size: 13px; line-height: 1.4; opacity: .8; }
+      </style>
+      <header part="header"></header>
+      <div class="avatar">
+        <!-- El contenido de un slot es el "valor por defecto" si no lo rellenan -->
+        <slot name="avatar">👤</slot>
+      </div>
+      <div class="body">
+        <h3><slot name="name">Anónimo</slot></h3>
+        <div class="role"><slot name="role"></slot></div>
+        <p><slot></slot></p>
+      </div>
+    `
+
+    class UserCard extends HTMLElement {
+      constructor() {
+        super()
+        // Clonar un <template> es más eficiente que reescribir innerHTML
+        this.attachShadow({ mode: 'open' }).append(userCardTemplate.content.cloneNode(true))
+      }
+    }
+
+    // ---------- <toggle-switch> ----------
+    class ToggleSwitch extends HTMLElement {
+      // formAssociated: el elemento participa en formularios como un <input>
+      static formAssociated = true
+      static observedAttributes = ['checked']
+
+      constructor() {
+        super()
+        // ElementInternals nos da acceso a la API de formularios y de accesibilidad
+        this.internals = this.attachInternals?.()
+        this.attachShadow({ mode: 'open' }).innerHTML = `
+          <style>
+            :host {
+              display: inline-block;
+              width: 48px;
+              height: 28px;
+              flex-shrink: 0;
+              border-radius: 99px;
+              background: #d4d4e0;
+              cursor: pointer;
+              transition: background .2s;
+              position: relative;
+            }
+            :host([checked]) { background: var(--toggle-color, #6d28d9); }
+            :host(:focus-visible) { outline: 3px solid #c4b5fd; outline-offset: 2px; }
+            .thumb {
+              position: absolute;
+              top: 3px;
+              left: 3px;
+              width: 22px;
+              height: 22px;
+              border-radius: 50%;
+              background: #fff;
+              box-shadow: 0 1px 3px rgb(0 0 0 / .3);
+              transition: translate .2s;
+            }
+            :host([checked]) .thumb { translate: 20px 0; }
+          </style>
+          <span class="thumb"></span>
+        `
+        this.addEventListener('click', () => this.toggle())
+        this.addEventListener('keydown', (event) => {
+          if (event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault()
+            this.toggle()
+          }
+        })
+      }
+
+      connectedCallback() {
+        if (!this.hasAttribute('tabindex')) this.tabIndex = 0
+        if (this.internals) this.internals.role = 'switch'
+        // Guardamos el estado inicial para poder restaurarlo al hacer reset
+        this.defaultChecked ??= this.checked
+        this.update()
+      }
+
+      get checked() {
+        return this.hasAttribute('checked')
+      }
+
+      set checked(value) {
+        this.toggleAttribute('checked', Boolean(value))
+      }
+
+      get name() {
+        return this.getAttribute('name')
+      }
+
+      get value() {
+        return this.getAttribute('value') ?? 'on'
+      }
+
+      toggle() {
+        this.checked = !this.checked
+        this.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+
+      attributeChangedCallback() {
+        this.update()
+      }
+
+      update() {
+        if (!this.internals) return
+        // Igual que un checkbox: si no está marcado, no envía nada (null)
+        this.internals.setFormValue(this.checked ? this.value : null)
+        this.internals.ariaChecked = String(this.checked)
+      }
+
+      // Callback de los elementos asociados a formularios: <button type="reset">
+      formResetCallback() {
+        this.checked = this.defaultChecked
+      }
+    }
+
+    // ---------- <count-down> ----------
+    class CountDown extends HTMLElement {
+      static observedAttributes = ['date']
+      static activeIntervals = 0
+
+      constructor() {
+        super()
+        this.attachShadow({ mode: 'open' })
+        this.intervalId = null
+      }
+
+      get target() {
+        const date = new Date(this.getAttribute('date'))
+        if (!Number.isNaN(date.getTime())) return date
+        // Sin fecha válida: contamos hasta el próximo Año Nuevo
+        return new Date(new Date().getFullYear() + 1, 0, 1)
+      }
+
+      connectedCallback() {
+        this.render()
+        this.start()
+      }
+
+      // Si no limpiáramos el intervalo, seguiría ejecutándose para siempre
+      // aunque el elemento ya no esté en la página (fuga de memoria)
+      disconnectedCallback() {
+        this.stop()
+      }
+
+      attributeChangedCallback() {
+        if (this.isConnected) this.tick()
+      }
+
+      start() {
+        this.stop()
+        this.tick()
+        this.intervalId = setInterval(() => this.tick(), 1000)
+        CountDown.activeIntervals++
+      }
+
+      stop() {
+        if (this.intervalId === null) return
+        clearInterval(this.intervalId)
+        this.intervalId = null
+        CountDown.activeIntervals--
+      }
+
+      tick() {
+        const diff = Math.max(0, this.target - Date.now())
+        const seconds = Math.floor(diff / 1000)
+        const parts = {
+          days: Math.floor(seconds / 86400),
+          hours: Math.floor(seconds / 3600) % 24,
+          minutes: Math.floor(seconds / 60) % 60,
+          seconds: seconds % 60
+        }
+        for (const [unit, value] of Object.entries(parts)) {
+          const $value = this.shadowRoot.querySelector(`[data-unit="${unit}"]`)
+          if ($value) $value.textContent = String(value).padStart(2, '0')
+        }
+        if (diff === 0) {
+          this.stop()
+          this.dispatchEvent(new CustomEvent('finish', { bubbles: true }))
+        }
+      }
+
+      render() {
+        const units = [['days', 'días'], ['hours', 'horas'], ['minutes', 'min'], ['seconds', 'seg']]
+        this.shadowRoot.innerHTML = `
+          <style>
+            :host { display: flex; gap: 8px; font-variant-numeric: tabular-nums; }
+            div {
+              display: grid;
+              min-width: 64px;
+              padding: 8px 6px;
+              border-radius: 12px;
+              background: #1e1b3a;
+              color: #fff;
+              text-align: center;
+            }
+            strong { font-size: 26px; }
+            span { font-size: 11px; opacity: .7; text-transform: uppercase; }
+          </style>
+          ${units.map(([unit, label]) => `<div><strong data-unit="${unit}">00</strong><span>${label}</span></div>`).join('')}
+        `
+      }
+    }
+
+    // Mostramos el código de las demos ANTES de registrar los componentes,
+    // para enseñar el HTML tal y como está escrito (sin atributos añadidos)
+    const nextNewYear = `${new Date().getFullYear() + 1}-01-01T00:00:00`
+    document.querySelector('count-down').setAttribute('date', nextNewYear)
+    renderCodeSnippets()
+
+    // Registramos los elementos: el nombre DEBE llevar un guion.
+    // Los que ya estaban en el HTML se "actualizan" (upgrade) en este momento
+    customElements.define('star-rating', StarRating)
+    customElements.define('user-card', UserCard)
+    customElements.define('toggle-switch', ToggleSwitch)
+    customElements.define('count-down', CountDown)
+
+    // =====================================================================
+    // CÓDIGO DE LA PÁGINA DE DEMO
+    // =====================================================================
+    function escapeHTML(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    function dedent(text) {
+      const lines = text.replace(/^\n+|\s+$/g, '').split('\n')
+      const indent = Math.min(...lines.filter(line => line.trim()).map(line => line.match(/^ */)[0].length))
+      return lines.map(line => line.slice(indent)).join('\n')
+    }
+
+    function highlight(html) {
+      // Resaltado muy simple: etiquetas, atributos y valores
+      return escapeHTML(html).replace(
+        /(&lt;\/?)([\w-]+)([^&]*?)(\/?&gt;)/g,
+        (_, open, tag, attrs, close) => {
+          const coloredAttrs = attrs.replace(/([\w-]+)(="[^"]*")?/g, (__, name, value = '') =>
+            `<span class="t-attr">${name}</span>${value ? `<span class="t-value">${value}</span>` : ''}`)
+          return `${open}<span class="t-tag">${tag}</span>${coloredAttrs}${close}`
+        }
+      )
+    }
+
+    // Mostramos el HTML real de cada demo, así el código nunca se desincroniza
+    function renderCodeSnippets() {
+      document.querySelectorAll('.card').forEach(($card) => {
+        const $source = $card.querySelector('[data-code]')
+        let html = $source.innerHTML
+        if ($source.matches('form')) {
+          // outerHTML no incluye la sangría de la primera línea: la recuperamos
+          const indent = $source.outerHTML.match(/\n( *)<\/form>$/)?.[1] ?? ''
+          html = indent + $source.outerHTML
+        }
+        const clean = html
+          .replace(/ data-code(="")?/g, '')
+          .replace(/ id="[^"]*"/g, '')
+          .replace(/=""/g, '')
+        $card.querySelector('pre code').innerHTML = highlight(dedent(clean))
+      })
+    }
+
+    const $ratingLog = document.querySelector('#rating-log')
+    document.addEventListener('change', (event) => {
+      if (event.target.localName !== 'star-rating') return
+      $ratingLog.innerHTML = `Evento <strong>change</strong> → detail.value = <strong>${event.detail.value}</strong>`
+    })
+
+    const $form = document.querySelector('#settings')
+    const $formLog = document.querySelector('#form-log')
+    $form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      // Los toggle-switch aparecen en el FormData gracias a ElementInternals
+      const entries = [...new FormData($form)].map(([key, value]) => `${key}=${value}`)
+      $formLog.innerHTML = `FormData: <strong>${entries.join(', ') || '(vacío)'}</strong>`
+    })
+    $form.addEventListener('reset', () => {
+      $formLog.textContent = 'Formulario restablecido (formResetCallback)'
+    })
+
+    const $slot = document.querySelector('#countdown-slot')
+    const $toggle = document.querySelector('#toggle-countdown')
+    const $countdownLog = document.querySelector('#countdown-log')
+    const $countdown = $slot.querySelector('count-down')
+
+    function logIntervals(action) {
+      $countdownLog.innerHTML = `${action} · intervalos activos: <strong>${CountDown.activeIntervals}</strong>`
+    }
+
+    $toggle.addEventListener('click', () => {
+      if ($countdown.isConnected) {
+        $countdown.remove()
+        $toggle.textContent = 'Añadir al DOM'
+        logIntervals('disconnectedCallback limpió el intervalo')
+      } else {
+        $slot.append($countdown)
+        $toggle.textContent = 'Quitar del DOM'
+        logIntervals('connectedCallback creó un intervalo')
+      }
+    })
+
+    logIntervals('Elemento conectado')
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>63 - Reactividad con Proxy</title>
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --card: #ffffff;
+      --line: #e4e6ef;
+      --text: #1b1e2b;
+      --muted: #737891;
+      --green: #16a34a;
+      --green-soft: #e8f7ee;
+      --violet: #7c3aed;
+      --violet-soft: #f1ebff;
+      --blue: #2563eb;
+      --blue-soft: #e8efff;
+      --code-bg: #0f1220;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px 10px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 99px;
+      font-family: ui-monospace, monospace;
+    }
+
+    .badge.set {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .badge.computed {
+      color: var(--violet);
+      background: var(--violet-soft);
+    }
+
+    .badge.effect {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, .85fr);
+      gap: 14px;
+      padding: 0 20px 20px;
+      min-height: 0;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .panel>h2 {
+      margin: 0;
+      padding: 12px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel>h2 small {
+      margin-left: auto;
+      font-weight: 500;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .scroll {
+      overflow: auto;
+      flex: 1;
+    }
+
+    /* Código */
+    .code {
+      background: var(--code-bg);
+      border-color: #1e2335;
+    }
+
+    .code>h2 {
+      color: #e6e9f5;
+      border-color: #1e2335;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 12px/1.55 ui-monospace, 'SF Mono', Menlo, monospace;
+      color: #d6dbee;
+      tab-size: 2;
+    }
+
+    .tok-comment {
+      color: #7d88a8;
+      font-style: italic;
+    }
+
+    .tok-string {
+      color: #a5e3a0;
+    }
+
+    .tok-keyword {
+      color: #f5a3ff;
+    }
+
+    .tok-fn {
+      color: #8ec7ff;
+    }
+
+    /* Tienda */
+    .shop {
+      display: grid;
+      gap: 12px;
+      padding: 12px 16px 16px;
+    }
+
+    .greeting {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    input[type="text"],
+    select {
+      font: inherit;
+      font-size: 14px;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--text);
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid color-mix(in srgb, var(--green) 35%, transparent);
+      border-color: var(--green);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .cart {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .cart li {
+      display: grid;
+      grid-template-columns: 32px 1fr auto auto 26px;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: #f8f9fc;
+      font-size: 14px;
+    }
+
+    .cart .emoji {
+      font-size: 22px;
+      text-align: center;
+    }
+
+    .cart small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .qty {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    .qty button,
+    .remove {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: white;
+      cursor: pointer;
+      font: inherit;
+      line-height: 1;
+    }
+
+    .remove {
+      border: none;
+      background: none;
+      color: var(--muted);
+    }
+
+    .line-total {
+      font-weight: 700;
+      min-width: 70px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .catalog {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .catalog button {
+      font: inherit;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 99px;
+      border: 1px dashed #c8ccdc;
+      background: white;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .catalog button:hover {
+      border-color: var(--green);
+      border-style: solid;
+    }
+
+    .summary {
+      display: grid;
+      gap: 4px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: #f8f9fc;
+      font-size: 14px;
+    }
+
+    .summary div {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .summary span:last-child {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary .discount {
+      color: var(--green);
+    }
+
+    .summary .total {
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px dashed #d5d8e4;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .shipping-bar {
+      height: 6px;
+      border-radius: 6px;
+      background: #e7e9f1;
+      overflow: hidden;
+    }
+
+    .shipping-bar span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #22c55e, #16a34a);
+      transition: width .3s;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Log */
+    .log {
+      list-style: none;
+      margin: 0;
+      padding: 8px 10px;
+      display: grid;
+      gap: 3px;
+      font: 12px/1.4 ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    .log li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 3px 4px;
+      animation: flash .8s ease;
+    }
+
+    .log li.divider {
+      display: block;
+      margin-top: 6px;
+      padding: 4px 0 2px;
+      border-top: 1px dashed var(--line);
+      color: var(--muted);
+      font-family: system-ui, sans-serif;
+      font-size: 11px;
+      animation: none;
+    }
+
+    @keyframes flash {
+      from {
+        background: #fff7c2;
+      }
+    }
+
+    .stats {
+      display: flex;
+      gap: 12px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stats strong {
+      color: var(--text);
+    }
+
+    .stats button {
+      margin-left: auto;
+      font: inherit;
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 8px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1000px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .shop-panel {
+        order: -1;
+      }
+
+      .panel {
+        max-height: 560px;
+      }
+
+      .shop-panel {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      header,
+      main {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .fields {
+        grid-template-columns: 1fr;
+      }
+
+      .legend {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>⚡ Reactividad con Proxy</h1>
+    <p>Un sistema reactivo como el de Vue, sin librerías. Cambia el formulario y observa qué se recalcula.</p>
+    <div class="legend">
+      <span class="badge set">SET</span>
+      <span class="badge computed">COMPUTED</span>
+      <span class="badge effect">EFFECT</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel code">
+      <h2>📄 reactivity.js <small>el sistema completo</small></h2>
+      <div class="scroll">
+        <pre><code id="source">Cargando código…</code></pre>
+      </div>
+    </section>
+
+    <section class="panel shop-panel">
+      <h2>🛒 Carrito reactivo <small>data-bind · data-model</small></h2>
+      <div class="scroll">
+        <div class="shop" id="app">
+          <p class="greeting">¡Hola, <span data-bind="state.customer"></span>! 👋</p>
+
+          <div class="fields">
+            <label class="field">
+              Tu nombre
+              <input type="text" data-model="state.customer" autocomplete="off">
+            </label>
+            <label class="field">
+              Cupón (prueba MIDU10)
+              <input type="text" data-model="state.coupon" autocomplete="off" placeholder="Código">
+            </label>
+          </div>
+
+          <ul class="cart" id="cart"></ul>
+
+          <div class="catalog" id="catalog">Añadir:</div>
+
+          <div class="fields">
+            <label class="field">
+              Envío
+              <select data-model="state.shipping">
+                <option value="standard">Estándar (4,99 €)</option>
+                <option value="express">Exprés (9,99 €)</option>
+                <option value="pickup">Recogida en tienda</option>
+              </select>
+            </label>
+            <label class="check">
+              <input type="checkbox" data-model="state.giftWrap"> Envolver para regalo (+2 €)
+            </label>
+          </div>
+
+          <div class="summary">
+            <div><span>Productos (<span data-bind="itemCount.value"></span>)</span><span data-bind="subtotal.value | money"></span></div>
+            <div class="discount" data-show="discount.value"><span>Cupón <span data-bind="state.coupon | upper"></span></span><span>−<span data-bind="discount.value | money"></span></span></div>
+            <div><span>Envío</span><span data-bind="shippingCost.value | shipping"></span></div>
+            <div data-show="state.giftWrap"><span>Envoltorio regalo</span><span data-bind="giftCost.value | money"></span></div>
+            <div class="total"><span>Total</span><span data-bind="total.value | money"></span></div>
+          </div>
+
+          <div class="shipping-bar"><span id="shipping-progress"></span></div>
+          <p class="hint" data-bind="freeShippingMessage.value"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>🔍 Log de reactividad <small>como la consola</small></h2>
+      <div class="scroll">
+        <ol class="log" id="log"></ol>
+      </div>
+      <div class="stats">
+        <span>Efectos: <strong id="effect-count">0</strong></span>
+        <span>Computed: <strong id="computed-count">0</strong></span>
+        <button id="clear-log">Limpiar</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { reactive, effect, computed, hooks } from './reactivity.js'
+
+    const FREE_SHIPPING = 50
+    const GIFT_WRAP = 2
+    const SHIPPING = { standard: 4.99, express: 9.99, pickup: 0 }
+    const COUPONS = { MIDU10: 0.1 }
+    const MAX_LOG = 120
+
+    const CATALOG = [
+      { name: 'Café de especialidad', short: 'Café', emoji: '☕', price: 12.5 },
+      { name: 'Taza de cerámica', short: 'Taza', emoji: '🍵', price: 9.9 },
+      { name: 'Galletas artesanas', short: 'Galletas', emoji: '🍪', price: 4.75 },
+      { name: 'Chocolate negro', short: 'Chocolate', emoji: '🍫', price: 3.2 },
+      { name: 'Tetera', short: 'Tetera', emoji: '🫖', price: 24.9 },
+      { name: 'Croissant', short: 'Croissant', emoji: '🥐', price: 1.8 }
+    ]
+
+    const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
+    const $ = selector => document.querySelector(selector)
+
+    // ---------- Log ----------
+    const counters = { effect: 0, computed: 0 }
+
+    function appendToLog(item) {
+      const list = $('#log')
+      list.append(item)
+      while (list.children.length > MAX_LOG) list.firstElementChild.remove()
+      // Como en la consola: lo más reciente abajo y siempre visible
+      list.parentElement.scrollTop = list.parentElement.scrollHeight
+    }
+
+    function log(type, message) {
+      if (type in counters) counters[type]++
+      const item = document.createElement('li')
+      item.innerHTML = `<span class="badge ${type}">${type.toUpperCase()}</span><span>${escapeHTML(message)}</span>`
+      appendToLog(item)
+      $('#effect-count').textContent = counters.effect
+      $('#computed-count').textContent = counters.computed
+    }
+
+    function logDivider(text) {
+      const item = document.createElement('li')
+      item.className = 'divider'
+      item.textContent = text
+      appendToLog(item)
+    }
+
+    function escapeHTML(text) {
+      return String(text).replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`)
+    }
+
+    logDivider('Montaje inicial: cada binding crea un efecto')
+
+    function preview(value) {
+      const text = typeof value === 'object' ? (Array.isArray(value) ? `Array(${value.length})` : '{…}') : JSON.stringify(value)
+      return text.length > 24 ? `${text.slice(0, 24)}…"` : text
+    }
+
+    // Cada vez que el Proxy detecta una escritura real, lo apuntamos
+    hooks.onSet = (key, value) => log('set', `${String(key)} = ${preview(value)}`)
+
+    // ---------- Estado reactivo ----------
+    const state = reactive({
+      customer: 'Ana',
+      coupon: '',
+      shipping: 'standard',
+      giftWrap: false,
+      items: [
+        { ...CATALOG[0], qty: 2 },
+        { ...CATALOG[1], qty: 1 },
+        { ...CATALOG[2], qty: 3 }
+      ]
+    })
+
+    // computed con log: así vemos cuándo se recalcula (y cuándo NO)
+    function loggedComputed(name, getter) {
+      return computed(() => {
+        log('computed', name)
+        return getter()
+      })
+    }
+
+    const itemCount = loggedComputed('itemCount', () => state.items.reduce((count, item) => count + item.qty, 0))
+    const subtotal = loggedComputed('subtotal', () => state.items.reduce((sum, item) => sum + item.price * item.qty, 0))
+    const discount = loggedComputed('discount', () => subtotal.value * (COUPONS[state.coupon.trim().toUpperCase()] ?? 0))
+    const shippingCost = loggedComputed('shippingCost', () => {
+      if (state.shipping === 'pickup' || subtotal.value - discount.value >= FREE_SHIPPING) return 0
+      return SHIPPING[state.shipping]
+    })
+    const giftCost = loggedComputed('giftCost', () => state.giftWrap ? GIFT_WRAP : 0)
+    const total = loggedComputed('total', () => subtotal.value - discount.value + shippingCost.value + giftCost.value)
+    const freeShippingMessage = loggedComputed('freeShippingMessage', () => {
+      const missing = FREE_SHIPPING - (subtotal.value - discount.value)
+      return missing > 0
+        ? `Te faltan ${money.format(missing)} para el envío gratis 🚚`
+        : '¡Tienes envío gratis! 🎉'
+    })
+
+    // ---------- Efectos agrupados (batching) ----------
+    // Si cambian varias cosas a la vez (p. ej. un splice en un array), no
+    // queremos repintar el DOM varias veces. Encolamos los efectos y los
+    // ejecutamos una sola vez en una microtarea, igual que hace Vue
+    const queue = new Set()
+    let isFlushPending = false
+
+    function queueJob(job) {
+      queue.add(job)
+      if (isFlushPending) return
+      isFlushPending = true
+      queueMicrotask(() => {
+        for (const job of queue) job()
+        queue.clear()
+        isFlushPending = false
+      })
+    }
+
+    function watchEffect(name, fn) {
+      const runner = effect(() => {
+        log('effect', name)
+        fn()
+      }, { scheduler: () => queueJob(runner) })
+      return runner
+    }
+
+    // ---------- Binding declarativo al DOM ----------
+    const scope = { state, itemCount, subtotal, discount, shippingCost, giftCost, total, freeShippingMessage }
+
+    const FORMATTERS = {
+      money: value => money.format(value),
+      upper: value => String(value).toUpperCase(),
+      shipping: value => value === 0 ? 'Gratis' : money.format(value)
+    }
+
+    // 'state.customer' → scope.state.customer (pasando por el Proxy, así se rastrea)
+    function getPath(path) {
+      return path.split('.').reduce((object, key) => object?.[key], scope)
+    }
+
+    function setPath(path, value) {
+      const keys = path.split('.')
+      const last = keys.pop()
+      const target = keys.reduce((object, key) => object[key], scope)
+      target[last] = value
+    }
+
+    function parseBinding(expression) {
+      const [path, formatter] = expression.split('|').map(part => part.trim())
+      return { path, format: FORMATTERS[formatter] ?? (value => value) }
+    }
+
+    function bindDOM(root) {
+      // data-bind: el texto del elemento siempre refleja el valor
+      root.querySelectorAll('[data-bind]').forEach(element => {
+        const { path, format } = parseBinding(element.dataset.bind)
+        watchEffect(`data-bind="${element.dataset.bind}"`, () => {
+          element.textContent = format(getPath(path))
+        })
+      })
+
+      // data-show: muestra u oculta el elemento según el valor
+      root.querySelectorAll('[data-show]').forEach(element => {
+        watchEffect(`data-show="${element.dataset.show}"`, () => {
+          element.hidden = !getPath(element.dataset.show)
+        })
+      })
+
+      // data-model: binding bidireccional (estado → input y input → estado)
+      root.querySelectorAll('[data-model]').forEach(element => {
+        const path = element.dataset.model
+        const property = element.type === 'checkbox' ? 'checked' : 'value'
+
+        watchEffect(`data-model="${path}"`, () => {
+          const value = getPath(path)
+          // Solo tocamos el input si cambia: así no movemos el cursor al escribir
+          if (element[property] !== value) element[property] = value
+        })
+
+        const eventName = element.tagName === 'SELECT' || property === 'checked' ? 'change' : 'input'
+        element.addEventListener(eventName, () => setPath(path, element[property]))
+      })
+    }
+
+    // ---------- Lista del carrito ----------
+    watchEffect('lista del carrito', () => {
+      $('#cart').innerHTML = state.items.map((item, index) => `
+        <li>
+          <span class="emoji">${item.emoji}</span>
+          <span>${escapeHTML(item.name)}<small>${money.format(item.price)}</small></span>
+          <span class="qty">
+            <button data-action="dec" data-index="${index}" aria-label="Quitar uno">−</button>
+            ${item.qty}
+            <button data-action="inc" data-index="${index}" aria-label="Añadir uno">+</button>
+          </span>
+          <span class="line-total">${money.format(item.price * item.qty)}</span>
+          <button class="remove" data-action="remove" data-index="${index}" aria-label="Eliminar">✕</button>
+        </li>
+      `).join('') || '<li>Tu carrito está vacío</li>'
+    })
+
+    watchEffect('barra de envío gratis', () => {
+      const progress = Math.min((subtotal.value - discount.value) / FREE_SHIPPING, 1)
+      $('#shipping-progress').style.width = `${progress * 100}%`
+    })
+
+    // Con reactividad, los eventos solo modifican el estado: el DOM se actualiza solo
+    $('#cart').addEventListener('click', event => {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      logDivider('Click en el carrito')
+      const index = Number(button.dataset.index)
+      const item = state.items[index]
+      const { action } = button.dataset
+
+      if (action === 'inc') item.qty++
+      if (action === 'dec' && item.qty > 1) item.qty--
+      else if (action === 'dec' || action === 'remove') state.items.splice(index, 1)
+    })
+
+    $('#catalog').insertAdjacentHTML('beforeend', CATALOG.map((product, index) => `
+      <button data-product="${index}" title="${product.name}">${product.emoji} ${product.short}</button>
+    `).join(''))
+
+    $('#catalog').addEventListener('click', event => {
+      const button = event.target.closest('[data-product]')
+      if (!button) return
+      logDivider('Añadir producto')
+      const product = CATALOG[Number(button.dataset.product)]
+      const existing = state.items.find(item => item.name === product.name)
+      if (existing) existing.qty++
+      else state.items.push({ ...product, qty: 1 })
+    })
+
+    document.querySelectorAll('[data-model]').forEach(element => {
+      element.addEventListener('focus', () => logDivider(`Editando ${element.dataset.model}`))
+    })
+
+    $('#clear-log').addEventListener('click', () => {
+      $('#log').innerHTML = ''
+      counters.effect = 0
+      counters.computed = 0
+      $('#effect-count').textContent = '0'
+      $('#computed-count').textContent = '0'
+    })
+
+    // ---------- Código fuente visible ----------
+    // Un resaltado de sintaxis mínimo con una sola expresión regular
+    function highlight(code) {
+      const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const pattern = /(\/\/.*$)|('(?:[^'\\]|\\.)*')|\b(const|let|export|function|return|if|else|for|of|new|typeof|try|finally|continue|null|true|false)\b|\b([a-zA-Z_]\w*)(?=\()/gm
+      return escaped.replace(pattern, (match, comment, string, keyword, fn) => {
+        if (comment) return `<span class="tok-comment">${comment}</span>`
+        if (string) return `<span class="tok-string">${string}</span>`
+        if (keyword) return `<span class="tok-keyword">${keyword}</span>`
+        return `<span class="tok-fn">${fn}</span>`
+      })
+    }
+
+    async function showSource() {
+      try {
+        const response = await fetch('./reactivity.js')
+        const code = await response.text()
+        $('#source').innerHTML = highlight(code)
+      } catch {
+        $('#source').textContent = 'No se pudo cargar reactivity.js'
+      }
+    }
+
+    // ---------- Inicio ----------
+    bindDOM($('#app'))
+    showSource()
+
+    // Un pequeño cambio automático para ver la cadena set → computed → effect
+    setTimeout(() => {
+      logDivider('Cambio: state.coupon = "MIDU10"')
+      state.coupon = 'MIDU10'
+    }, 400)
+  </script>
+</body>
+
+</html>

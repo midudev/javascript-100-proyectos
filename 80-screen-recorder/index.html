@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>80 - Grabador de pantalla</title>
+  <style>
+    :root {
+      --bg: #09090f;
+      --panel: #13131d;
+      --border: #25253a;
+      --text: #ececf4;
+      --muted: #8c8ca6;
+      --rec: #ef4444;
+      --accent: #f43f5e;
+      --ok: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      padding: 20px 16px 40px;
+      background:
+        radial-gradient(ellipse at 50% -20%, #f43f5e22 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      width: min(760px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      font-size: .85rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status::before {
+      content: '';
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .status[data-state="recording"]::before {
+      background: var(--rec);
+      animation: blink 1s infinite;
+    }
+
+    .status[data-state="paused"]::before {
+      background: #f59e0b;
+    }
+
+    .status[data-state="done"]::before {
+      background: var(--ok);
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: .25;
+      }
+    }
+
+    /* --- Escenario del vídeo --- */
+    .stage {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 20px;
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, #1a1a2a, #0e0e16);
+      border: 1px solid var(--border);
+      box-shadow: 0 30px 60px -30px #000;
+    }
+
+    .stage video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+      display: block;
+    }
+
+    .placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      gap: 10px;
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+    }
+
+    .placeholder svg {
+      width: 120px;
+      height: auto;
+    }
+
+    .placeholder strong {
+      color: var(--text);
+      font-size: 1.1rem;
+    }
+
+    .countdown {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: clamp(5rem, 20vw, 9rem);
+      font-weight: 800;
+      background: #09090fcc;
+      backdrop-filter: blur(4px);
+    }
+
+    .countdown span {
+      animation: pop 1s ease-out;
+    }
+
+    @keyframes pop {
+      from {
+        transform: scale(1.6);
+        opacity: 0;
+      }
+    }
+
+    .rec-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: var(--rec);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    /* --- Controles --- */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+      font-size: .88rem;
+    }
+
+    .options label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .options input {
+      accent-color: var(--accent);
+    }
+
+    select {
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #1b1b28;
+      color: var(--text);
+      font: inherit;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 42px;
+      padding: 0 18px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #1f1f2e;
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      border: 0;
+      background: linear-gradient(135deg, #fb7185, var(--accent));
+      color: white;
+      box-shadow: 0 10px 25px -10px var(--accent);
+    }
+
+    .button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .message {
+      margin: 0;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: .9rem;
+      line-height: 1.45;
+      background: #2a1d10;
+      color: #fbd38d;
+      border: 1px solid #5c3d12;
+    }
+
+    .message.error {
+      background: #2a1116;
+      color: #fda4af;
+      border-color: #5c1a25;
+    }
+
+    .message a {
+      color: inherit;
+      font-weight: 700;
+    }
+
+    /* --- Grabaciones --- */
+    .recordings h2 {
+      margin: 8px 0 10px;
+      font-size: .78rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .recordings ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .recording {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .recording.is-active {
+      border-color: var(--accent);
+    }
+
+    .recording button.play {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      text-align: left;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .recording strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .recording small {
+      color: var(--muted);
+    }
+
+    .recording .button {
+      height: 36px;
+      padding: 0 12px;
+      font-size: .85rem;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: .88rem;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 560px) {
+      h1 {
+        font-size: 1.1rem;
+      }
+
+      .status {
+        white-space: nowrap;
+      }
+
+      .placeholder svg {
+        width: 64px;
+      }
+
+      .placeholder strong {
+        font-size: .95rem;
+      }
+
+      .placeholder span {
+        display: none;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .buttons {
+        justify-content: stretch;
+      }
+
+      .buttons .button {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <h1>🎬 Grabador de pantalla</h1>
+      <span class="status" id="status" data-state="idle">Listo para grabar</span>
+    </header>
+
+    <p class="message" id="message" role="alert" hidden></p>
+
+    <div class="stage" id="stage">
+      <video id="video" playsinline></video>
+      <div class="placeholder" id="placeholder">
+        <svg viewBox="0 0 120 90" fill="none" aria-hidden="true">
+          <rect x="6" y="6" width="108" height="66" rx="8" stroke="#8c8ca6" stroke-width="4" />
+          <path d="M44 84h32M60 72v12" stroke="#8c8ca6" stroke-width="4" stroke-linecap="round" />
+          <circle cx="60" cy="39" r="14" fill="#f43f5e" />
+          <circle cx="60" cy="39" r="22" stroke="#f43f5e" stroke-opacity=".35" stroke-width="4" />
+        </svg>
+        <strong>Graba tu pantalla, una ventana o una pestaña</strong>
+        <span>Con audio del sistema y micrófono. Todo ocurre en tu navegador: nada se sube a ningún servidor.</span>
+      </div>
+      <span class="rec-badge" id="rec-badge" hidden>● REC</span>
+      <div class="countdown" id="countdown" hidden></div>
+    </div>
+
+    <div class="controls">
+      <div class="options" id="options">
+        <label><input type="checkbox" id="system-audio" checked> Audio del sistema</label>
+        <label><input type="checkbox" id="mic"> Micrófono</label>
+        <label>Cuenta atrás
+          <select id="countdown-select">
+            <option value="0">No</option>
+            <option value="3" selected>3 s</option>
+            <option value="5">5 s</option>
+          </select>
+        </label>
+        <label>Formato <select id="format"></select></label>
+      </div>
+      <div class="buttons">
+        <button class="button primary" id="start">● Grabar</button>
+        <button class="button" id="pause" hidden>⏸ Pausar</button>
+        <button class="button primary" id="stop" hidden>■ Detener</button>
+      </div>
+    </div>
+
+    <section class="recordings">
+      <h2>Tus grabaciones</h2>
+      <ul id="recordings"></ul>
+      <p class="empty" id="empty">Aún no has grabado nada. Las grabaciones se guardan solo mientras la página esté abierta.</p>
+    </section>
+  </div>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    // Formatos por orden de preferencia; nos quedaremos con los que soporte el navegador
+    const MIME_TYPES = [
+      { type: 'video/webm;codecs=vp9,opus', label: 'WebM · VP9', extension: 'webm' },
+      { type: 'video/webm;codecs=vp8,opus', label: 'WebM · VP8', extension: 'webm' },
+      { type: 'video/webm', label: 'WebM', extension: 'webm' },
+      { type: 'video/mp4;codecs=avc1,mp4a', label: 'MP4 · H.264', extension: 'mp4' },
+      { type: 'video/mp4', label: 'MP4', extension: 'mp4' }
+    ]
+    const TIMESLICE_MS = 1000
+    const VIDEO_BITRATE = 5_000_000
+
+    // ESTADO
+    let displayStream = null
+    let micStream = null
+    let audioContext = null
+    let recorder = null
+    let chunks = []
+    let recordedBytes = 0
+    let startTime = 0
+    let pausedAt = 0
+    let pausedTotal = 0
+    let timerId = null
+    let finalDuration = 0
+    let isCancelled = false
+    const recordings = []
+
+    const video = $('#video')
+    const status = $('#status')
+
+    // --- Soporte ---
+
+    const isSupported = Boolean(navigator.mediaDevices?.getDisplayMedia) && 'MediaRecorder' in window
+    const supportedFormats = isSupported
+      ? MIME_TYPES.filter(({ type }) => MediaRecorder.isTypeSupported(type))
+      : []
+
+    function checkSupport() {
+      if (!isSupported) {
+        showMessage('Tu navegador no permite grabar la pantalla. getDisplayMedia no existe en móviles (iOS y Android): prueba desde Chrome, Edge, Firefox o Safari en un ordenador.', true)
+        $('#start').disabled = true
+        return
+      }
+
+      $('#format').innerHTML = supportedFormats
+        .map(({ type, label }, index) => `<option value="${index}" title="${type}">${label}</option>`)
+        .join('')
+
+      // Dentro de un iframe hace falta allow="display-capture" para poder capturar
+      const isEmbedded = window.self !== window.top
+      const isBlocked = document.featurePolicy && !document.featurePolicy.allowsFeature('display-capture')
+      if (isEmbedded && isBlocked) showEmbeddedHint()
+    }
+
+    function showEmbeddedHint() {
+      showMessage(`Esta página está incrustada y el navegador no deja capturar la pantalla desde aquí.
+        <a href="${location.href}" target="_blank" rel="noopener">Ábrela en una pestaña nueva</a> para grabar.`, true, true)
+    }
+
+    // --- Utilidades ---
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000)
+      const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+      const seconds = String(totalSeconds % 60).padStart(2, '0')
+      return `${minutes}:${seconds}`
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    }
+
+    function showMessage(text, isError = false, isHTML = false) {
+      const message = $('#message')
+      message.hidden = !text
+      message.classList.toggle('error', isError)
+      if (isHTML) message.innerHTML = text
+      else message.textContent = text
+    }
+
+    function setStatus(state, text) {
+      status.dataset.state = state
+      status.textContent = text
+    }
+
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    // --- Captura ---
+
+    // MediaRecorder graba UNA sola pista de audio. Si tenemos audio del sistema y
+    // micrófono los mezclamos con la Web Audio API en una pista nueva y creamos un
+    // MediaStream con la pista de vídeo de la pantalla + esa pista de audio mezclada.
+    function combineStreams(display, mic) {
+      const videoTracks = display.getVideoTracks()
+      const audioStreams = [display, mic].filter((stream) => stream?.getAudioTracks().length > 0)
+
+      if (audioStreams.length === 0) return new MediaStream(videoTracks)
+      if (audioStreams.length === 1) return new MediaStream([...videoTracks, ...audioStreams[0].getAudioTracks()])
+
+      audioContext = new AudioContext()
+      const destination = audioContext.createMediaStreamDestination()
+      audioStreams.forEach((stream) => audioContext.createMediaStreamSource(stream).connect(destination))
+      return new MediaStream([...videoTracks, ...destination.stream.getAudioTracks()])
+    }
+
+    function describeError(error) {
+      if (error.name === 'NotAllowedError') {
+        return 'Has cancelado la selección o el navegador ha denegado el permiso para capturar la pantalla.'
+      }
+      if (error.name === 'NotFoundError') return 'No hay ninguna fuente de vídeo disponible para capturar.'
+      if (error.name === 'NotReadableError') return 'El sistema operativo ha bloqueado la captura (revisa los permisos de grabación de pantalla).'
+      return `No se pudo iniciar la captura (${error.name}).`
+    }
+
+    async function startRecording() {
+      showMessage('')
+      isCancelled = false
+      const format = supportedFormats[Number($('#format').value)] ?? supportedFormats[0]
+
+      try {
+        // El navegador muestra su propio selector: pantalla completa, ventana o pestaña.
+        // Con audio: true el usuario puede compartir también el sonido (según navegador)
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: $('#system-audio').checked
+        })
+      } catch (error) {
+        showMessage(describeError(error), true)
+        if (window.self !== window.top && error.name === 'NotAllowedError') showEmbeddedHint()
+        return
+      }
+
+      if ($('#mic').checked) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+        } catch {
+          showMessage('No hemos podido usar el micrófono: la grabación seguirá sin él.')
+        }
+      }
+
+      // Si el usuario pulsa "Dejar de compartir" en la barra del navegador,
+      // la pista de vídeo termina: lo detectamos y paramos la grabación
+      const [videoTrack] = displayStream.getVideoTracks()
+      videoTrack.addEventListener('ended', () => {
+        isCancelled = true
+        stopRecording()
+      })
+
+      // Vista previa en directo (silenciada para no crear eco)
+      video.srcObject = displayStream
+      video.muted = true
+      video.controls = false
+      video.play().catch(() => {})
+      $('#placeholder').hidden = true
+      setControls('countdown')
+
+      await runCountdown(Number($('#countdown-select').value))
+      if (isCancelled) return
+
+      const stream = combineStreams(displayStream, micStream)
+      chunks = []
+      recordedBytes = 0
+
+      recorder = new MediaRecorder(stream, { mimeType: format.type, videoBitsPerSecond: VIDEO_BITRATE })
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size === 0) return
+        chunks.push(event.data)
+        recordedBytes += event.data.size
+      })
+      recorder.addEventListener('stop', () => finishRecording(format))
+
+      // Con timeslice el navegador nos entrega un trozo (Blob) cada segundo
+      // en lugar de uno gigante al final
+      recorder.start(TIMESLICE_MS)
+      startTimer()
+      setControls('recording')
+    }
+
+    async function runCountdown(seconds) {
+      const overlay = $('#countdown')
+      for (let i = seconds; i > 0 && !isCancelled; i--) {
+        setStatus('idle', `Empieza en ${i}…`)
+        overlay.hidden = false
+        overlay.innerHTML = `<span>${i}</span>`
+        await wait(1000)
+      }
+      overlay.hidden = true
+    }
+
+    function togglePause() {
+      if (!recorder) return
+      if (recorder.state === 'recording') {
+        recorder.pause()
+        pausedAt = performance.now()
+        setControls('paused')
+      } else if (recorder.state === 'paused') {
+        recorder.resume()
+        pausedTotal += performance.now() - pausedAt
+        setControls('recording')
+      }
+      updateTimer()
+    }
+
+    function stopRecording() {
+      if (recorder) finalDuration = getElapsed()
+      stopTimer()
+      // stop() dispara un último 'dataavailable' y después el evento 'stop'
+      if (recorder && recorder.state !== 'inactive') recorder.stop()
+      else if (!recorder) resetToIdle()
+
+      // Paramos todas las pistas para que el navegador quite el aviso de "compartiendo"
+      displayStream?.getTracks().forEach((track) => track.stop())
+      micStream?.getTracks().forEach((track) => track.stop())
+      audioContext?.close()
+      displayStream = null
+      micStream = null
+      audioContext = null
+    }
+
+    function resetToIdle() {
+      $('#countdown').hidden = true
+      video.srcObject = null
+      $('#placeholder').hidden = recordings.length > 0
+      if (recordings.length > 0) showRecording(recordings[0])
+      setControls('idle')
+    }
+
+    // --- Resultado ---
+
+    function finishRecording(format) {
+      const duration = finalDuration
+      // Unimos todos los trozos en un único Blob: un "fichero" en memoria
+      const blob = new Blob(chunks, { type: recorder.mimeType || format.type })
+      recorder = null
+      chunks = []
+
+      const date = new Date()
+      const pad = (number) => String(number).padStart(2, '0')
+      const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`
+      const recording = {
+        id: stamp,
+        name: `grabacion-${stamp}.${format.extension}`,
+        // Una URL blob: apunta al Blob en memoria y sirve como src o para descargar
+        url: URL.createObjectURL(blob),
+        size: blob.size,
+        duration,
+        time: date
+      }
+      recordings.unshift(recording)
+      renderRecordings()
+      showRecording(recording)
+      setControls('done')
+    }
+
+    function showRecording(recording) {
+      video.srcObject = null
+      video.src = recording.url
+      video.muted = false
+      video.controls = true
+      $('#placeholder').hidden = true
+      document.querySelectorAll('.recording').forEach((item) => {
+        item.classList.toggle('is-active', item.dataset.id === recording.id)
+      })
+    }
+
+    // Los WebM de MediaRecorder no guardan la duración en la cabecera y Chrome la
+    // muestra como Infinity (y no deja buscar). Truco: saltar muy lejos para que
+    // el navegador calcule la duración real y volver al principio.
+    video.addEventListener('loadedmetadata', () => {
+      if (video.duration !== Infinity) return
+      video.currentTime = Number.MAX_SAFE_INTEGER
+      video.addEventListener('timeupdate', () => { video.currentTime = 0 }, { once: true })
+    })
+
+    function renderRecordings() {
+      $('#empty').hidden = recordings.length > 0
+      const timeFormat = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+      $('#recordings').innerHTML = recordings.map((recording) => `
+        <li class="recording" data-id="${recording.id}">
+          <button class="play" data-action="play">
+            <strong>▶ ${recording.name}</strong>
+            <small>${formatTime(recording.duration)} · ${formatBytes(recording.size)} · ${timeFormat.format(recording.time)}</small>
+          </button>
+          <a class="button" href="${recording.url}" download="${recording.name}">⬇ Descargar</a>
+          <button class="button" data-action="delete" aria-label="Eliminar grabación">🗑</button>
+        </li>
+      `).join('')
+    }
+
+    $('#recordings').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action]')
+      if (!button) return
+      const id = button.closest('.recording').dataset.id
+      const index = recordings.findIndex((recording) => recording.id === id)
+      if (index === -1) return
+
+      if (button.dataset.action === 'play') {
+        showRecording(recordings[index])
+        video.play()
+        return
+      }
+
+      // Liberamos la memoria del Blob al borrar la grabación
+      const [removed] = recordings.splice(index, 1)
+      if (video.src === removed.url) {
+        video.removeAttribute('src')
+        video.load()
+        video.controls = false
+        $('#placeholder').hidden = recordings.length > 0
+        if (recordings.length > 0) showRecording(recordings[0])
+      }
+      URL.revokeObjectURL(removed.url)
+      renderRecordings()
+    })
+
+    // --- Cronómetro ---
+
+    function getElapsed() {
+      const now = recorder?.state === 'paused' ? pausedAt : performance.now()
+      return now - startTime - pausedTotal
+    }
+
+    function startTimer() {
+      startTime = performance.now()
+      pausedTotal = 0
+      updateTimer()
+      timerId = setInterval(updateTimer, 250)
+    }
+
+    function stopTimer() {
+      clearInterval(timerId)
+      timerId = null
+    }
+
+    function updateTimer() {
+      if (!recorder) return
+      const isPaused = recorder.state === 'paused'
+      setStatus(isPaused ? 'paused' : 'recording', `${isPaused ? 'En pausa' : 'Grabando'} · ${formatTime(getElapsed())} · ${formatBytes(recordedBytes)}`)
+    }
+
+    // --- Interfaz ---
+
+    function setControls(mode) {
+      const isBusy = mode === 'recording' || mode === 'paused' || mode === 'countdown'
+      $('#start').hidden = isBusy
+      $('#stop').hidden = !isBusy
+      $('#pause').hidden = !(mode === 'recording' || mode === 'paused')
+      $('#pause').textContent = mode === 'paused' ? '▶ Reanudar' : '⏸ Pausar'
+      $('#rec-badge').hidden = mode !== 'recording'
+      document.querySelectorAll('#options input, #options select').forEach((input) => { input.disabled = isBusy })
+
+      if (mode === 'idle') setStatus('idle', 'Listo para grabar')
+      if (mode === 'done') setStatus('done', 'Grabación lista')
+    }
+
+    $('#start').addEventListener('click', startRecording)
+    $('#stop').addEventListener('click', () => {
+      isCancelled = true
+      stopRecording()
+    })
+    $('#pause').addEventListener('click', togglePause)
+
+    // Al cerrar la página liberamos las URLs de los Blobs
+    window.addEventListener('pagehide', () => recordings.forEach(({ url }) => URL.revokeObjectURL(url)))
+
+    checkSupport()
+    renderRecordings()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>93 - Calculadora sin eval</title>
+  <style>
+    :root {
+      --bg: #edf0f6;
+      --card: #ffffff;
+      --soft: #f4f6fb;
+      --text: #1b1f2e;
+      --muted: #7b8196;
+      --line: #e2e6f0;
+      --accent: #6d28d9;
+      --accent-soft: #efe9ff;
+      --orange: #ea580c;
+      --error: #dc2626;
+      --number: #2563eb;
+      --operator: #ea580c;
+      --function: #7c3aed;
+      --constant: #059669;
+      --paren: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100dvh;
+      margin: 0;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 85% 10%, #e4dcff 0, transparent 35%),
+        radial-gradient(circle at 0% 100%, #d8ecff 0, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 560px) 400px;
+      gap: 24px;
+      width: min(100%, 1000px);
+      height: min(680px, calc(100dvh - 40px));
+    }
+
+    .card {
+      min-height: 0;
+      border-radius: 24px;
+      background: var(--card);
+      box-shadow: 0 20px 50px -25px rgb(30 40 90 / 35%);
+    }
+
+    /* ---------- Calculadora ---------- */
+    .calculator {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .display {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--soft);
+    }
+
+    .display-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .mode {
+      padding: 3px 10px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      background: var(--card);
+      font-weight: 700;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .expression {
+      width: 100%;
+      padding: 6px 0;
+      border: 0;
+      background: transparent;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 1.1rem;
+      text-align: right;
+      outline: none;
+    }
+
+    .result {
+      min-height: 2.6rem;
+      overflow: hidden;
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      letter-spacing: -0.02em;
+    }
+
+    .result.is-preview {
+      color: var(--muted);
+    }
+
+    .error {
+      min-height: 1.2rem;
+      margin: 0;
+      color: var(--error);
+      font-size: 0.85rem;
+      text-align: right;
+      opacity: 0.65;
+    }
+
+    .error.is-strong {
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .shake {
+      animation: shake 0.3s;
+    }
+
+    @keyframes shake {
+      25% {
+        transform: translateX(-6px);
+      }
+
+      75% {
+        transform: translateX(6px);
+      }
+    }
+
+    .keypad {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .key {
+      min-height: 40px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--soft);
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.08s;
+    }
+
+    .key:hover {
+      background: #e8ebf4;
+    }
+
+    .key:active {
+      transform: scale(0.95);
+    }
+
+    .key.fn {
+      color: var(--function);
+      font-size: 0.95rem;
+    }
+
+    .key.op {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 1.3rem;
+    }
+
+    .key.danger {
+      color: var(--error);
+    }
+
+    .key.equals {
+      background: linear-gradient(135deg, #7c3aed, #db2777);
+      color: #fff;
+      font-size: 1.4rem;
+    }
+
+    /* ---------- Panel explicativo ---------- */
+    .explain {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 22px;
+      overflow: auto;
+    }
+
+    .explain header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    h2 {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-height: 30px;
+    }
+
+    .chip {
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--color) 12%, white);
+      color: var(--color);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .chip small {
+      margin-left: 4px;
+      opacity: 0.6;
+      font-weight: 500;
+    }
+
+    .chip.is-implicit {
+      outline: 1px dashed var(--color);
+    }
+
+    .chip.number {
+      --color: var(--number);
+    }
+
+    .chip.operator {
+      --color: var(--operator);
+    }
+
+    .chip.function {
+      --color: var(--function);
+    }
+
+    .chip.constant {
+      --color: var(--constant);
+    }
+
+    .chip.leftParen,
+    .chip.rightParen {
+      --color: var(--paren);
+    }
+
+    .stack-steps {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+    }
+
+    .stack-steps li {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 8px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .stack-steps .read {
+      color: var(--muted);
+    }
+
+    .stack-steps .stack {
+      overflow-wrap: anywhere;
+    }
+
+    .stack-steps .stack span {
+      display: inline-block;
+      margin-right: 4px;
+      padding: 0 6px;
+      border-radius: 5px;
+      background: var(--soft);
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .steps[hidden] {
+      display: none;
+    }
+
+    .history {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .history button {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--soft);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .history button:hover {
+      background: #e8ebf4;
+    }
+
+    .history .value {
+      color: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    @media (width < 860px) {
+      body {
+        place-items: start center;
+        padding: 12px;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .calculator {
+        order: -1;
+        min-height: 560px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="card explain" aria-label="Cómo se calcula">
+      <header>
+        <div>
+          <h1>Calculadora sin <code>eval</code></h1>
+          <p class="subtitle">Tokenizador + shunting-yard + pila</p>
+        </div>
+        <label class="toggle"><input type="checkbox" id="show-steps" checked> Ver el proceso</label>
+      </header>
+
+      <div class="steps" id="steps">
+        <h2>1 · Tokens</h2>
+        <div class="chips" id="tokens"></div>
+        <h2>2 · Notación polaca inversa (RPN)</h2>
+        <div class="chips" id="rpn"></div>
+        <h2>3 · Evaluación con una pila</h2>
+        <ol class="stack-steps" id="stack-steps"></ol>
+      </div>
+
+      <h2>Historial</h2>
+      <ul class="history" id="history"></ul>
+    </section>
+
+    <section class="card calculator" aria-label="Calculadora">
+      <div class="display" id="display">
+        <div class="display-top">
+          <button class="mode" id="angle-mode" title="Unidades de los ángulos">DEG</button>
+          <span id="ans"></span>
+        </div>
+        <input class="expression" id="expression" aria-label="Expresión" autocomplete="off" spellcheck="false">
+        <output class="result" id="result" aria-live="polite"></output>
+        <p class="error" id="error" role="alert"></p>
+      </div>
+
+      <div class="keypad" id="keypad">
+        <button class="key fn" data-insert="sin(">sin</button>
+        <button class="key fn" data-insert="cos(">cos</button>
+        <button class="key fn" data-insert="tan(">tan</button>
+        <button class="key" data-insert="(">(</button>
+        <button class="key" data-insert=")">)</button>
+
+        <button class="key fn" data-insert="sqrt(">√</button>
+        <button class="key fn" data-insert="log(">log</button>
+        <button class="key fn" data-insert="ln(">ln</button>
+        <button class="key op" data-insert="^">xʸ</button>
+        <button class="key op" data-insert="!">n!</button>
+
+        <button class="key" data-insert="7">7</button>
+        <button class="key" data-insert="8">8</button>
+        <button class="key" data-insert="9">9</button>
+        <button class="key op" data-insert="÷">÷</button>
+        <button class="key danger" data-action="clear">AC</button>
+
+        <button class="key" data-insert="4">4</button>
+        <button class="key" data-insert="5">5</button>
+        <button class="key" data-insert="6">6</button>
+        <button class="key op" data-insert="×">×</button>
+        <button class="key" data-action="backspace" aria-label="Borrar">⌫</button>
+
+        <button class="key" data-insert="1">1</button>
+        <button class="key" data-insert="2">2</button>
+        <button class="key" data-insert="3">3</button>
+        <button class="key op" data-insert="−">−</button>
+        <button class="key fn" data-insert="π">π</button>
+
+        <button class="key" data-insert="0">0</button>
+        <button class="key" data-insert=".">.</button>
+        <button class="key fn" data-insert="e">e</button>
+        <button class="key op" data-insert="+">+</button>
+        <button class="key equals" data-action="equals">=</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    // ¿Por qué no usamos eval('2+2')?
+    // 1. Seguridad: eval ejecuta CUALQUIER código JavaScript, no solo matemáticas.
+    // 2. Sintaxis: JS no entiende 2^3 como potencia (^ es XOR), ni 5!, ni sin(30) en grados.
+    // 3. Errores: con nuestro propio intérprete podemos explicar exactamente qué falla y dónde.
+
+    const HISTORY_KEY = 'calculator-history'
+    const MAX_HISTORY = 12
+    const INITIAL_EXPRESSION = '2 * (3 + 4)^2 - sqrt(16) / -2'
+    const EXAMPLES = ['2^3^2', '-2^2', '5! / 3!', 'sin(30) + cos(60)', '0.1 + 0.2']
+
+    // Operadores con su precedencia (quién se calcula antes) y asociatividad
+    // (en empate, si se agrupa por la izquierda o por la derecha).
+    const OPERATORS = {
+      '+': { precedence: 1, associativity: 'left', arity: 2, apply: (a, b) => a + b },
+      '-': { precedence: 1, associativity: 'left', arity: 2, apply: (a, b) => a - b },
+      '*': { precedence: 2, associativity: 'left', arity: 2, apply: (a, b) => a * b },
+      '/': { precedence: 2, associativity: 'left', arity: 2, apply: divide },
+      // El menos unario va por debajo de ^ para que -2^2 sea -(2^2) = -4, como en matemáticas
+      neg: { precedence: 3, associativity: 'right', arity: 1, apply: a => -a },
+      // ^ es asociativo por la DERECHA: 2^3^2 = 2^(3^2) = 512, no (2^3)^2 = 64
+      '^': { precedence: 4, associativity: 'right', arity: 2, apply: (a, b) => a ** b },
+      // ! es un operador posfijo: se escribe DESPUÉS de su operando
+      '!': { precedence: 5, associativity: 'left', arity: 1, postfix: true, apply: factorial }
+    }
+
+    const FUNCTIONS = {
+      sin: x => cleanTrig(Math.sin(toRadians(x))),
+      cos: x => cleanTrig(Math.cos(toRadians(x))),
+      tan: tangent,
+      asin: x => fromRadians(Math.asin(x)),
+      acos: x => fromRadians(Math.acos(x)),
+      atan: x => fromRadians(Math.atan(x)),
+      sqrt: Math.sqrt,
+      log: Math.log10,
+      ln: Math.log,
+      abs: Math.abs
+    }
+
+    const CONSTANTS = {
+      pi: () => Math.PI,
+      π: () => Math.PI,
+      e: () => Math.E,
+      ans: () => lastAnswer
+    }
+
+    // Símbolos "bonitos" de la botonera -> símbolo que entiende el tokenizador
+    const SYMBOL_ALIASES = { '×': '*', '÷': '/', '−': '-', '√': 'sqrt' }
+
+    const input = $('#expression')
+    const resultOutput = $('#result')
+    const errorOutput = $('#error')
+
+    let isDegrees = true
+    let lastAnswer = 0
+    let history = loadHistory()
+
+    class CalcError extends Error {
+      constructor(message, position = null) {
+        super(message)
+        this.position = position
+      }
+    }
+
+    // ---------- Funciones matemáticas ----------
+
+    function toRadians(x) {
+      return isDegrees ? (x * Math.PI) / 180 : x
+    }
+
+    function fromRadians(x) {
+      return isDegrees ? (x * 180) / Math.PI : x
+    }
+
+    function cleanTrig(value) {
+      // sin(180°) da 1.22e-16 por culpa de la coma flotante: lo redondeamos a 0
+      return Math.abs(value) < 1e-12 ? 0 : value
+    }
+
+    function tangent(x) {
+      if (isDegrees && Math.abs(x % 180) === 90) throw new CalcError(`tan(${x}°) no está definida`)
+      return cleanTrig(Math.tan(toRadians(x)))
+    }
+
+    function divide(a, b) {
+      if (b === 0) throw new CalcError('No se puede dividir entre cero')
+      return a / b
+    }
+
+    function factorial(n) {
+      if (!Number.isInteger(n) || n < 0) throw new CalcError('El factorial solo existe para enteros ≥ 0')
+      if (n > 170) throw new CalcError('Factorial demasiado grande')
+      let result = 1
+      for (let i = 2; i <= n; i++) result *= i
+      return result
+    }
+
+    // ---------- 1. Tokenizador: texto -> lista de tokens ----------
+
+    function endsOperand(token) {
+      return token && (
+        token.type === 'number' ||
+        token.type === 'constant' ||
+        token.type === 'rightParen' ||
+        (token.type === 'operator' && OPERATORS[token.value].postfix)
+      )
+    }
+
+    function tokenize(text) {
+      const tokens = []
+      let index = 0
+
+      function push(token) {
+        const previous = tokens.at(-1)
+        // Multiplicación implícita: 2π, 3(4+1), (1+2)(3+4), 2sin(30)...
+        // Entre dos números seguidos NO la añadimos: "2 3" es un error, no 6
+        const startsOperand = ['constant', 'function', 'leftParen'].includes(token.type) ||
+          (token.type === 'number' && previous?.type !== 'number')
+        if (endsOperand(previous) && startsOperand) {
+          tokens.push({ type: 'operator', value: '*', position: token.position, implicit: true })
+        }
+        tokens.push(token)
+      }
+
+      while (index < text.length) {
+        const char = SYMBOL_ALIASES[text[index]] ?? text[index]
+        const rest = text.slice(index)
+
+        if (/\s/.test(char)) {
+          index++
+          continue
+        }
+
+        // Números: 42, 3.14, .5 y notación científica con E mayúscula (1.5E+21).
+        // La e minúscula la reservamos para la constante e = 2.718...
+        const number = rest.match(/^(\d+(\.\d*)?|\.\d+)(E[+-]?\d+)?/)
+        if (number) {
+          if (rest[number[0].length] === '.') throw new CalcError('Número mal escrito: sobra un punto', index + number[0].length)
+          push({ type: 'number', value: Number(number[0]), text: number[0], position: index })
+          index += number[0].length
+          continue
+        }
+
+        // \p{L} = cualquier letra Unicode (así también reconocemos π). El símbolo √ equivale a sqrt
+        const word = char === 'sqrt' ? ['√'] : rest.match(/^\p{L}+/u)
+        if (word) {
+          const name = char === 'sqrt' ? 'sqrt' : word[0].toLowerCase()
+          if (name in FUNCTIONS) push({ type: 'function', value: name, position: index })
+          else if (name in CONSTANTS) push({ type: 'constant', value: name, position: index })
+          else throw new CalcError(`No conozco "${word[0]}"`, index)
+          index += word[0].length
+          continue
+        }
+
+        if (char === '(') push({ type: 'leftParen', value: '(', position: index })
+        else if (char === ')') push({ type: 'rightParen', value: ')', position: index })
+        else if (char === '-' || char === '+') {
+          // Un + o - es UNARIO si no tiene nada a su izquierda que pueda ser un operando: -2, 3*-2, (-1)
+          const isUnary = !endsOperand(tokens.at(-1))
+          if (!isUnary) push({ type: 'operator', value: char, position: index })
+          else if (char === '-') push({ type: 'operator', value: 'neg', position: index })
+          // el + unario no hace nada, así que simplemente lo ignoramos
+        } else if (char in OPERATORS) {
+          push({ type: 'operator', value: char, position: index })
+        } else {
+          throw new CalcError(`Carácter no válido "${text[index]}"`, index)
+        }
+        index++
+      }
+
+      tokens.forEach((token, i) => {
+        if (token.type === 'function' && tokens[i + 1]?.type !== 'leftParen') {
+          throw new CalcError(`Falta "(" después de ${token.value}`, token.position)
+        }
+        if (token.type === 'leftParen' && tokens[i + 1]?.type === 'rightParen') {
+          throw new CalcError('Hay unos paréntesis vacíos', token.position)
+        }
+      })
+
+      return tokens
+    }
+
+    // ---------- 2. Shunting-yard (Dijkstra): infija -> notación polaca inversa ----------
+
+    function toRPN(tokens) {
+      const output = []
+      const stack = [] // pila de operadores, funciones y paréntesis pendientes
+
+      for (const token of tokens) {
+        if (token.type === 'number' || token.type === 'constant') {
+          // Los operandos van directos a la salida
+          output.push(token)
+        } else if (token.type === 'function' || token.type === 'leftParen') {
+          stack.push(token)
+        } else if (token.type === 'operator') {
+          const operator = OPERATORS[token.value]
+
+          // Posfijo (!): su operando ya está en la salida, así que va directo
+          if (operator.postfix) {
+            output.push(token)
+            continue
+          }
+
+          // Prefijo (menos unario): no tiene operando a la izquierda, no saca nada de la pila
+          if (operator.arity === 1) {
+            stack.push(token)
+            continue
+          }
+
+          // Binario: antes de apilarlo sacamos los operadores que deben calcularse ANTES:
+          // los de mayor precedencia, o los de igual precedencia si somos asociativos por la izquierda
+          while (stack.at(-1)?.type === 'operator') {
+            const top = OPERATORS[stack.at(-1).value]
+            const shouldPop = top.precedence > operator.precedence ||
+              (top.precedence === operator.precedence && operator.associativity === 'left')
+            if (!shouldPop) break
+            output.push(stack.pop())
+          }
+          stack.push(token)
+        } else if (token.type === 'rightParen') {
+          // Vaciamos hasta encontrar el "(" que abre este grupo
+          while (stack.length > 0 && stack.at(-1).type !== 'leftParen') output.push(stack.pop())
+          if (stack.length === 0) throw new CalcError('Sobra un ")" sin abrir', token.position)
+          stack.pop()
+          // Si el paréntesis era de una función, sin(...), la función va ahora a la salida
+          if (stack.at(-1)?.type === 'function') output.push(stack.pop())
+        }
+      }
+
+      while (stack.length > 0) {
+        const token = stack.pop()
+        if (token.type === 'leftParen') throw new CalcError('Falta cerrar un paréntesis', token.position)
+        output.push(token)
+      }
+
+      return output
+    }
+
+    // ---------- 3. Evaluar la RPN con una pila ----------
+
+    function evaluateRPN(rpn) {
+      const stack = []
+      const steps = []
+
+      for (const token of rpn) {
+        if (token.type === 'number') {
+          stack.push(token.value)
+        } else if (token.type === 'constant') {
+          stack.push(CONSTANTS[token.value]())
+        } else {
+          // Operadores y funciones sacan sus operandos de la pila y apilan el resultado
+          const isFunction = token.type === 'function'
+          const arity = isFunction ? 1 : OPERATORS[token.value].arity
+          if (stack.length < arity) {
+            throw new CalcError(`Falta un operando para ${tokenLabel(token)}`, token.position)
+          }
+          const operands = stack.splice(-arity)
+          const apply = isFunction ? FUNCTIONS[token.value] : OPERATORS[token.value].apply
+          stack.push(apply(...operands))
+        }
+        steps.push({ token, stack: [...stack] })
+      }
+
+      if (stack.length === 0) throw new CalcError('Escribe una expresión')
+      if (stack.length > 1) throw new CalcError('Falta un operador entre dos valores')
+
+      const [value] = stack
+      if (Number.isNaN(value)) throw new CalcError('Resultado no definido')
+      if (!Number.isFinite(value)) throw new CalcError('Resultado infinito o demasiado grande')
+      return { value, steps }
+    }
+
+    function calculate(text) {
+      const tokens = tokenize(text)
+      const rpn = toRPN(tokens)
+      const { value, steps } = evaluateRPN(rpn)
+      return { tokens, rpn, value, steps }
+    }
+
+    // ---------- Interfaz ----------
+
+    function formatNumber(value) {
+      // La coma flotante no es exacta: 0.1 + 0.2 = 0.30000000000000004.
+      // Redondeamos a 12 cifras significativas para mostrar un resultado "humano"
+      return String(Number(value.toPrecision(12))).replace('e', 'E')
+    }
+
+    function tokenLabel(token) {
+      if (token.type === 'number') return token.text
+      if (token.value === 'neg') return '−'
+      return token.value
+    }
+
+    function renderChips(container, tokens) {
+      container.innerHTML = tokens.map(token => {
+        const extra = token.value === 'neg' ? '<small>unario</small>' : token.implicit ? '<small>implícito</small>' : ''
+        return `<span class="chip ${token.type} ${token.implicit ? 'is-implicit' : ''}">${tokenLabel(token)}${extra}</span>`
+      }).join('')
+    }
+
+    function renderSteps(steps) {
+      $('#stack-steps').innerHTML = steps.map(({ token, stack }) => `
+        <li>
+          <span class="read">${tokenLabel(token)}</span>
+          <span class="stack">${stack.map(value => `<span>${formatNumber(value)}</span>`).join('')}</span>
+        </li>
+      `).join('')
+    }
+
+    function renderProcess(text) {
+      // Pintamos cada fase por separado para ver hasta dónde llega aunque haya errores
+      let tokens = []
+      let rpn = []
+      let steps = []
+      try {
+        tokens = tokenize(text)
+        rpn = toRPN(tokens)
+        steps = evaluateRPN(rpn).steps
+      } catch {
+        // el error ya se muestra en la pantalla de la calculadora
+      }
+      renderChips($('#tokens'), tokens)
+      renderChips($('#rpn'), rpn)
+      renderSteps(steps)
+    }
+
+    function update() {
+      const text = input.value
+      errorOutput.classList.remove('is-strong')
+      renderProcess(text)
+
+      if (text.trim() === '') {
+        resultOutput.textContent = ''
+        errorOutput.textContent = ''
+        return
+      }
+
+      try {
+        // Resultado en vivo mientras escribes
+        const { value } = calculate(text)
+        resultOutput.textContent = `= ${formatNumber(value)}`
+        resultOutput.classList.add('is-preview')
+        errorOutput.textContent = ''
+      } catch (error) {
+        resultOutput.textContent = ''
+        errorOutput.textContent = error instanceof CalcError ? error.message : 'Expresión no válida'
+      }
+    }
+
+    function showError(error) {
+      errorOutput.textContent = error instanceof CalcError ? error.message : 'Expresión no válida'
+      errorOutput.classList.add('is-strong')
+
+      const display = $('#display')
+      display.classList.remove('shake')
+      void display.offsetWidth // forzamos un reflow para poder repetir la animación
+      display.classList.add('shake')
+
+      // Seleccionamos el carácter donde está el problema
+      if (error.position !== null && error.position !== undefined) {
+        input.focus()
+        input.setSelectionRange(error.position, error.position + 1)
+      }
+    }
+
+    function evaluateInput() {
+      const text = input.value.trim()
+      if (!text) return
+
+      try {
+        const { value } = calculate(text)
+        const formatted = formatNumber(value)
+        lastAnswer = Number(formatted)
+        addToHistory(text, formatted)
+        input.value = formatted
+        resultOutput.textContent = `= ${formatted}`
+        resultOutput.classList.remove('is-preview')
+        errorOutput.textContent = ''
+        renderProcess(text)
+        renderAnswer()
+      } catch (error) {
+        showError(error)
+      }
+    }
+
+    function insertAtCursor(text) {
+      const { selectionStart: start, selectionEnd: end, value } = input
+      input.value = value.slice(0, start) + text + value.slice(end)
+      const caret = start + text.length
+      input.setSelectionRange(caret, caret)
+      update()
+    }
+
+    function backspace() {
+      const { selectionStart: start, selectionEnd: end, value } = input
+      if (start === end && start === 0) return
+      const from = start === end ? start - 1 : start
+      input.value = value.slice(0, from) + value.slice(end)
+      input.setSelectionRange(from, from)
+      update()
+    }
+
+    function clearAll() {
+      input.value = ''
+      update()
+    }
+
+    function renderAnswer() {
+      $('#ans').textContent = `Ans = ${formatNumber(lastAnswer)}`
+    }
+
+    function loadHistory() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(HISTORY_KEY))
+        if (Array.isArray(saved)) return saved
+      } catch {
+        // sin historial guardado
+      }
+      return null
+    }
+
+    function saveHistory() {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+      } catch {
+        // almacenamiento no disponible: el historial vive solo en memoria
+      }
+    }
+
+    function addToHistory(expression, value) {
+      history = [{ expression, value }, ...history].slice(0, MAX_HISTORY)
+      saveHistory()
+      renderHistory()
+    }
+
+    function renderHistory() {
+      const list = $('#history')
+      if (history.length === 0) {
+        list.innerHTML = '<li class="empty">Aún no hay operaciones</li>'
+        return
+      }
+      list.innerHTML = history.map(({ expression, value }, index) => `
+        <li><button data-index="${index}">
+          <span>${expression.replace(/[&<>]/g, char => `&#${char.charCodeAt(0)};`)}</span>
+          <span class="value">= ${value}</span>
+        </button></li>
+      `).join('')
+    }
+
+    function createExampleHistory() {
+      // Ejemplos que muestran detalles interesantes del algoritmo
+      return EXAMPLES.map(expression => ({ expression, value: formatNumber(calculate(expression).value) }))
+    }
+
+    // Los botones no roban el foco al input, así el cursor se mantiene donde estaba
+    $('#keypad').addEventListener('pointerdown', event => {
+      if (event.target.closest('button')) event.preventDefault()
+    })
+
+    $('#keypad').addEventListener('click', event => {
+      const key = event.target.closest('button')
+      if (!key) return
+      const { insert, action } = key.dataset
+      if (insert) insertAtCursor(insert)
+      else if (action === 'equals') evaluateInput()
+      else if (action === 'backspace') backspace()
+      else if (action === 'clear') clearAll()
+    })
+
+    input.addEventListener('input', update)
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === '=') {
+        event.preventDefault()
+        evaluateInput()
+      } else if (event.key === 'Escape') {
+        clearAll()
+      }
+    })
+
+    // Si el foco está en otro sitio, el teclado físico sigue escribiendo en la expresión
+    document.addEventListener('keydown', event => {
+      if (event.target === input || event.target.matches('input, button') || event.metaKey || event.ctrlKey) return
+      if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Enter') input.focus()
+    })
+
+    $('#angle-mode').addEventListener('click', event => {
+      isDegrees = !isDegrees
+      event.currentTarget.textContent = isDegrees ? 'DEG' : 'RAD'
+      update()
+    })
+
+    $('#show-steps').addEventListener('change', event => {
+      $('#steps').hidden = !event.target.checked
+    })
+
+    $('#history').addEventListener('click', event => {
+      const button = event.target.closest('button')
+      if (!button) return
+      input.value = history[button.dataset.index].expression
+      input.focus()
+      update()
+    })
+
+    // En móvil usamos solo la botonera en pantalla, sin abrir el teclado virtual
+    if (matchMedia('(pointer: coarse)').matches) input.inputMode = 'none'
+
+    history ??= createExampleHistory()
+    input.value = INITIAL_EXPRESSION
+    lastAnswer = calculate(INITIAL_EXPRESSION).value
+    renderAnswer()
+    renderHistory()
+    update()
+    input.focus()
+  </script>
+</body>
+
+</html>

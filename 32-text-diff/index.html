@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32 - Comparador de textos</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8d96a0;
+      --add-bg: #2ea04326;
+      --add-strong: #2ea04366;
+      --add: #3fb950;
+      --del-bg: #f8514926;
+      --del-strong: #f8514966;
+      --del: #f85149;
+      --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 18px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .segmented {
+      display: flex;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+
+    .segmented button {
+      font: inherit;
+      font-size: 13px;
+      padding: 5px 12px;
+      border: 0;
+      border-radius: 7px;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: #30363d;
+      color: var(--text);
+    }
+
+    label.check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .stats {
+      margin-left: auto;
+      display: flex;
+      gap: 12px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .stats .add {
+      color: var(--add);
+    }
+
+    .stats .del {
+      color: var(--del);
+    }
+
+    .stats .eq {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    main {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(140px, 36%) 1fr;
+      gap: 14px;
+      padding: 14px 20px 16px;
+    }
+
+    .inputs {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+    }
+
+    .field {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .field span {
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field span::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: var(--dot);
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      padding: 10px 12px;
+      border: 0;
+      resize: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: 13px/1.55 var(--mono);
+      font-variant-ligatures: none;
+      tab-size: 2;
+    }
+
+    .swap {
+      align-self: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .swap:hover {
+      border-color: var(--muted);
+    }
+
+    /* ---------- Resultado ---------- */
+
+    .result {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: #1c222b;
+    }
+
+    .output {
+      flex: 1;
+      overflow: auto;
+      font: 13px/1.6 var(--mono);
+      font-variant-ligatures: none;
+    }
+
+    .diff {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .diff td {
+      padding: 0 10px;
+      vertical-align: top;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .diff .num {
+      width: 1%;
+      min-width: 44px;
+      text-align: right;
+      color: #6e7681;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .diff .sign {
+      width: 1%;
+      padding: 0 4px;
+      user-select: none;
+    }
+
+    .diff tr.insert {
+      background: var(--add-bg);
+    }
+
+    .diff tr.insert .num,
+    .diff tr.insert .sign {
+      background: var(--add-strong);
+      color: var(--text);
+    }
+
+    .diff tr.delete {
+      background: var(--del-bg);
+    }
+
+    .diff tr.delete .num,
+    .diff tr.delete .sign {
+      background: var(--del-strong);
+      color: var(--text);
+    }
+
+    .diff tr.hunk td {
+      padding: 4px 10px;
+      background: #1f6feb1f;
+      color: #7aa5e8;
+    }
+
+    .inline {
+      margin: 0;
+      padding: 12px 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    ins {
+      text-decoration: none;
+      background: var(--add-strong);
+      border-radius: 3px;
+    }
+
+    del {
+      text-decoration: line-through;
+      text-decoration-color: #f8514999;
+      background: var(--del-strong);
+      border-radius: 3px;
+    }
+
+    .empty {
+      padding: 30px;
+      text-align: center;
+      color: var(--muted);
+      font-family: system-ui, sans-serif;
+    }
+
+    @media (max-width: 760px) {
+      header {
+        padding: 12px 16px;
+      }
+
+      .stats {
+        margin-left: 0;
+      }
+
+      main {
+        grid-template-rows: auto 1fr;
+        padding: 12px 16px;
+      }
+
+      .inputs {
+        grid-template-columns: 1fr;
+        grid-template-rows: 150px auto 150px;
+      }
+
+      .swap {
+        justify-self: center;
+        rotate: 90deg;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🔀 Comparador de textos</h1>
+    <div class="segmented" id="mode" role="group" aria-label="Modo de comparación">
+      <button data-mode="lines" aria-pressed="true">Por líneas</button>
+      <button data-mode="words" aria-pressed="false">Por palabras</button>
+    </div>
+    <label class="check"><input type="checkbox" id="only-changes"> Ocultar líneas sin cambios</label>
+    <div class="stats" aria-live="polite">
+      <span class="add" id="added">+0</span>
+      <span class="del" id="removed">-0</span>
+      <span class="eq" id="equal">=0</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="inputs">
+      <label class="field" style="--dot: var(--del)">
+        <span>Original</span>
+        <textarea id="original" spellcheck="false"></textarea>
+      </label>
+      <button class="swap" id="swap" title="Intercambiar textos" aria-label="Intercambiar textos">⇄</button>
+      <label class="field" style="--dot: var(--add)">
+        <span>Modificado</span>
+        <textarea id="modified" spellcheck="false"></textarea>
+      </label>
+    </section>
+
+    <section class="result">
+      <div class="result-header">
+        <strong>Diferencias</strong>
+        <span id="info"></span>
+      </div>
+      <div class="output" id="output"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const CONTEXT_LINES = 3
+    const MAX_CELLS = 12_000_000 // límite de la tabla DP (memoria)
+    const DEBOUNCE_MS = 120
+
+    const EXAMPLE_ORIGINAL = `function saludar(nombre) {
+  console.log('Hola ' + nombre)
+}
+
+const usuarios = ['Ana', 'Luis', 'Marta']
+
+for (let i = 0; i < usuarios.length; i++) {
+  saludar(usuarios[i])
+}
+
+// TODO: añadir una despedida
+console.log('Fin del programa')`
+
+    const EXAMPLE_MODIFIED = `function saludar(nombre, idioma = 'es') {
+  const saludo = idioma === 'es' ? 'Hola' : 'Hello'
+  console.log(\`\${saludo}, \${nombre}!\`)
+}
+
+const usuarios = ['Ana', 'Luis', 'Marta', 'Pablo']
+
+usuarios.forEach(usuario => saludar(usuario))
+
+function despedir(nombre) {
+  console.log('Adiós ' + nombre)
+}
+
+console.log('Fin del programa')`
+
+    const $original = $('#original')
+    const $modified = $('#modified')
+    const $output = $('#output')
+    const $onlyChanges = $('#only-changes')
+
+    let mode = 'lines'
+
+    /* ---------- Algoritmo: LCS con programación dinámica ---------- */
+
+    // Un diff es buscar la SUBSECUENCIA COMÚN MÁS LARGA (LCS) entre los dos
+    // textos: lo que está en la LCS no ha cambiado, lo que solo está en el
+    // original se ha borrado (-) y lo que solo está en el nuevo se ha añadido (+).
+    //
+    // Programación dinámica: resolvemos el problema grande a partir de
+    // subproblemas más pequeños y guardamos sus resultados en una tabla.
+    // dp[i][j] = longitud de la LCS entre a[i..] y b[j..] (desde i y j al final)
+    //
+    //  - Si a[i] === b[j], ese elemento está en la LCS:
+    //      dp[i][j] = 1 + dp[i + 1][j + 1]
+    //  - Si no, nos quedamos con la mejor opción de saltarnos uno de los dos:
+    //      dp[i][j] = max(dp[i + 1][j], dp[i][j + 1])
+    //
+    // Ejemplo con a = "ABCB" y b = "BDCB" (la LCS es "BCB", longitud 3):
+    //
+    //          B  D  C  B  ·
+    //      A [ 3  2  2  1  0 ]
+    //      B [ 3  2  2  1  0 ]
+    //      C [ 2  2  2  1  0 ]
+    //      B [ 1  1  1  1  0 ]
+    //      · [ 0  0  0  0  0 ]
+    //
+    // Rellenamos la tabla de abajo a arriba y de derecha a izquierda.
+    // Coste: O(n · m) en tiempo y memoria.
+    function diff(a, b) {
+      // Optimización: el principio y el final comunes no hace falta
+      // meterlos en la tabla (en textos reales suele ser casi todo)
+      let start = 0
+      while (start < a.length && start < b.length && a[start] === b[start]) start++
+
+      let endA = a.length
+      let endB = b.length
+      while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+        endA--
+        endB--
+      }
+
+      const midA = a.slice(start, endA)
+      const midB = b.slice(start, endB)
+      const n = midA.length
+      const m = midB.length
+      const cells = (n + 1) * (m + 1)
+      if (cells > MAX_CELLS) throw new Error('Los textos son demasiado grandes para comparar')
+
+      // Tabla en un array plano (más rápido y compacto que un array de arrays):
+      // la celda [i][j] está en la posición i * width + j
+      const width = m + 1
+      const dp = new Uint32Array(cells)
+
+      for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+          dp[i * width + j] = midA[i] === midB[j]
+            ? dp[(i + 1) * width + j + 1] + 1
+            : Math.max(dp[(i + 1) * width + j], dp[i * width + j + 1])
+        }
+      }
+
+      // Backtracking: recorremos la tabla desde [0][0] siguiendo el camino
+      // que nos dio el máximo para reconstruir las operaciones
+      const ops = a.slice(0, start).map(value => ({ type: 'equal', value }))
+      let i = 0
+      let j = 0
+
+      while (i < n && j < m) {
+        if (midA[i] === midB[j]) {
+          ops.push({ type: 'equal', value: midA[i] })
+          i++
+          j++
+        } else if (dp[(i + 1) * width + j] >= dp[i * width + j + 1]) {
+          // Saltarse a[i] no empeora la LCS → a[i] se ha borrado
+          ops.push({ type: 'delete', value: midA[i] })
+          i++
+        } else {
+          // Si no, b[j] es nuevo → se ha insertado
+          ops.push({ type: 'insert', value: midB[j] })
+          j++
+        }
+      }
+      while (i < n) ops.push({ type: 'delete', value: midA[i++] })
+      while (j < m) ops.push({ type: 'insert', value: midB[j++] })
+
+      for (const value of a.slice(endA)) ops.push({ type: 'equal', value })
+
+      return { ops, tableSize: `${n + 1} × ${m + 1}` }
+    }
+
+    /* ---------- Tokenizar ---------- */
+
+    // Un texto vacío no tiene ninguna línea (y no una línea vacía)
+    const splitLines = (text) => text === '' ? [] : text.split(/\r?\n/)
+
+    // Separamos palabras y espacios, conservando los espacios como
+    // tokens para poder reconstruir el texto tal cual
+    const splitWords = (text) => text.split(/(\s+)/).filter(token => token !== '')
+
+    /* ---------- Render ---------- */
+
+    const escapeHtml = (text) => text
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+
+    // Añade a cada operación su número de línea en el original y en el nuevo
+    function numberLines(ops) {
+      let oldLine = 0
+      let newLine = 0
+      return ops.map(op => ({
+        ...op,
+        oldNo: op.type !== 'insert' ? ++oldLine : '',
+        newNo: op.type !== 'delete' ? ++newLine : ''
+      }))
+    }
+
+    // Como hace git: solo mostramos CONTEXT_LINES líneas sin cambios
+    // alrededor de cada cambio y resumimos el resto
+    function collapse(rows) {
+      const changed = rows.map(row => row.type !== 'equal')
+      const keep = rows.map((row, index) => {
+        if (changed[index]) return true
+        const from = Math.max(0, index - CONTEXT_LINES)
+        const to = Math.min(rows.length - 1, index + CONTEXT_LINES)
+        for (let k = from; k <= to; k++) if (changed[k]) return true
+        return false
+      })
+
+      const result = []
+      let hidden = 0
+      rows.forEach((row, index) => {
+        if (keep[index]) {
+          if (hidden > 0) result.push({ type: 'hunk', count: hidden })
+          hidden = 0
+          result.push(row)
+        } else {
+          hidden++
+        }
+      })
+      if (hidden > 0) result.push({ type: 'hunk', count: hidden })
+      return result
+    }
+
+    const SIGNS = { equal: ' ', insert: '+', delete: '-' }
+
+    function renderLines(ops) {
+      let rows = numberLines(ops)
+      if ($onlyChanges.checked) rows = collapse(rows)
+
+      const html = rows.map(row => {
+        if (row.type === 'hunk') {
+          const label = row.count === 1 ? 'línea sin cambios' : 'líneas sin cambios'
+          return `<tr class="hunk"><td colspan="4">⋯ ${row.count} ${label}</td></tr>`
+        }
+        return `<tr class="${row.type}">
+          <td class="num">${row.oldNo}</td><td class="num">${row.newNo}</td>
+          <td class="sign">${SIGNS[row.type]}</td><td>${escapeHtml(row.value) || ' '}</td>
+        </tr>`
+      }).join('')
+
+      $output.innerHTML = `<table class="diff">${html}</table>`
+    }
+
+    function renderWords(ops) {
+      // Juntamos operaciones seguidas del mismo tipo en un solo bloque
+      const groups = []
+      for (const op of ops) {
+        const last = groups.at(-1)
+        if (last?.type === op.type) last.value += op.value
+        else groups.push({ ...op })
+      }
+
+      const TAGS = { insert: 'ins', delete: 'del' }
+      const html = groups.map(({ type, value }) => {
+        const text = escapeHtml(value)
+        return TAGS[type] ? `<${TAGS[type]}>${text}</${TAGS[type]}>` : text
+      }).join('')
+
+      $output.innerHTML = `<pre class="inline">${html}</pre>`
+    }
+
+    function updateStats(ops) {
+      // En modo palabras no contamos los espacios como "palabras"
+      const counted = mode === 'words' ? ops.filter(op => op.value.trim() !== '') : ops
+      const count = (type) => counted.filter(op => op.type === type).length
+      $('#added').textContent = `+${count('insert')}`
+      $('#removed').textContent = `-${count('delete')}`
+      $('#equal').textContent = `=${count('equal')}`
+    }
+
+    function compare() {
+      const a = $original.value
+      const b = $modified.value
+      const split = mode === 'lines' ? splitLines : splitWords
+      const unit = mode === 'lines' ? 'líneas' : 'palabras'
+
+      try {
+        const startTime = performance.now()
+        const { ops, tableSize } = diff(split(a), split(b))
+        const elapsed = (performance.now() - startTime).toFixed(1)
+
+        if (a === b) {
+          $output.innerHTML = '<p class="empty">Los dos textos son idénticos ✨</p>'
+        } else if (mode === 'lines') {
+          renderLines(ops)
+        } else {
+          renderWords(ops)
+        }
+
+        updateStats(ops)
+        $('#info').textContent = `Tabla DP: ${tableSize} · ${elapsed} ms · comparando ${unit}`
+      } catch (error) {
+        $output.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`
+      }
+    }
+
+    /* ---------- Eventos ---------- */
+
+    let debounceId
+    function scheduleCompare() {
+      clearTimeout(debounceId)
+      debounceId = setTimeout(compare, DEBOUNCE_MS)
+    }
+
+    $original.addEventListener('input', scheduleCompare)
+    $modified.addEventListener('input', scheduleCompare)
+    $onlyChanges.addEventListener('change', compare)
+
+    $('#mode').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-mode]')
+      if (!button) return
+      mode = button.dataset.mode
+      document.querySelectorAll('[data-mode]').forEach(item => {
+        item.setAttribute('aria-pressed', item === button)
+      })
+      $onlyChanges.disabled = mode === 'words'
+      compare()
+    })
+
+    $('#swap').addEventListener('click', () => {
+      ;[$original.value, $modified.value] = [$modified.value, $original.value]
+      compare()
+    })
+
+    $original.value = EXAMPLE_ORIGINAL
+    $modified.value = EXAMPLE_MODIFIED
+    compare()
+  </script>
+</body>
+
+</html>

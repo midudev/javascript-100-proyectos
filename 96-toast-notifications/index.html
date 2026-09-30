@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>96 - Notificaciones toast</title>
+  <style>
+    :root {
+      --bg: #f6f6f3;
+      --card: #ffffff;
+      --text: #18181b;
+      --muted: #71717a;
+      --line: #e7e5e4;
+      --accent: #18181b;
+      --success: #16a34a;
+      --error: #dc2626;
+      --info: #2563eb;
+      --loading: #71717a;
+      --code-bg: #18181b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 100% 0%, #fde7d6 0, transparent 30%),
+        radial-gradient(circle at 0% 100%, #dcebfb 0, transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 28px 28px;
+    }
+
+    .intro {
+      grid-column: 1 / -1;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -0.04em;
+    }
+
+    .intro p {
+      max-width: 640px;
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .demo-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .demo-buttons button,
+    .positions button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fafaf9;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.15s, background 0.15s;
+    }
+
+    .demo-buttons button:hover,
+    .positions button:hover {
+      border-color: #a8a29e;
+      background: #fff;
+    }
+
+    .demo-buttons button:active {
+      transform: scale(0.97);
+    }
+
+    .positions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 8px;
+      border-radius: 14px;
+      background: #f5f5f4;
+    }
+
+    .positions button {
+      justify-content: center;
+      padding: 8px 4px;
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+
+    .positions [aria-pressed='true'] {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .options {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .options label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .options output {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .options input {
+      grid-column: 1 / -1;
+      accent-color: var(--accent);
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .stats b {
+      color: var(--text);
+    }
+
+    .code-card {
+      grid-column: 1 / -1;
+      padding: 0;
+      overflow: hidden;
+      background: var(--code-bg);
+      border-color: var(--code-bg);
+    }
+
+    .code-card h2 {
+      margin: 0;
+      padding: 14px 20px 0;
+      color: #a1a1aa;
+    }
+
+    pre {
+      margin: 0;
+      padding: 12px 20px 18px;
+      overflow-x: auto;
+      color: #e4e4e7;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .code-string {
+      color: #86efac;
+    }
+
+    .code-fn {
+      color: #93c5fd;
+    }
+
+    /* ============ Estilos de la librería ============ */
+    .toaster {
+      position: fixed;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      width: min(370px, calc(100vw - 32px));
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      pointer-events: none;
+    }
+
+    .toaster[data-position^='top'] {
+      top: 12px;
+    }
+
+    .toaster[data-position^='bottom'] {
+      bottom: 12px;
+      /* abajo, el toast más nuevo queda pegado al borde inferior */
+      flex-direction: column-reverse;
+    }
+
+    .toaster[data-position$='right'] {
+      right: 16px;
+    }
+
+    .toaster[data-position$='left'] {
+      left: 16px;
+    }
+
+    .toaster[data-position$='center'] {
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .toast-wrapper {
+      padding-block: 5px;
+      pointer-events: auto;
+    }
+
+    .toast {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 10px 30px -12px rgb(0 0 0 / 25%);
+      overflow: hidden;
+      touch-action: pan-y;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .toast:active {
+      cursor: grabbing;
+    }
+
+    .toast-icon {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--color);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    .toast[data-type='default'] .toast-icon {
+      display: none;
+    }
+
+    .toast[data-type='success'] {
+      --color: var(--success);
+    }
+
+    .toast[data-type='error'] {
+      --color: var(--error);
+    }
+
+    .toast[data-type='info'] {
+      --color: var(--info);
+    }
+
+    .toast[data-type='loading'] {
+      --color: var(--loading);
+    }
+
+    .toast[data-type='loading'] .toast-icon {
+      border: 2.5px solid #e4e4e7;
+      border-top-color: var(--text);
+      background: transparent;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .toast-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .toast-title {
+      margin: 1px 0 0;
+      font-size: 0.92rem;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .toast-description {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 0.83rem;
+      line-height: 1.4;
+    }
+
+    .toast-action {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--text);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .toast-close {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      margin: -2px -4px 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .toast-close:hover {
+      background: #f4f4f5;
+      color: var(--text);
+    }
+
+    .toast-progress {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--color, var(--text));
+      opacity: 0.6;
+      transform-origin: left;
+    }
+
+    .queue-badge {
+      align-self: center;
+      margin-block: 5px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: var(--text);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      pointer-events: auto;
+    }
+
+    .queue-badge[hidden] {
+      display: none;
+    }
+
+    @media (width < 760px) {
+      .page {
+        grid-template-columns: 1fr;
+        padding: 20px 14px 120px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toast[data-type='loading'] .toast-icon {
+        animation-duration: 2s;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header class="intro">
+      <h1>🍞 Notificaciones toast</h1>
+      <p>Una mini librería <code>toast()</code> con animaciones de la Web Animations API, cola de espera, pausa al pasar el ratón, cierre deslizando y región <code>aria-live</code> para lectores de pantalla.</p>
+    </header>
+
+    <section class="card">
+      <h2>Prueba las variantes</h2>
+      <div class="demo-buttons" id="demo-buttons"></div>
+      <p class="stats">
+        <span>En pantalla: <b id="visible-count">0</b></span>
+        <span>En cola: <b id="queue-count">0</b></span>
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Posición</h2>
+      <div class="positions" id="positions"></div>
+      <div class="options">
+        <label>Duración <output id="duration-value">4 s</output>
+          <input type="range" id="duration" min="1" max="10" value="4">
+        </label>
+        <label>Máximo visibles <output id="max-value">3</output>
+          <input type="range" id="max-visible" min="1" max="5" value="3">
+        </label>
+      </div>
+    </section>
+
+    <section class="card code-card">
+      <h2>Código</h2>
+      <pre><code id="code"></code></pre>
+    </section>
+  </main>
+
+  <!--
+    La región aria-live DEBE existir en el HTML desde el principio: los lectores de pantalla
+    solo anuncian los cambios que ocurren DENTRO de una región que ya estaban observando.
+  -->
+  <ol class="toaster" id="toaster" aria-live="polite" aria-label="Notificaciones" data-position="bottom-right">
+    <li class="queue-badge" id="queue-badge" hidden></li>
+  </ol>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    // =====================================================================
+    //  Mini librería toast()
+    // =====================================================================
+
+    const DEFAULT_DURATION = 4000
+    const SWIPE_THRESHOLD = 80
+    const ICONS = { success: '✓', error: '!', info: 'i', loading: '', default: '' }
+    const ENTER_EASING = 'cubic-bezier(0.21, 1.02, 0.73, 1)'
+
+    const toaster = $('#toaster')
+    const queueBadge = $('#queue-badge')
+    const config = { position: 'bottom-right', maxVisible: 3, duration: DEFAULT_DURATION }
+    const visible = [] // toasts en pantalla
+    const queue = [] // toasts esperando a que haya hueco
+    const listeners = new Set()
+    let nextId = 1
+
+    function toast(message, options = {}) {
+      const item = {
+        type: 'default',
+        description: '',
+        action: null,
+        duration: config.duration,
+        ...options,
+        id: nextId++,
+        message,
+        timeoutId: null,
+        startedAt: 0,
+        element: null,
+        progress: null,
+        isHovered: false,
+        isLeaving: false
+      }
+      item.remaining = item.duration
+
+      // Si ya hay demasiados en pantalla, esperamos en la cola
+      if (visible.length < config.maxVisible) show(item)
+      else queue.push(item)
+
+      notify()
+      return item.id
+    }
+
+    toast.success = (message, options) => toast(message, { ...options, type: 'success' })
+    toast.error = (message, options) => toast(message, { ...options, type: 'error' })
+    toast.info = (message, options) => toast(message, { ...options, type: 'info' })
+    toast.loading = (message, options) => toast(message, { ...options, type: 'loading', duration: Infinity })
+
+    toast.promise = (promise, messages) => {
+      const id = toast.loading(messages.loading)
+      const resolveText = (text, value) => typeof text === 'function' ? text(value) : text
+
+      promise.then(
+        value => toast.update(id, { type: 'success', message: resolveText(messages.success, value), duration: config.duration }),
+        error => toast.update(id, { type: 'error', message: resolveText(messages.error, error), duration: config.duration })
+      )
+      return promise
+    }
+
+    toast.update = (id, patch) => {
+      const item = findToast(id)
+      if (!item) return
+
+      Object.assign(item, patch)
+      if ('duration' in patch) item.remaining = item.duration
+      // Si todavía está en la cola, se mostrará directamente con los datos nuevos
+      if (!item.element) return
+
+      renderContent(item)
+      item.element.querySelector('.toast-icon').animate(
+        [{ transform: 'scale(0.4)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }],
+        { duration: 300, easing: 'ease-out' }
+      )
+      restartTimer(item)
+    }
+
+    toast.dismiss = (id, direction) => {
+      const queued = queue.findIndex(item => item.id === id)
+      if (queued !== -1) {
+        queue.splice(queued, 1)
+        notify()
+        return
+      }
+
+      const item = visible.find(item => item.id === id)
+      if (item && !item.isLeaving) removeToast(item, direction)
+    }
+
+    toast.setPosition = position => {
+      config.position = position
+      toaster.dataset.position = position
+    }
+
+    toast.setMaxVisible = max => {
+      config.maxVisible = max
+      showNext()
+    }
+
+    toast.subscribe = listener => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    }
+
+    function notify() {
+      queueBadge.hidden = queue.length === 0
+      queueBadge.textContent = `+${queue.length} en cola`
+      listeners.forEach(listener => listener({ visible: visible.length, queued: queue.length }))
+    }
+
+    function findToast(id) {
+      return visible.find(item => item.id === id) ?? queue.find(item => item.id === id)
+    }
+
+    function renderContent(item) {
+      const card = item.element.querySelector('.toast')
+      card.dataset.type = item.type
+      // Los errores se anuncian de inmediato (role="alert"); el resto, cuando el lector acabe (status)
+      card.setAttribute('role', item.type === 'error' ? 'alert' : 'status')
+      card.querySelector('.toast-icon').textContent = ICONS[item.type]
+      card.querySelector('.toast-title').textContent = item.message
+
+      const description = card.querySelector('.toast-description')
+      description.textContent = item.description
+      description.hidden = !item.description
+
+      const action = card.querySelector('.toast-action')
+      action.hidden = !item.action
+      action.textContent = item.action?.label ?? ''
+    }
+
+    function createElement(item) {
+      const wrapper = document.createElement('li')
+      wrapper.className = 'toast-wrapper'
+      wrapper.innerHTML = `
+        <div class="toast">
+          <span class="toast-icon" aria-hidden="true"></span>
+          <div class="toast-body">
+            <p class="toast-title"></p>
+            <p class="toast-description"></p>
+          </div>
+          <button class="toast-action"></button>
+          <button class="toast-close" aria-label="Cerrar notificación">×</button>
+          <span class="toast-progress"></span>
+        </div>
+      `
+      wrapper.querySelector('.toast-close').addEventListener('click', () => toast.dismiss(item.id))
+      wrapper.querySelector('.toast-action').addEventListener('click', () => {
+        item.action?.onClick?.()
+        toast.dismiss(item.id)
+      })
+      addHoverPause(item, wrapper)
+      addSwipe(item, wrapper.querySelector('.toast'))
+      return wrapper
+    }
+
+    function show(item) {
+      item.element = createElement(item)
+      renderContent(item)
+      visible.push(item)
+      // Siempre al principio: con column (arriba) o column-reverse (abajo) queda pegado al borde
+      toaster.prepend(item.element)
+
+      // Web Animations API: animamos desde JS sin clases ni keyframes en el CSS.
+      // 1. el hueco crece desde 0 para que el resto de toasts se aparte con suavidad
+      const height = item.element.offsetHeight
+      item.element.animate(
+        [{ height: '0px', paddingBlock: '0px' }, { height: `${height}px` }],
+        { duration: 250, easing: ENTER_EASING }
+      )
+      // 2. la tarjeta entra desde el borde de la pantalla
+      const fromY = config.position.startsWith('top') ? -30 : 30
+      item.element.firstElementChild.animate(
+        [{ opacity: 0, transform: `translateY(${fromY}px) scale(0.95)` }, { opacity: 1, transform: 'none' }],
+        { duration: 350, easing: ENTER_EASING }
+      )
+
+      restartTimer(item)
+    }
+
+    function showNext() {
+      while (visible.length < config.maxVisible && queue.length > 0) show(queue.shift())
+      notify()
+    }
+
+    async function removeToast(item, direction = getExitDirection()) {
+      item.isLeaving = true
+      pauseTimer(item)
+
+      const wrapper = item.element
+      const card = wrapper.firstElementChild
+      const currentTransform = card.style.transform || 'none'
+      const currentOpacity = card.style.opacity || 1
+      const exitTransform = direction === 0
+        ? `translateY(${config.position.startsWith('top') ? -20 : 20}px) scale(0.95)`
+        : `translateX(${direction * 110}%)`
+
+      // element.animate() devuelve un objeto Animation con la promesa .finished.
+      // Esperamos a que termine ANTES de tocar el DOM: si hiciéramos wrapper.remove()
+      // directamente, el nodo desaparecería de golpe y no veríamos la animación de salida
+      await card.animate(
+        [{ transform: currentTransform, opacity: currentOpacity }, { transform: exitTransform, opacity: 0 }],
+        { duration: 200, easing: 'ease-in', fill: 'forwards' }
+      ).finished
+
+      // Después colapsamos el hueco para que los demás se recoloquen sin saltos
+      wrapper.style.overflow = 'hidden'
+      await wrapper.animate(
+        [{ height: `${wrapper.offsetHeight}px` }, { height: '0px', paddingBlock: '0px' }],
+        { duration: 180, easing: 'ease-out', fill: 'forwards' }
+      ).finished
+
+      wrapper.remove()
+      visible.splice(visible.indexOf(item), 1)
+      showNext()
+    }
+
+    function getExitDirection() {
+      if (config.position.endsWith('right')) return 1
+      if (config.position.endsWith('left')) return -1
+      return 0
+    }
+
+    // ---------- Temporizador pausable ----------
+
+    function startTimer(item) {
+      if (!Number.isFinite(item.duration) || item.timeoutId || item.isLeaving) return
+      item.startedAt = performance.now()
+      item.timeoutId = setTimeout(() => toast.dismiss(item.id), item.remaining)
+      item.progress?.play()
+    }
+
+    function pauseTimer(item) {
+      if (!item.timeoutId) return
+      clearTimeout(item.timeoutId)
+      item.timeoutId = null
+      // setTimeout no se puede pausar: lo cancelamos y apuntamos cuánto tiempo le quedaba
+      item.remaining -= performance.now() - item.startedAt
+      item.progress?.pause()
+    }
+
+    function restartTimer(item) {
+      pauseTimer(item)
+      item.remaining = item.duration
+      item.progress?.cancel()
+
+      const bar = item.element.querySelector('.toast-progress')
+      bar.hidden = !Number.isFinite(item.duration)
+      item.progress = Number.isFinite(item.duration)
+        // La barra de progreso es otra animación que pausamos y reanudamos junto al temporizador
+        ? bar.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: item.duration, fill: 'forwards' })
+        : null
+
+      if (item.isHovered || document.hidden) item.progress?.pause()
+      else startTimer(item)
+    }
+
+    function addHoverPause(item, wrapper) {
+      const pause = () => {
+        item.isHovered = true
+        pauseTimer(item)
+      }
+      const resume = () => {
+        item.isHovered = false
+        if (!document.hidden) startTimer(item)
+      }
+      wrapper.addEventListener('pointerenter', pause)
+      wrapper.addEventListener('pointerleave', resume)
+      // También pausamos mientras un botón del toast tiene el foco del teclado
+      wrapper.addEventListener('focusin', pause)
+      wrapper.addEventListener('focusout', resume)
+    }
+
+    function addSwipe(item, card) {
+      let startX = null
+
+      card.addEventListener('pointerdown', event => {
+        if (event.target.closest('button') || item.isLeaving) return
+        startX = event.clientX
+        card.setPointerCapture(event.pointerId)
+      })
+
+      card.addEventListener('pointermove', event => {
+        if (startX === null) return
+        const deltaX = event.clientX - startX
+        card.style.transform = `translateX(${deltaX}px)`
+        card.style.opacity = Math.max(0.2, 1 - Math.abs(deltaX) / 250)
+      })
+
+      const end = event => {
+        if (startX === null) return
+        const deltaX = event.clientX - startX
+        startX = null
+
+        if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+          toast.dismiss(item.id, Math.sign(deltaX))
+          return
+        }
+        // No ha llegado al umbral: vuelve a su sitio
+        card.animate(
+          [{ transform: card.style.transform, opacity: card.style.opacity }, { transform: 'none', opacity: 1 }],
+          { duration: 200, easing: ENTER_EASING }
+        )
+        card.style.transform = ''
+        card.style.opacity = ''
+      }
+      card.addEventListener('pointerup', end)
+      card.addEventListener('pointercancel', end)
+    }
+
+    // Si cambias de pestaña, los toasts se quedan esperando a que vuelvas
+    document.addEventListener('visibilitychange', () => {
+      visible.forEach(item => {
+        if (document.hidden) pauseTimer(item)
+        else if (!item.isHovered) startTimer(item)
+      })
+    })
+
+    // =====================================================================
+    //  Página de demostración
+    // =====================================================================
+
+    const POSITIONS = [
+      ['top-left', '↖ Arriba izq.'], ['top-center', '↑ Arriba'], ['top-right', '↗ Arriba der.'],
+      ['bottom-left', '↙ Abajo izq.'], ['bottom-center', '↓ Abajo'], ['bottom-right', '↘ Abajo der.']
+    ]
+
+    const wait = (ms, fail = false) => new Promise((resolve, reject) => {
+      setTimeout(() => fail ? reject(new Error('Tiempo agotado')) : resolve({ name: 'foto.png' }), ms)
+    })
+
+    const DEMOS = [
+      {
+        label: '✅ Éxito',
+        code: `toast.success('Cambios guardados', {\n  description: 'Tu perfil se ha actualizado'\n})`,
+        run: () => toast.success('Cambios guardados', { description: 'Tu perfil se ha actualizado' })
+      },
+      {
+        label: '⛔ Error',
+        code: `toast.error('No se pudo conectar', {\n  description: 'Revisa tu conexión a internet'\n})`,
+        run: () => toast.error('No se pudo conectar', { description: 'Revisa tu conexión a internet' })
+      },
+      {
+        label: 'ℹ️ Info',
+        code: `toast.info('Hay una nueva versión disponible')`,
+        run: () => toast.info('Hay una nueva versión disponible')
+      },
+      {
+        label: '⏳ Promesa',
+        code: `toast.promise(subirFoto(), {\n  loading: 'Subiendo foto…',\n  success: foto => \`\${foto.name} subida\`,\n  error: 'Error al subir la foto'\n})`,
+        run: () => toast.promise(wait(2200, Math.random() < 0.3), {
+          loading: 'Subiendo foto…',
+          success: photo => `${photo.name} subida`,
+          error: 'Error al subir la foto'
+        }).catch(() => {})
+      },
+      {
+        label: '↩️ Con acción',
+        code: `toast('Correo archivado', {\n  action: {\n    label: 'Deshacer',\n    onClick: () => toast.success('Correo restaurado')\n  }\n})`,
+        run: () => toast('Correo archivado', {
+          action: { label: 'Deshacer', onClick: () => toast.success('Correo restaurado') }
+        })
+      },
+      {
+        label: '📌 Persistente',
+        code: `toast.info('Este no se cierra solo', {\n  duration: Infinity\n})`,
+        run: () => toast.info('Este no se cierra solo', { description: 'Ciérralo con la × o deslizándolo', duration: Infinity })
+      },
+      {
+        label: '🌊 Ráfaga ×6',
+        // getter: así el comentario siempre muestra el máximo configurado en ese momento
+        get code() {
+          return `// Solo se ven ${config.maxVisible} a la vez: el resto espera en la cola\nfor (let i = 1; i <= 6; i++) {\n  toast(\`Notificación \${i}\`)\n}`
+        },
+        run: () => {
+          for (let i = 1; i <= 6; i++) toast(`Notificación ${i}`, { description: 'Esperaba su turno en la cola' })
+        }
+      }
+    ]
+
+    function highlight(code) {
+      return code
+        .replace(/[&<>]/g, char => `&#${char.charCodeAt(0)};`)
+        .replace(/('[^']*'|`[^`]*`)/g, '<span class="code-string">$1</span>')
+        .replace(/\b(toast(\.\w+)?)\(/g, '<span class="code-fn">$1</span>(')
+    }
+
+    function showCode(code) {
+      $('#code').innerHTML = highlight(code)
+    }
+
+    function renderDemos() {
+      $('#demo-buttons').innerHTML = DEMOS.map((demo, index) => `<button data-index="${index}">${demo.label}</button>`).join('')
+      $('#positions').innerHTML = POSITIONS.map(([value, label]) => `
+        <button data-position="${value}" aria-pressed="${value === config.position}">${label}</button>
+      `).join('')
+    }
+
+    $('#demo-buttons').addEventListener('click', event => {
+      const button = event.target.closest('button')
+      if (!button) return
+      const demo = DEMOS[button.dataset.index]
+      demo.run()
+      showCode(demo.code)
+    })
+
+    $('#positions').addEventListener('click', event => {
+      const button = event.target.closest('button')
+      if (!button) return
+      toast.setPosition(button.dataset.position)
+      renderDemos()
+      showCode(`toast.setPosition('${button.dataset.position}')`)
+    })
+
+    $('#duration').addEventListener('input', event => {
+      config.duration = Number(event.target.value) * 1000
+      $('#duration-value').textContent = `${event.target.value} s`
+    })
+
+    $('#max-visible').addEventListener('input', event => {
+      toast.setMaxVisible(Number(event.target.value))
+      $('#max-value').textContent = event.target.value
+    })
+
+    toast.subscribe(({ visible, queued }) => {
+      $('#visible-count').textContent = visible
+      $('#queue-count').textContent = queued
+    })
+
+    renderDemos()
+    showCode(DEMOS[3].code)
+
+    // Unos toasts de bienvenida para ver la librería en acción nada más entrar
+    toast.info('¡Bienvenido! 👋', { description: 'Pasa el ratón por encima para pausar el temporizador', duration: 20000 })
+    setTimeout(() => toast.success('Librería cargada', { description: 'Menos de 300 líneas y sin dependencias', duration: 15000 }), 250)
+    setTimeout(() => toast.promise(wait(3000), {
+      loading: 'Subiendo foto…',
+      success: photo => `${photo.name} subida`,
+      error: 'Error al subir la foto'
+    }), 500)
+  </script>
+</body>
+
+</html>

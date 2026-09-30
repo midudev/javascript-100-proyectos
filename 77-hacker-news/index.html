@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>77 - Lector de Hacker News</title>
+  <style>
+    :root {
+      --bg: #f6f5f1;
+      --surface: #ffffff;
+      --border: #e7e4dc;
+      --text: #1f1d1a;
+      --muted: #7a756b;
+      --accent: #ff6600;
+      --accent-soft: #fff1e8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* --- Cabecera --- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
+    .logo span {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: white;
+    }
+
+    nav {
+      display: flex;
+      gap: 4px;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    nav button {
+      border: 0;
+      background: none;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    nav button:hover {
+      color: var(--text);
+    }
+
+    nav button[aria-selected="true"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .cache-info {
+      margin-left: auto;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    #refresh {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font: inherit;
+      font-size: .82rem;
+    }
+
+    /* --- Contenido --- */
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .feed {
+      overflow-y: auto;
+      padding: 12px 20px 160px;
+    }
+
+    .stories {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .story {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 8px;
+      padding: 12px;
+      border-radius: 12px;
+      transition: background .15s;
+    }
+
+    .story:hover {
+      background: var(--surface);
+    }
+
+    .story.is-active {
+      background: var(--surface);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .rank {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      padding-top: 1px;
+    }
+
+    .story-title {
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .story-title:visited {
+      color: #6b6558;
+    }
+
+    .story-title:hover {
+      color: var(--accent);
+    }
+
+    .domain {
+      color: var(--muted);
+      font-size: .8rem;
+      margin-left: 4px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 10px;
+      margin-top: 4px;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    .comments-button {
+      border: 0;
+      background: none;
+      padding: 0;
+      font: inherit;
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .skeleton {
+      height: 58px;
+      margin: 6px 12px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #ebe8e0 0%, #f5f3ee 50%, #ebe8e0 100%) 0 0 / 200% 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+
+    @keyframes shimmer {
+      to {
+        background-position: -200% 0;
+      }
+    }
+
+    .notice {
+      margin: 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #fff7e0;
+      color: #8a5a00;
+      font-size: .85rem;
+    }
+
+    .notice.error {
+      background: #ffeceb;
+      color: #b42318;
+    }
+
+    .notice button {
+      margin-left: 8px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .load-more {
+      display: block;
+      margin: 16px auto;
+      padding: 10px 22px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .load-more:disabled {
+      opacity: .6;
+      cursor: progress;
+    }
+
+    /* --- Detalle y comentarios --- */
+    .detail {
+      overflow-y: auto;
+      padding: 24px 28px 48px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+    }
+
+    .detail-empty {
+      height: 100%;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .detail h2 {
+      margin: 0 0 6px;
+      font-size: 1.3rem;
+      line-height: 1.3;
+    }
+
+    .detail h2 a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .detail h2 a:hover {
+      color: var(--accent);
+    }
+
+    #close-detail {
+      display: none;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .story-text,
+    .comment-body {
+      font-size: .92rem;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .story-text {
+      padding: 12px 14px;
+      margin-top: 12px;
+      border-radius: 10px;
+      background: var(--bg);
+    }
+
+    .story-text p,
+    .comment-body p {
+      margin: .6em 0 0;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      background: var(--bg);
+      padding: 8px;
+      border-radius: 8px;
+      font-size: .82rem;
+    }
+
+    .detail a {
+      color: var(--accent);
+    }
+
+    .comments-title {
+      margin: 24px 0 8px;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+
+    .comment {
+      margin-top: 10px;
+    }
+
+    .comment>summary {
+      cursor: pointer;
+      font-size: .8rem;
+      color: var(--muted);
+      list-style: none;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .comment>summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .comment>summary::before {
+      content: '▾';
+      width: 12px;
+      transition: transform .15s;
+    }
+
+    .comment:not([open])>summary::before {
+      transform: rotate(-90deg);
+    }
+
+    .comment>summary strong {
+      color: var(--text);
+    }
+
+    .comment-body {
+      margin: 4px 0 0 18px;
+    }
+
+    .replies {
+      margin-left: 5px;
+      padding-left: 12px;
+      border-left: 2px solid var(--border);
+    }
+
+    .loading {
+      color: var(--muted);
+      font-size: .85rem;
+      margin: 12px 0;
+    }
+
+    @media (max-width: 900px) {
+      .content {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .topbar {
+        gap: 10px;
+        padding: 10px 12px;
+      }
+
+      .feed {
+        padding: 8px 8px 40px;
+      }
+
+      .detail {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        padding: 16px;
+        transform: translateX(100%);
+        transition: transform .25s ease;
+      }
+
+      .detail.is-open {
+        transform: none;
+      }
+
+      #close-detail {
+        display: inline-block;
+      }
+
+      .cache-info {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="logo"><span>Y</span> Hacker News</div>
+    <nav id="tabs" role="tablist" aria-label="Secciones"></nav>
+    <span class="cache-info" id="cache-info"></span>
+    <button id="refresh" title="Ignorar la caché y recargar">↻ Actualizar</button>
+  </header>
+
+  <div class="content">
+    <main class="feed" id="feed">
+      <ol class="stories" id="stories"></ol>
+      <div id="feed-notice"></div>
+      <button class="load-more" id="load-more" hidden>Cargar 20 más</button>
+    </main>
+
+    <aside class="detail" id="detail" aria-live="polite">
+      <div class="detail-empty">
+        <div style="font-size: 2.5rem">💬</div>
+        <p>Elige una historia para leer sus comentarios</p>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    const API = 'https://hacker-news.firebaseio.com/v0'
+    const PAGE_SIZE = 20
+    const COMMENTS_PAGE_SIZE = 25
+    const LIST_TTL_MS = 5 * 60 * 1000
+    const FEEDS = {
+      top: { label: 'Top', endpoint: 'topstories' },
+      new: { label: 'Nuevas', endpoint: 'newstories' },
+      best: { label: 'Mejores', endpoint: 'beststories' },
+      ask: { label: 'Ask HN', endpoint: 'askstories' },
+      show: { label: 'Show HN', endpoint: 'showstories' }
+    }
+
+    // CACHÉ
+    // Guardamos la PROMESA de cada ítem, no el resultado: si dos partes de la app
+    // piden el mismo ítem a la vez comparten la misma petición en vuelo.
+    const itemCache = new Map() // id → Promise<item>
+    const listCache = new Map() // feed → { ids, time }
+
+    // ESTADO
+    let currentFeed = 'top'
+    let storyIds = []
+    let page = 0
+    let feedToken = 0 // para descartar respuestas de peticiones antiguas
+    let detailToken = 0
+
+    const storiesList = $('#stories')
+    const loadMoreButton = $('#load-more')
+    const detail = $('#detail')
+
+    // --- Datos ---
+
+    async function fetchJSON(url) {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      return response.json()
+    }
+
+    function getItem(id) {
+      if (!itemCache.has(id)) {
+        const promise = fetchJSON(`${API}/item/${id}.json`).catch((error) => {
+          itemCache.delete(id) // los errores no se cachean: la próxima vez se reintenta
+          throw error
+        })
+        itemCache.set(id, promise)
+      }
+      return itemCache.get(id)
+    }
+
+    async function getStoryIds(feed, { force = false } = {}) {
+      const cached = listCache.get(feed)
+      // La lista de ids cambia a menudo: la cacheamos solo unos minutos (TTL)
+      if (!force && cached && Date.now() - cached.time < LIST_TTL_MS) return cached.ids
+      const ids = await fetchJSON(`${API}/${FEEDS[feed].endpoint}.json`)
+      listCache.set(feed, { ids, time: Date.now() })
+      return ids
+    }
+
+    // --- Formato ---
+
+    const relativeTime = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
+    const TIME_UNITS = [
+      ['year', 31536000], ['month', 2592000], ['week', 604800],
+      ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]
+    ]
+
+    // Buscamos la unidad más grande que "quepa" en la diferencia: 5400s → "hace 2 horas"
+    function timeAgo(unixSeconds) {
+      const diff = unixSeconds - Date.now() / 1000 // negativo = pasado
+      for (const [unit, seconds] of TIME_UNITS) {
+        if (Math.abs(diff) >= seconds || unit === 'second') {
+          return relativeTime.format(Math.round(diff / seconds), unit)
+        }
+      }
+    }
+
+    // new URL() analiza la dirección por nosotros; si no es válida lanza un error
+    function getDomain(url) {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '')
+      } catch {
+        return ''
+      }
+    }
+
+    const plural = (count, singular, pluralForm) => `${count} ${count === 1 ? singular : pluralForm}`
+
+    // El texto de HN llega como HTML. Nunca lo metemos tal cual con innerHTML:
+    // lo parseamos en un <template> (inerte: no ejecuta scripts ni carga imágenes)
+    // y solo dejamos pasar unas pocas etiquetas seguras.
+    const ALLOWED_TAGS = new Set(['P', 'A', 'I', 'B', 'EM', 'STRONG', 'PRE', 'CODE', 'BR'])
+
+    function sanitize(html = '') {
+      const template = document.createElement('template')
+      template.innerHTML = html
+
+      const clean = (node) => {
+        for (const child of [...node.childNodes]) {
+          if (child.nodeType !== Node.ELEMENT_NODE) continue
+          if (!ALLOWED_TAGS.has(child.tagName)) {
+            child.replaceWith(document.createTextNode(child.textContent))
+            continue
+          }
+          for (const { name } of [...child.attributes]) {
+            if (!(child.tagName === 'A' && name === 'href')) child.removeAttribute(name)
+          }
+          if (child.tagName === 'A') {
+            if (!/^https?:\/\//i.test(child.getAttribute('href') ?? '')) child.removeAttribute('href')
+            child.target = '_blank'
+            child.rel = 'noopener noreferrer'
+          }
+          clean(child)
+        }
+      }
+
+      clean(template.content)
+      return template.content
+    }
+
+    // --- Listado ---
+
+    function renderTabs() {
+      $('#tabs').innerHTML = Object.entries(FEEDS).map(([key, { label }]) => `
+        <button role="tab" data-feed="${key}" aria-selected="${key === currentFeed}">${label}</button>
+      `).join('')
+    }
+
+    function createStoryElement(story, rank) {
+      const item = document.createElement('li')
+      item.className = 'story'
+      item.dataset.id = story.id
+
+      const url = story.url ?? `https://news.ycombinator.com/item?id=${story.id}`
+      const domain = story.url ? getDomain(story.url) : ''
+      const comments = story.descendants ?? 0
+
+      item.innerHTML = `
+        <span class="rank">${rank}.</span>
+        <div>
+          <a class="story-title" target="_blank" rel="noopener noreferrer"></a>
+          ${domain ? '<span class="domain"></span>' : ''}
+          <div class="meta">
+            <span>▲ ${plural(story.score ?? 0, 'punto', 'puntos')}</span>
+            <span class="author"></span>
+            <time datetime="${new Date(story.time * 1000).toISOString()}">${timeAgo(story.time)}</time>
+            <button class="comments-button" data-id="${story.id}">💬 ${plural(comments, 'comentario', 'comentarios')}</button>
+          </div>
+        </div>
+      `
+      // Los textos que vienen de la API van con textContent (nada de HTML)
+      const link = item.querySelector('.story-title')
+      link.href = url
+      link.textContent = story.title
+      item.querySelector('.author').textContent = `por ${story.by ?? 'anónimo'}`
+      if (domain) item.querySelector('.domain').textContent = `(${domain})`
+      return item
+    }
+
+    function showSkeletons(count) {
+      for (let i = 0; i < count; i++) {
+        const skeleton = document.createElement('li')
+        skeleton.className = 'skeleton'
+        storiesList.append(skeleton)
+      }
+    }
+
+    function setNotice(html, type = '') {
+      $('#feed-notice').innerHTML = html ? `<p class="notice ${type}">${html}</p>` : ''
+    }
+
+    async function loadFeed(feed, { force = false } = {}) {
+      const token = ++feedToken
+      currentFeed = feed
+      page = 0
+      renderTabs()
+      storiesList.replaceChildren()
+      loadMoreButton.hidden = true
+      setNotice('')
+      showSkeletons(8)
+
+      try {
+        storyIds = await getStoryIds(feed, { force })
+      } catch {
+        if (token !== feedToken) return
+        storiesList.replaceChildren()
+        setNotice('No se pudo cargar el listado. <button id="retry">Reintentar</button>', 'error')
+        return
+      }
+
+      if (token !== feedToken) return
+      storiesList.replaceChildren()
+      await loadNextPage(token)
+    }
+
+    async function loadNextPage(token = feedToken) {
+      const start = page * PAGE_SIZE
+      const pageIds = storyIds.slice(start, start + PAGE_SIZE)
+      loadMoreButton.disabled = true
+      showSkeletons(Math.min(pageIds.length, 6))
+
+      // Promise.allSettled espera a TODAS las promesas, cumplan o fallen, y nos da
+      // un informe de cada una ({ status, value } o { status, reason }).
+      // Con Promise.all bastaría con que fallase UNA historia para perder la página entera.
+      const results = await Promise.allSettled(pageIds.map(getItem))
+
+      // Si mientras tanto el usuario ha cambiado de pestaña, esta respuesta ya no sirve
+      if (token !== feedToken) return
+
+      storiesList.querySelectorAll('.skeleton').forEach((skeleton) => skeleton.remove())
+
+      let failed = 0
+      results.forEach((result, index) => {
+        const story = result.status === 'fulfilled' ? result.value : null
+        // La API devuelve null o { deleted: true } para ítems borrados
+        if (!story || story.deleted || story.dead) {
+          failed++
+          return
+        }
+        storiesList.append(createStoryElement(story, start + index + 1))
+      })
+
+      setNotice(failed ? `${plural(failed, 'historia no se pudo cargar', 'historias no se pudieron cargar')} (el resto sí 😉)` : '')
+      page++
+      loadMoreButton.disabled = false
+      loadMoreButton.hidden = page * PAGE_SIZE >= storyIds.length
+      renderCacheInfo()
+      return results
+    }
+
+    function renderCacheInfo() {
+      const shown = Math.min(page * PAGE_SIZE, storyIds.length)
+      $('#cache-info').textContent = `${shown} de ${storyIds.length} historias · ${itemCache.size} ítems en caché`
+    }
+
+    // --- Detalle y comentarios ---
+
+    async function openStory(id) {
+      const token = ++detailToken
+      document.querySelectorAll('.story').forEach((story) => {
+        story.classList.toggle('is-active', story.dataset.id === String(id))
+      })
+      detail.classList.add('is-open')
+      detail.innerHTML = '<p class="loading">Cargando historia…</p>'
+      detail.scrollTop = 0
+
+      let story
+      try {
+        story = await getItem(id)
+      } catch {
+        if (token === detailToken) detail.innerHTML = '<p class="notice error">No se pudo cargar la historia</p>'
+        return
+      }
+      if (token !== detailToken) return
+
+      const domain = story.url ? getDomain(story.url) : ''
+      detail.innerHTML = `
+        <button id="close-detail">← Volver</button>
+        <h2><a target="_blank" rel="noopener noreferrer"></a></h2>
+        <div class="meta">
+          <span>▲ ${plural(story.score ?? 0, 'punto', 'puntos')}</span>
+          <span class="author"></span>
+          <span>${timeAgo(story.time)}</span>
+          ${domain ? '<span class="domain"></span>' : ''}
+        </div>
+        ${story.text ? '<div class="story-text"></div>' : ''}
+        <h3 class="comments-title">${plural(story.descendants ?? 0, 'comentario', 'comentarios')}</h3>
+        <div id="comments"></div>
+      `
+      const link = detail.querySelector('h2 a')
+      link.href = story.url ?? `https://news.ycombinator.com/item?id=${story.id}`
+      link.textContent = story.title
+      detail.querySelector('.author').textContent = `por ${story.by ?? 'anónimo'}`
+      if (domain) detail.querySelector('.domain').textContent = domain
+      if (story.text) detail.querySelector('.story-text').append(sanitize(story.text))
+
+      const kids = story.kids ?? []
+      const container = $('#comments')
+      if (kids.length === 0) {
+        container.innerHTML = '<p class="loading">Todavía no hay comentarios</p>'
+        return
+      }
+      loadTopComments(kids, container, 0, token)
+    }
+
+    // Los comentarios de primer nivel se cargan por tandas; sus respuestas, enteras
+    async function loadTopComments(kids, container, start, token) {
+      const loading = document.createElement('p')
+      loading.className = 'loading'
+      loading.textContent = 'Cargando comentarios…'
+      container.append(loading)
+
+      const slice = kids.slice(start, start + COMMENTS_PAGE_SIZE)
+      const list = document.createElement('div')
+      container.insertBefore(list, loading)
+      await renderComments(slice, list, token)
+      if (token !== detailToken) return
+      loading.remove()
+
+      const remaining = kids.length - (start + COMMENTS_PAGE_SIZE)
+      if (remaining > 0) {
+        const more = document.createElement('button')
+        more.className = 'load-more'
+        more.textContent = `Ver ${plural(Math.min(remaining, COMMENTS_PAGE_SIZE), 'comentario más', 'comentarios más')}`
+        more.addEventListener('click', () => {
+          more.remove()
+          loadTopComments(kids, container, start + COMMENTS_PAGE_SIZE, token)
+        })
+        container.append(more)
+      }
+    }
+
+    // Recursión: cada comentario puede tener hijos (kids), que son comentarios
+    // que a su vez pueden tener hijos... Pintamos un nivel y llamamos a la misma
+    // función para cada rama. El caso base: un comentario sin kids.
+    async function renderComments(ids, container, token) {
+      const results = await Promise.allSettled(ids.map(getItem))
+      if (token !== detailToken) return
+
+      const branches = []
+      for (const result of results) {
+        const comment = result.status === 'fulfilled' ? result.value : null
+        if (!comment || comment.deleted || comment.dead) continue
+
+        const details = document.createElement('details')
+        details.className = 'comment'
+        details.open = true
+        const replies = comment.kids?.length ?? 0
+        details.innerHTML = `
+          <summary><strong></strong> · ${timeAgo(comment.time)}${replies ? ` · ${plural(replies, 'respuesta', 'respuestas')}` : ''}</summary>
+          <div class="comment-body"></div>
+          <div class="replies"></div>
+        `
+        details.querySelector('strong').textContent = comment.by ?? 'anónimo'
+        details.querySelector('.comment-body').append(sanitize(comment.text))
+        container.append(details)
+
+        if (replies) branches.push(renderComments(comment.kids, details.querySelector('.replies'), token))
+      }
+
+      // Las ramas se cargan en paralelo; esperamos a todas antes de terminar
+      await Promise.allSettled(branches)
+      renderCacheInfo()
+    }
+
+    function closeDetail() {
+      detail.classList.remove('is-open')
+    }
+
+    // --- Eventos ---
+
+    $('#tabs').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-feed]')
+      if (button && button.dataset.feed !== currentFeed) loadFeed(button.dataset.feed)
+    })
+
+    storiesList.addEventListener('click', (event) => {
+      const button = event.target.closest('.comments-button')
+      if (button) openStory(Number(button.dataset.id))
+    })
+
+    detail.addEventListener('click', (event) => {
+      if (event.target.id === 'close-detail') closeDetail()
+    })
+
+    $('#feed-notice').addEventListener('click', (event) => {
+      if (event.target.id === 'retry') loadFeed(currentFeed, { force: true })
+    })
+
+    loadMoreButton.addEventListener('click', () => loadNextPage())
+    $('#refresh').addEventListener('click', () => loadFeed(currentFeed, { force: true }))
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeDetail()
+    })
+
+    // Al arrancar cargamos las historias top y, en pantallas anchas,
+    // abrimos la primera para que el panel de comentarios no esté vacío
+    await loadFeed('top')
+    const firstStory = storiesList.querySelector('.story')
+    if (firstStory && window.matchMedia('(min-width: 901px)').matches) openStory(Number(firstStory.dataset.id))
+  </script>
+</body>
+
+</html>

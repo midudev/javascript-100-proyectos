@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>20 - Batería virtual</title>
+  <style>
+    :root {
+      --bg: #08060f;
+      --surface: #14111f;
+      --border: #262036;
+      --text: #f5f3ff;
+      --muted: #9a92b5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(244, 63, 94, 0.14), transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(56, 189, 248, 0.12), transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+    }
+
+    main {
+      width: min(100%, 760px);
+      display: grid;
+      gap: 18px;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .controls button {
+      padding: 9px 16px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .controls button[aria-pressed='true'] {
+      border-color: #f43f5e;
+      background: #f43f5e;
+    }
+
+    .controls label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .controls input {
+      width: 90px;
+      accent-color: #f43f5e;
+    }
+
+    /* --- Pads --- */
+    .pads {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .pad {
+      --color: #f43f5e;
+      position: relative;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      justify-items: start;
+      gap: 4px;
+      height: clamp(96px, calc((100dvh - 250px) / 3), 150px);
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background:
+        linear-gradient(160deg, color-mix(in srgb, var(--color) 16%, transparent), transparent 60%),
+        var(--surface);
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    .pad::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 2px var(--color);
+      opacity: 0.25;
+    }
+
+    .pad kbd {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--color) 25%, transparent);
+      color: var(--color);
+      font-family: inherit;
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .pad .emoji {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      font-size: clamp(1.6rem, 6vw, 2.8rem);
+      line-height: 1;
+    }
+
+    .pad .name {
+      font-weight: 700;
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .status strong {
+      color: var(--text);
+    }
+  </style>
+
+  <script type="module">
+    const $pads = document.querySelector('.pads')
+    const $demo = document.querySelector('#demo')
+    const $volume = document.querySelector('#volume')
+    const $audioStatus = document.querySelector('#audio-status')
+    const $lastPlayed = document.querySelector('#last-played')
+
+    // ESTADO DEL AUDIO
+    let audioContext = null
+    let masterGain = null
+    let noiseBuffer = null
+
+    // POLÍTICA DE AUTOPLAY
+    // Los navegadores no permiten que una web reproduzca sonido sin que el
+    // usuario haya interactuado antes (clic, tecla, toque). Un AudioContext
+    // creado antes de esa interacción nace en estado "suspended" y no suena.
+    // Por eso lo creamos de forma perezosa en el primer keydown/pointerdown
+    function getAudioContext() {
+      if (audioContext) {
+        if (audioContext.state === 'suspended') audioContext.resume()
+        return audioContext
+      }
+
+      audioContext = new AudioContext()
+
+      // Cadena maestra: volumen → compresor → altavoces.
+      // El compresor evita la distorsión cuando suenan muchos golpes a la vez
+      const compressor = audioContext.createDynamicsCompressor()
+      masterGain = audioContext.createGain()
+      masterGain.gain.value = Number($volume.value)
+      masterGain.connect(compressor).connect(audioContext.destination)
+
+      noiseBuffer = createNoiseBuffer(2)
+      $audioStatus.textContent = '🔊 Audio activo'
+      return audioContext
+    }
+
+    // Ruido blanco: muestras aleatorias entre -1 y 1. Contiene todas las
+    // frecuencias a la vez, por eso filtrándolo obtenemos platos, cajas y palmas
+    function createNoiseBuffer(seconds) {
+      const length = audioContext.sampleRate * seconds
+      const buffer = audioContext.createBuffer(1, length, audioContext.sampleRate)
+      const data = buffer.getChannelData(0)
+      for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1
+      return buffer
+    }
+
+    function createNoise() {
+      const source = audioContext.createBufferSource()
+      source.buffer = noiseBuffer
+      return source
+    }
+
+    function createFilter(type, frequency, Q = 1) {
+      const filter = audioContext.createBiquadFilter()
+      filter.type = type
+      filter.frequency.value = frequency
+      filter.Q.value = Q
+      return filter
+    }
+
+    // Envolvente de volumen: ataque casi instantáneo y caída exponencial.
+    // exponentialRamp no puede llegar a 0, por eso usamos 0.0001
+    function createEnvelope(time, peak, decay) {
+      const gain = audioContext.createGain()
+      gain.gain.setValueAtTime(0.0001, time)
+      gain.gain.exponentialRampToValueAtTime(peak, time + 0.002)
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + decay)
+      return gain
+    }
+
+    // RECETAS DE SÍNTESIS
+    // Todas reciben `time`: el instante (en el reloj del AudioContext) en el que deben sonar
+
+    // BOMBO: una onda senoidal cuya frecuencia cae muy rápido (de 150 Hz a 45 Hz).
+    // Esa caída de tono es lo que nuestro oído percibe como el "golpe"
+    function playKick(time) {
+      const oscillator = audioContext.createOscillator()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(150, time)
+      oscillator.frequency.exponentialRampToValueAtTime(45, time + 0.12)
+
+      const envelope = createEnvelope(time, 1, 0.5)
+      oscillator.connect(envelope).connect(masterGain)
+      oscillator.start(time)
+      oscillator.stop(time + 0.5)
+    }
+
+    // CAJA: dos capas. El ruido filtrado imita la bordonera (los muelles
+    // metálicos bajo el parche) y un tono triangular corto el cuerpo del tambor
+    function playSnare(time) {
+      const noise = createNoise()
+      const noiseEnvelope = createEnvelope(time, 0.8, 0.2)
+      noise.connect(createFilter('highpass', 1200)).connect(noiseEnvelope).connect(masterGain)
+      noise.start(time)
+      noise.stop(time + 0.2)
+
+      const body = audioContext.createOscillator()
+      body.type = 'triangle'
+      body.frequency.setValueAtTime(220, time)
+      body.frequency.exponentialRampToValueAtTime(160, time + 0.1)
+      const bodyEnvelope = createEnvelope(time, 0.6, 0.12)
+      body.connect(bodyEnvelope).connect(masterGain)
+      body.start(time)
+      body.stop(time + 0.12)
+    }
+
+    // HI-HAT: el truco de la mítica TR-808. Seis ondas cuadradas con
+    // frecuencias NO armónicas entre sí suenan "metálicas". Después un
+    // filtro paso alto deja solo el brillo
+    const METALLIC_RATIOS = [2, 3, 4.16, 5.43, 6.79, 8.21]
+    let openHat = null
+
+    function playMetallic(time, decay, peak) {
+      const bandpass = createFilter('bandpass', 10_000)
+      const highpass = createFilter('highpass', 7000)
+      const envelope = createEnvelope(time, peak, decay)
+
+      bandpass.connect(highpass).connect(envelope).connect(masterGain)
+
+      for (const ratio of METALLIC_RATIOS) {
+        const oscillator = audioContext.createOscillator()
+        oscillator.type = 'square'
+        oscillator.frequency.value = 40 * ratio
+        oscillator.connect(bandpass)
+        oscillator.start(time)
+        oscillator.stop(time + decay)
+      }
+
+      return envelope
+    }
+
+    function playClosedHat(time) {
+      // Al cerrar el hi-hat, el abierto deja de sonar ("choke"), como en una batería real
+      chokeOpenHat(time)
+      playMetallic(time, 0.06, 0.5)
+    }
+
+    function playOpenHat(time) {
+      chokeOpenHat(time)
+      const decay = 0.45
+      openHat = { envelope: playMetallic(time, decay, 0.4), start: time, end: time + decay, peak: 0.4 }
+    }
+
+    function chokeOpenHat(time) {
+      if (!openHat || time >= openHat.end) return
+
+      // Calculamos el volumen que tendría en ese instante la caída exponencial
+      // y desde ahí lo apagamos muy rápido
+      const { envelope, start, end, peak } = openHat
+      const progress = Math.max(0, (time - start) / (end - start))
+      const current = peak * (0.0001 / peak) ** progress
+
+      envelope.gain.cancelScheduledValues(time)
+      envelope.gain.setValueAtTime(current, time)
+      envelope.gain.exponentialRampToValueAtTime(0.0001, time + 0.02)
+      openHat = null
+    }
+
+    // PALMAS: varias ráfagas de ruido muy seguidas (como varias personas
+    // aplaudiendo casi a la vez) y una cola más larga, todo por un paso banda
+    function playClap(time) {
+      const noise = createNoise()
+      const gain = audioContext.createGain()
+      const bursts = 3
+
+      gain.gain.setValueAtTime(0.0001, time)
+      for (let i = 0; i < bursts; i++) {
+        const start = time + i * 0.012
+        gain.gain.setValueAtTime(0.9, start)
+        gain.gain.exponentialRampToValueAtTime(0.08, start + 0.01)
+      }
+      const tail = time + bursts * 0.012
+      gain.gain.setValueAtTime(0.9, tail)
+      gain.gain.exponentialRampToValueAtTime(0.0001, tail + 0.22)
+
+      noise.connect(createFilter('bandpass', 1300, 1.2)).connect(gain).connect(masterGain)
+      noise.start(time)
+      noise.stop(tail + 0.25)
+    }
+
+    // TOMS: como el bombo pero más agudos y con una caída de tono más suave
+    function playTom(time, from, to) {
+      const oscillator = audioContext.createOscillator()
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(from, time)
+      oscillator.frequency.exponentialRampToValueAtTime(to, time + 0.3)
+
+      const envelope = createEnvelope(time, 0.9, 0.45)
+      oscillator.connect(envelope).connect(masterGain)
+      oscillator.start(time)
+      oscillator.stop(time + 0.45)
+    }
+
+    // CRASH: mucho ruido agudo con una caída larga, más una capa metálica
+    function playCrash(time) {
+      const noise = createNoise()
+      const envelope = createEnvelope(time, 0.55, 1.6)
+      noise.connect(createFilter('highpass', 5000)).connect(envelope).connect(masterGain)
+      noise.start(time)
+      noise.stop(time + 1.6)
+
+      playMetallic(time, 1.1, 0.25)
+    }
+
+    // CENCERRO (808): dos ondas cuadradas desafinadas (540 y 800 Hz)
+    // por un filtro paso banda. Más cencerro, por favor 🐮
+    function playCowbell(time) {
+      const bandpass = createFilter('bandpass', 800, 1.5)
+      const envelope = createEnvelope(time, 0.6, 0.35)
+      bandpass.connect(envelope).connect(masterGain)
+
+      for (const frequency of [540, 800]) {
+        const oscillator = audioContext.createOscillator()
+        oscillator.type = 'square'
+        oscillator.frequency.value = frequency
+        oscillator.connect(bandpass)
+        oscillator.start(time)
+        oscillator.stop(time + 0.35)
+      }
+    }
+
+    const PADS = [
+      { key: 'a', name: 'Bombo', emoji: '🥁', color: '#f43f5e', play: playKick },
+      { key: 's', name: 'Caja', emoji: '🪘', color: '#f97316', play: playSnare },
+      { key: 'd', name: 'Hi-hat cerrado', emoji: '🔔', color: '#eab308', play: playClosedHat },
+      { key: 'f', name: 'Hi-hat abierto', emoji: '🛎️', color: '#84cc16', play: playOpenHat },
+      { key: 'g', name: 'Palmas', emoji: '👏', color: '#22c55e', play: playClap },
+      { key: 'h', name: 'Tom agudo', emoji: '🔴', color: '#14b8a6', play: (time) => playTom(time, 260, 170) },
+      { key: 'j', name: 'Tom grave', emoji: '🟣', color: '#38bdf8', play: (time) => playTom(time, 140, 85) },
+      { key: 'k', name: 'Crash', emoji: '💥', color: '#818cf8', play: playCrash },
+      { key: 'l', name: 'Cencerro', emoji: '🐮', color: '#e879f9', play: playCowbell }
+    ]
+
+    const PADS_BY_KEY = new Map(PADS.map((pad) => [pad.key, pad]))
+
+    // INTERFAZ
+    function renderPads() {
+      $pads.replaceChildren(...PADS.map(({ key, name, emoji, color }) => {
+        const $pad = document.createElement('button')
+        $pad.className = 'pad'
+        $pad.dataset.key = key
+        $pad.style.setProperty('--color', color)
+        $pad.innerHTML = `<kbd>${key}</kbd><span class="name">${name}</span><span class="emoji">${emoji}</span>`
+        return $pad
+      }))
+    }
+
+    function flashPad(key) {
+      const $pad = $pads.querySelector(`[data-key="${key}"]`)
+      const { color, name, emoji } = PADS_BY_KEY.get(key)
+
+      // Web Animations API: se puede relanzar aunque la anterior no haya terminado
+      $pad.animate([
+        { transform: 'scale(0.94)', filter: 'brightness(1.8)', boxShadow: `0 0 0 2px ${color}, 0 0 40px ${color}` },
+        { transform: 'scale(1)', filter: 'brightness(1)', boxShadow: `0 0 0 0 ${color}, 0 0 0 transparent` }
+      ], { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' })
+
+      $lastPlayed.textContent = `${emoji} ${name}`
+    }
+
+    function hit(key) {
+      const pad = PADS_BY_KEY.get(key)
+      if (!pad) return
+
+      const context = getAudioContext()
+      pad.play(context.currentTime)
+      flashPad(key)
+    }
+
+    // RITMO DE DEMO
+    // setTimeout/setInterval no son precisos (pueden retrasarse varios ms),
+    // pero el reloj del AudioContext sí lo es. Técnica de "mirar hacia delante":
+    // cada 25 ms programamos con antelación las notas de los próximos 100 ms
+    // usando audioContext.currentTime. Así el ritmo no tiembla aunque el hilo principal esté ocupado
+    const BPM = 100
+    const STEP_DURATION = 60 / BPM / 4 // semicorcheas
+    const LOOKAHEAD = 0.1
+    const DEMO_PATTERN = {
+      a: 'x.....x...x.....',
+      s: '....x.......x..x',
+      d: 'x.x.x.x.x.x.x...',
+      f: '..............x.',
+      g: '............x...',
+      l: '..x.............'
+    }
+
+    let schedulerId = null
+    let nextStepTime = 0
+    let currentStep = 0
+
+    function scheduleDemo() {
+      while (nextStepTime < audioContext.currentTime + LOOKAHEAD) {
+        for (const [key, pattern] of Object.entries(DEMO_PATTERN)) {
+          if (pattern[currentStep] !== 'x') continue
+
+          PADS_BY_KEY.get(key).play(nextStepTime)
+          // La animación sí va con setTimeout: un pequeño desfase visual no se nota
+          const delay = Math.max(0, (nextStepTime - audioContext.currentTime) * 1000)
+          setTimeout(() => flashPad(key), delay)
+        }
+
+        nextStepTime += STEP_DURATION
+        currentStep = (currentStep + 1) % 16
+      }
+    }
+
+    function toggleDemo() {
+      const context = getAudioContext()
+
+      if (schedulerId) {
+        clearInterval(schedulerId)
+        schedulerId = null
+      } else {
+        currentStep = 0
+        nextStepTime = context.currentTime + 0.05
+        schedulerId = setInterval(scheduleDemo, 25)
+        scheduleDemo()
+      }
+
+      $demo.setAttribute('aria-pressed', String(Boolean(schedulerId)))
+      $demo.textContent = schedulerId ? '⏹ Parar ritmo' : '▶ Ritmo de demo'
+    }
+
+    // EVENTOS
+    document.addEventListener('keydown', (event) => {
+      // event.repeat es true cuando se mantiene la tecla pulsada: no queremos redobles involuntarios
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.target instanceof HTMLInputElement) return
+      hit(event.key.toLowerCase())
+    })
+
+    // pointerdown en vez de click: responde al instante (click espera a soltar)
+    // y funciona con varios dedos a la vez en pantallas táctiles
+    $pads.addEventListener('pointerdown', (event) => {
+      const $pad = event.target.closest('.pad')
+      if (!$pad) return
+      event.preventDefault()
+      hit($pad.dataset.key)
+    })
+
+    // Evitamos que Enter/Espacio sobre un pad enfocado dispare un click extra
+    $pads.addEventListener('click', (event) => event.preventDefault())
+
+    $demo.addEventListener('click', toggleDemo)
+
+    $volume.addEventListener('input', () => {
+      if (!masterGain) return
+      // setTargetAtTime suaviza el cambio y evita "clics" en el audio
+      masterGain.gain.setTargetAtTime(Number($volume.value), audioContext.currentTime, 0.02)
+    })
+
+    renderPads()
+  </script>
+</head>
+
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>🥁 Batería virtual</h1>
+        <p>Sonidos sintetizados en tiempo real con la Web Audio API. Sin archivos de audio.</p>
+      </div>
+      <div class="controls">
+        <button id="demo" aria-pressed="false">▶ Ritmo de demo</button>
+        <label>🔈 <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volumen"></label>
+      </div>
+    </header>
+
+    <section class="pads" aria-label="Pads de batería"></section>
+
+    <div class="status">
+      <span>Pulsa <strong>A S D F G H J K L</strong> o toca los pads</span>
+      <span id="audio-status">🔇 El audio se activará con tu primera pulsación</span>
+      <span>Último: <strong id="last-played">—</strong></span>
+    </div>
+  </main>
+</body>
+
+</html>

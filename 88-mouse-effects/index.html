@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>88 - Efectos con el ratón</title>
+  <style>
+    :root {
+      --bg: #09090f;
+      --card: #12121b;
+      --border: #22222e;
+      --text: #ecebf5;
+      --muted: #8a89a0;
+      --violet: #a855f7;
+      --cyan: #22d3ee;
+      --pink: #f472b6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(168, 85, 247, .12), transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Solo ocultamos el cursor nativo cuando el JS activa el cursor propio */
+    html.custom-cursor,
+    html.custom-cursor * {
+      cursor: none !important;
+    }
+
+    main {
+      width: min(1180px, 100%);
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: 22px 20px 28px;
+      display: grid;
+      align-content: center;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 8px 24px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3.4vw, 34px);
+      letter-spacing: -.03em;
+    }
+
+    h1 span {
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .notice {
+      display: none;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .effects-off .notice {
+      display: block;
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .panel {
+      position: relative;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: rgba(18, 18, 27, .7);
+      overflow: hidden;
+    }
+
+    .panel.wide {
+      grid-column: span 2;
+    }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .label strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .label code {
+      font-size: 11px;
+      color: var(--cyan);
+    }
+
+    /* ---------- 1. Tarjetas con inclinación 3D ---------- */
+    .tilt-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    /* El wrapper NO se transforma: medimos su rectángulo, que es estable.
+       Si midiéramos la tarjeta inclinada, su caja cambiaría al girar */
+    .tilt-wrapper {
+      perspective: 700px;
+    }
+
+    .tilt {
+      --rx: 0deg;
+      --ry: 0deg;
+      --gx: 50%;
+      --gy: 0%;
+      position: relative;
+      height: 230px;
+      padding: 18px;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--gradient);
+      transform: rotateX(var(--rx)) rotateY(var(--ry));
+      transform-style: preserve-3d;
+      transition: transform .5s cubic-bezier(.2, .8, .2, 1);
+      box-shadow: 0 20px 40px -20px rgba(0, 0, 0, .8);
+    }
+
+    .tilt.active {
+      transition-duration: .08s;
+    }
+
+    /* Reflejo de luz que sigue al cursor */
+    .tilt::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(circle at var(--gx) var(--gy), rgba(255, 255, 255, .35), transparent 55%);
+      opacity: .6;
+      pointer-events: none;
+    }
+
+    /* translateZ separa las capas: dan sensación de profundidad al inclinar */
+    .tilt .emoji {
+      font-size: 46px;
+      transform: translateZ(50px);
+    }
+
+    .tilt h3 {
+      margin: 0;
+      font-size: 20px;
+      transform: translateZ(35px);
+    }
+
+    .tilt p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      opacity: .85;
+      transform: translateZ(25px);
+    }
+
+    /* ---------- 2. Spotlight ---------- */
+    .spotlight {
+      --x: 35%;
+      --y: 45%;
+      display: grid;
+      align-content: end;
+      min-height: 100%;
+      background:
+        radial-gradient(circle 180px at var(--x) var(--y), rgba(34, 211, 238, .22), transparent 70%),
+        rgba(18, 18, 27, .7);
+    }
+
+    .spotlight .grid-pattern {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, .18) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .18) 1px, transparent 1px);
+      background-size: 24px 24px;
+      /* La máscara solo deja ver la cuadrícula alrededor del cursor */
+      -webkit-mask-image: radial-gradient(circle 140px at var(--x) var(--y), #000, transparent);
+      mask-image: radial-gradient(circle 140px at var(--x) var(--y), #000, transparent);
+      pointer-events: none;
+    }
+
+    .spotlight h2 {
+      position: relative;
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -.03em;
+    }
+
+    .spotlight p {
+      position: relative;
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ---------- 3. Borde con brillo ---------- */
+    .glow-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .glow-card {
+      --x: -500px;
+      --y: -500px;
+      position: relative;
+      padding: 18px;
+      border-radius: 16px;
+      background: var(--card);
+    }
+
+    /* Borde: un degradado radial centrado en el cursor, recortado con una
+       máscara para que solo se vea en el "marco" de 1px de padding */
+    .glow-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      padding: 1px;
+      border-radius: inherit;
+      background:
+        radial-gradient(260px circle at var(--x) var(--y), var(--violet), transparent 60%),
+        var(--border);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* Resplandor suave en el interior */
+    .glow-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(320px circle at var(--x) var(--y), rgba(168, 85, 247, .1), transparent 60%);
+      pointer-events: none;
+    }
+
+    .glow-card .icon {
+      font-size: 24px;
+    }
+
+    .glow-card h3 {
+      margin: 10px 0 4px;
+      font-size: 16px;
+    }
+
+    .glow-card p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    /* ---------- 4. Botones magnéticos ---------- */
+    .magnetic-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      min-height: 150px;
+    }
+
+    .magnetic-row {
+      display: flex;
+      gap: 32px;
+    }
+
+    .magnetic {
+      --tx: 0px;
+      --ty: 0px;
+      padding: 14px 24px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--text);
+      color: var(--bg);
+      font: inherit;
+      font-weight: 700;
+      font-size: 15px;
+      translate: var(--tx) var(--ty);
+      transition: translate .4s cubic-bezier(.2, .8, .2, 1), box-shadow .3s;
+    }
+
+    .magnetic span {
+      display: inline-block;
+      /* El texto se desplaza un poco más que el botón: efecto parallax */
+      translate: calc(var(--tx) * .4) calc(var(--ty) * .4);
+      transition: translate .4s cubic-bezier(.2, .8, .2, 1);
+    }
+
+    .magnetic.near {
+      transition-duration: .12s;
+      box-shadow: 0 10px 30px -8px rgba(168, 85, 247, .7);
+    }
+
+    .magnetic.near span {
+      transition-duration: .12s;
+    }
+
+    .magnetic.round {
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      background: linear-gradient(135deg, var(--violet), var(--pink));
+      color: #fff;
+      font-size: 22px;
+    }
+
+    .magnetic.outline {
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    /* ---------- 5. Cursor personalizado ---------- */
+    .cursor-dot,
+    .cursor-ring {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .2s, width .25s, height .25s, background .25s, border-color .25s;
+    }
+
+    .custom-cursor .cursor-dot,
+    .custom-cursor .cursor-ring {
+      opacity: 1;
+    }
+
+    .cursor-dot {
+      width: 6px;
+      height: 6px;
+      margin: -3px 0 0 -3px;
+      background: #fff;
+    }
+
+    .cursor-ring {
+      width: 36px;
+      height: 36px;
+      margin: -18px 0 0 -18px;
+      border: 1.5px solid rgba(255, 255, 255, .6);
+      mix-blend-mode: difference;
+    }
+
+    .cursor-ring.hover {
+      width: 60px;
+      height: 60px;
+      margin: -30px 0 0 -30px;
+      background: rgba(255, 255, 255, .9);
+      border-color: transparent;
+    }
+
+    .cursor-ring.hidden,
+    .cursor-dot.hidden {
+      opacity: 0;
+    }
+
+    @media (width < 900px) {
+      .bento {
+        grid-template-columns: 1fr;
+      }
+
+      .panel.wide {
+        grid-column: auto;
+      }
+
+      .tilt-row,
+      .glow-row {
+        grid-template-columns: 1fr;
+      }
+
+      .tilt {
+        height: 150px;
+      }
+
+      .spotlight {
+        min-height: 220px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const root = document.documentElement
+    const tiltWrappers = [...document.querySelectorAll('.tilt-wrapper')]
+    const spotlight = document.querySelector('.spotlight')
+    const glowRow = document.querySelector('.glow-row')
+    const glowCards = [...document.querySelectorAll('.glow-card')]
+    const magnets = [...document.querySelectorAll('.magnetic')]
+    const dot = document.querySelector('.cursor-dot')
+    const ring = document.querySelector('.cursor-ring')
+
+    // CONSTANTES
+    const MAX_TILT = 14 // grados
+    const MAGNET_PADDING = 40 // px alrededor del botón donde empieza a atraer
+    const MAGNET_STRENGTH = 0.3
+    const RING_SMOOTHING = 0.16 // cuánto se acerca el anillo al cursor en cada frame (a 60 fps)
+    const INTERACTIVE = 'a, button, [data-cursor]'
+
+    // Estos efectos solo tienen sentido con un ratón de verdad y si el
+    // usuario no ha pedido reducir el movimiento
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    // ESTADO
+    const pointer = { x: -1000, y: -1000, moved: false }
+    const ringPosition = { x: -1000, y: -1000 }
+    let lastTime = performance.now()
+
+    // ---------- La idea central ----------
+
+    // getBoundingClientRect() nos da la posición del elemento en la
+    // ventana. Restándosela a clientX/clientY obtenemos las coordenadas
+    // del cursor RELATIVAS al elemento (0,0 = su esquina superior izquierda)
+    function getRelativePoint (element) {
+      const rect = element.getBoundingClientRect()
+      return {
+        x: pointer.x - rect.left,
+        y: pointer.y - rect.top,
+        width: rect.width,
+        height: rect.height
+      }
+    }
+
+    // ---------- 1. Inclinación 3D ----------
+
+    function updateTilt () {
+      for (const wrapper of tiltWrappers) {
+        const card = wrapper.firstElementChild
+        const { x, y, width, height } = getRelativePoint(wrapper)
+        const inside = x >= 0 && x <= width && y >= 0 && y <= height
+
+        if (!inside) {
+          if (card.classList.contains('active')) resetTilt(card)
+          continue
+        }
+
+        // Normalizamos a -0.5..0.5: el centro de la tarjeta es (0, 0)
+        const px = x / width - 0.5
+        const py = y / height - 0.5
+        card.classList.add('active')
+        // Ratón arriba → la tarjeta se inclina hacia atrás (rotateX positivo)
+        card.style.setProperty('--rx', `${-py * MAX_TILT * 2}deg`)
+        card.style.setProperty('--ry', `${px * MAX_TILT * 2}deg`)
+        card.style.setProperty('--gx', `${x / width * 100}%`)
+        card.style.setProperty('--gy', `${y / height * 100}%`)
+      }
+    }
+
+    function resetTilt (card) {
+      card.classList.remove('active')
+      card.style.setProperty('--rx', '0deg')
+      card.style.setProperty('--ry', '0deg')
+    }
+
+    // ---------- 2. Spotlight ----------
+
+    function updateSpotlight () {
+      const { x, y, width, height } = getRelativePoint(spotlight)
+      // Si el cursor sale del panel, la luz se queda donde estaba
+      if (x < 0 || y < 0 || x > width || y > height) return
+      // Solo escribimos variables CSS; el radial-gradient hace el resto
+      spotlight.style.setProperty('--x', `${x}px`)
+      spotlight.style.setProperty('--y', `${y}px`)
+    }
+
+    // ---------- 3. Borde con brillo ----------
+
+    function updateGlow () {
+      // Cada tarjeta recibe la posición relativa a sí misma, aunque el
+      // cursor esté fuera: así las vecinas brillan por el borde más cercano
+      for (const card of glowCards) {
+        const { x, y } = getRelativePoint(card)
+        card.style.setProperty('--x', `${x}px`)
+        card.style.setProperty('--y', `${y}px`)
+      }
+    }
+
+    // ---------- 4. Botones magnéticos ----------
+
+    function updateMagnets () {
+      for (const button of magnets) {
+        // Usamos la posición de reposo del botón: si midiéramos el botón ya
+        // desplazado, su centro se movería con él y nunca se estabilizaría
+        const rect = getAnchorRect(button)
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const dx = pointer.x - centerX
+        const dy = pointer.y - centerY
+        // ¿Está el cursor dentro del rectángulo del botón ampliado con un margen?
+        const near = Math.abs(dx) < rect.width / 2 + MAGNET_PADDING &&
+          Math.abs(dy) < rect.height / 2 + MAGNET_PADDING
+
+        if (near) {
+          button.classList.add('near')
+          button.style.setProperty('--tx', `${dx * MAGNET_STRENGTH}px`)
+          button.style.setProperty('--ty', `${dy * MAGNET_STRENGTH}px`)
+        } else if (button.classList.contains('near')) {
+          button.classList.remove('near')
+          button.style.setProperty('--tx', '0px')
+          button.style.setProperty('--ty', '0px')
+        }
+      }
+    }
+
+    // La propiedad `translate` no cambia el hueco que ocupa el botón en el
+    // layout, pero SÍ afecta a getBoundingClientRect. Deshacemos el
+    // desplazamiento actual para obtener su posición "de reposo"
+    function getAnchorRect (button) {
+      const rect = button.getBoundingClientRect()
+      const [tx = 0, ty = 0] = getComputedStyle(button).translate.split(' ').map(value => parseFloat(value) || 0)
+      return { left: rect.left - tx, top: rect.top - ty, width: rect.width, height: rect.height }
+    }
+
+    // ---------- 5. Cursor con retardo ----------
+
+    // Interpolación lineal (lerp): avanzamos un porcentaje de la distancia
+    // que falta. Cada frame recorre menos → movimiento suave que "persigue"
+    function lerp (from, to, amount) {
+      return from + (to - from) * amount
+    }
+
+    function updateCursor (dt) {
+      // Ajustamos el factor al tiempo real del frame para que el retardo
+      // sea igual en pantallas de 60 Hz y de 120 Hz
+      const amount = 1 - Math.pow(1 - RING_SMOOTHING, dt * 60)
+      ringPosition.x = lerp(ringPosition.x, pointer.x, amount)
+      ringPosition.y = lerp(ringPosition.y, pointer.y, amount)
+
+      dot.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`
+      ring.style.transform = `translate(${ringPosition.x}px, ${ringPosition.y}px)`
+    }
+
+    // ---------- Bucle ----------
+
+    // pointermove puede dispararse muchas veces por frame. Guardamos la
+    // posición y hacemos las lecturas/escrituras del DOM una sola vez por
+    // frame dentro de requestAnimationFrame
+    function handlePointerMove (event) {
+      pointer.x = event.clientX
+      pointer.y = event.clientY
+
+      if (!pointer.moved) {
+        pointer.moved = true
+        ringPosition.x = pointer.x
+        ringPosition.y = pointer.y
+        root.classList.add('custom-cursor')
+      }
+
+      const interactive = event.target.closest?.(INTERACTIVE)
+      ring.classList.toggle('hover', Boolean(interactive))
+    }
+
+    function loop (time) {
+      const dt = Math.min((time - lastTime) / 1000, 0.1)
+      lastTime = time
+
+      if (pointer.moved) {
+        updateTilt()
+        updateSpotlight()
+        updateGlow()
+        updateMagnets()
+        updateCursor(dt)
+      }
+
+      requestAnimationFrame(loop)
+    }
+
+    function toggleCursorVisibility (visible) {
+      dot.classList.toggle('hidden', !visible)
+      ring.classList.toggle('hidden', !visible)
+    }
+
+    function init () {
+      if (!finePointer.matches || reducedMotion.matches) {
+        // Táctil o movimiento reducido: dejamos el diseño estático
+        root.classList.add('effects-off')
+        return
+      }
+
+      // Estado inicial bonito para cuando aún no se ha movido el ratón
+      glowCards[1].style.setProperty('--x', '30%')
+      glowCards[1].style.setProperty('--y', '0%')
+
+      document.addEventListener('pointermove', handlePointerMove)
+      document.addEventListener('pointerleave', () => toggleCursorVisibility(false))
+      document.addEventListener('pointerenter', () => toggleCursorVisibility(true))
+      requestAnimationFrame(loop)
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <div class="cursor-ring" aria-hidden="true"></div>
+  <div class="cursor-dot" aria-hidden="true"></div>
+
+  <main>
+    <header>
+      <h1>Efectos con el <span>ratón</span></h1>
+      <p>Mueve el cursor por los paneles · todo con getBoundingClientRect y variables CSS</p>
+    </header>
+
+    <p class="notice">🖐️ Estás en un dispositivo táctil o tienes activado "reducir movimiento": los efectos se muestran en estático.</p>
+
+    <div class="bento">
+      <section class="panel wide">
+        <div class="label"><strong>Inclinación 3D</strong><code>rotateX(--rx) rotateY(--ry)</code></div>
+        <div class="tilt-row">
+          <div class="tilt-wrapper">
+            <article class="tilt" style="--gradient: linear-gradient(135deg, #7c3aed, #db2777)">
+              <span class="emoji">🪐</span>
+              <div>
+                <h3>Perspectiva</h3>
+                <p>perspective en el padre crea el espacio 3D</p>
+              </div>
+            </article>
+          </div>
+          <div class="tilt-wrapper">
+            <article class="tilt" style="--gradient: linear-gradient(135deg, #0891b2, #4f46e5); --rx: 6deg; --ry: -10deg">
+              <span class="emoji">🧊</span>
+              <div>
+                <h3>Profundidad</h3>
+                <p>translateZ separa cada capa</p>
+              </div>
+            </article>
+          </div>
+          <div class="tilt-wrapper">
+            <article class="tilt" style="--gradient: linear-gradient(135deg, #ea580c, #ca8a04)">
+              <span class="emoji">✨</span>
+              <div>
+                <h3>Brillo</h3>
+                <p>un radial-gradient sigue al cursor</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel spotlight">
+        <div class="grid-pattern"></div>
+        <div class="label" style="position: absolute; top: 16px; left: 16px; right: 16px">
+          <strong>Spotlight</strong><code>--x / --y</code>
+        </div>
+        <h2>Ilumina lo que importa</h2>
+        <p>Un radial-gradient y una máscara que siguen al ratón.</p>
+      </section>
+
+      <section class="panel wide">
+        <div class="label"><strong>Borde con brillo</strong><code>mask-composite: exclude</code></div>
+        <div class="glow-row">
+          <article class="glow-card">
+            <span class="icon">⚡</span>
+            <h3>Sin librerías</h3>
+            <p>Unas líneas de JS escriben variables CSS. El navegador pinta el resto.</p>
+          </article>
+          <article class="glow-card">
+            <span class="icon">🎯</span>
+            <h3>Coordenadas relativas</h3>
+            <p>clientX − rect.left: la posición del cursor dentro de cada tarjeta.</p>
+          </article>
+          <article class="glow-card">
+            <span class="icon">🧩</span>
+            <h3>Una vez por frame</h3>
+            <p>Leemos y escribimos el DOM dentro de requestAnimationFrame.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="label"><strong>Botones magnéticos</strong><code>translate</code></div>
+        <div class="magnetic-area">
+          <div class="magnetic-row">
+            <button class="magnetic"><span>Empezar →</span></button>
+            <button class="magnetic round" aria-label="Me gusta"><span>💜</span></button>
+          </div>
+          <button class="magnetic outline"><span>Suscríbete</span></button>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+
+</html>

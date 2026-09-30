@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>89 - Reproductor de vídeo</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #12151d;
+      --border: #222734;
+      --text: #eef1f7;
+      --muted: #8790a3;
+      --accent: #ff3d5a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 20px;
+      padding: 20px;
+      background: radial-gradient(900px 500px at 30% 0%, rgba(255, 61, 90, .08), transparent 70%), var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    .stage {
+      display: grid;
+      grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+      place-items: center;
+      min-height: 0;
+    }
+
+    /* ---------- Reproductor ---------- */
+    .player {
+      position: relative;
+      /* El más pequeño entre el ancho disponible y el ancho que cabe en alto */
+      width: min(100%, calc((100dvh - 40px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .9);
+      outline: none;
+    }
+
+    .player:focus-visible {
+      box-shadow: 0 0 0 3px var(--accent);
+    }
+
+    .player:fullscreen {
+      width: 100%;
+      border-radius: 0;
+      aspect-ratio: auto;
+    }
+
+    .player.idle {
+      cursor: none;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .big-play {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 84px;
+      height: 84px;
+      border: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 61, 90, .9);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 10px 40px rgba(255, 61, 90, .5);
+      transition: scale .2s, opacity .2s;
+    }
+
+    .big-play:hover {
+      scale: 1.08;
+    }
+
+    .player:not(.paused) .big-play {
+      opacity: 0;
+      scale: .8;
+      pointer-events: none;
+    }
+
+    .spinner {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 54px;
+      height: 54px;
+      border: 4px solid rgba(255, 255, 255, .2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      display: none;
+    }
+
+    .player.waiting .spinner {
+      display: block;
+    }
+
+    @keyframes spin {
+      to {
+        rotate: 1turn;
+      }
+    }
+
+    .message {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 20px;
+      text-align: center;
+      background: rgba(0, 0, 0, .75);
+    }
+
+    .player.error .message {
+      display: grid;
+    }
+
+    .controls {
+      position: absolute;
+      inset: auto 0 0;
+      padding: 40px 16px 12px;
+      background: linear-gradient(transparent, rgba(0, 0, 0, .85));
+      transition: opacity .3s, translate .3s;
+    }
+
+    /* Tras un rato sin mover el ratón, los controles se esconden */
+    .player.idle .controls {
+      opacity: 0;
+      translate: 0 12px;
+      pointer-events: none;
+    }
+
+    /* ---------- Barra de progreso ---------- */
+    .progress {
+      --played: 0%;
+      --hover: 0%;
+      position: relative;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      touch-action: none;
+      outline: none;
+    }
+
+    .track {
+      position: relative;
+      width: 100%;
+      height: 4px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, .2);
+      transition: height .15s;
+    }
+
+    .progress:hover .track,
+    .progress.dragging .track,
+    .progress:focus-visible .track {
+      height: 7px;
+    }
+
+    .buffered span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, .4);
+    }
+
+    .played {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: var(--played);
+      border-radius: 4px;
+      background: var(--accent);
+    }
+
+    .thumb {
+      position: absolute;
+      top: 50%;
+      left: var(--played);
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+      border-radius: 50%;
+      background: var(--accent);
+      scale: 0;
+      transition: scale .15s;
+    }
+
+    .progress:hover .thumb,
+    .progress.dragging .thumb,
+    .progress:focus-visible .thumb {
+      scale: 1;
+    }
+
+    .tooltip {
+      position: absolute;
+      bottom: 22px;
+      left: var(--hover);
+      translate: -50% 0;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, .85);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s;
+    }
+
+    .progress:hover .tooltip,
+    .progress.dragging .tooltip {
+      opacity: 1;
+    }
+
+    /* ---------- Botonera ---------- */
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .bar button {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .bar button:hover,
+    .bar button:focus-visible {
+      background: rgba(255, 255, 255, .14);
+      outline: none;
+    }
+
+    .bar button[aria-pressed="true"] {
+      color: var(--accent);
+    }
+
+    .bar svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    /* Cada botón de dos estados lleva sus dos iconos y mostramos uno */
+    [data-state="paused"] .icon-pause,
+    [data-state="playing"] .icon-play,
+    [data-state="on"] .icon-off,
+    [data-state="off"] .icon-on {
+      display: none;
+    }
+
+    .volume {
+      width: 0;
+      opacity: 0;
+      accent-color: #fff;
+      transition: width .2s, opacity .2s;
+    }
+
+    .volume-group:hover .volume,
+    .volume-group:focus-within .volume {
+      width: 80px;
+      opacity: 1;
+    }
+
+    .volume-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .time {
+      margin-left: 6px;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    select {
+      height: 32px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .12);
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    select option {
+      background: #1b1f29;
+    }
+
+    /* ---------- Panel lateral ---------- */
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      overflow-y: auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    h1 + p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .file-button {
+      display: block;
+      padding: 10px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+
+    .file-button:hover {
+      border-color: var(--accent);
+      background: rgba(255, 61, 90, .06);
+    }
+
+    #file-input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+
+    .source {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .events {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .events li {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, .03);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 11.5px;
+    }
+
+    .events li span:last-child {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .shortcuts {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 10px;
+      margin: 0;
+      font-size: 12.5px;
+    }
+
+    .shortcuts dt {
+      text-align: right;
+    }
+
+    .shortcuts dd {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 22px;
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #1a1e28;
+      font-family: inherit;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    @media (width < 860px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+        grid-template-columns: 1fr;
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .volume-group:hover .volume,
+      .volume-group:focus-within .volume {
+        width: 60px;
+      }
+
+      .speed-label {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const player = $('.player')
+    const video = $('video')
+    const playButton = $('#play')
+    const muteButton = $('#mute')
+    const volumeInput = $('.volume')
+    const speedSelect = $('#speed')
+    const loopButton = $('#loop')
+    const pipButton = $('#pip')
+    const fullscreenButton = $('#fullscreen')
+    const progress = $('.progress')
+    const buffered = $('.buffered')
+    const tooltip = $('.tooltip')
+    const timeLabel = $('.time')
+    const fileInput = $('#file-input')
+    const sourceLabel = $('.source')
+    const eventsList = $('.events')
+
+    // CONSTANTES
+    const DEFAULT_SOURCE = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+    const IDLE_DELAY = 2500
+    const SEEK_STEP = 5
+    const JUMP_STEP = 10
+    const VOLUME_STEP = 0.1
+    const WATCHED_EVENTS = [
+      'loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'play', 'playing', 'pause',
+      'waiting', 'seeking', 'seeked', 'timeupdate', 'progress', 'ratechange', 'volumechange', 'ended', 'error'
+    ]
+
+    // ESTADO
+    let idleTimeout = null
+    let objectUrl = null
+    let isDragging = false
+    let wasPlayingBeforeDrag = false
+    let rafId = null
+    const eventCounts = new Map()
+
+    // ---------- Utilidades ----------
+
+    function formatTime (seconds) {
+      if (!Number.isFinite(seconds)) return '0:00'
+      const total = Math.floor(seconds)
+      const hours = Math.floor(total / 3600)
+      const minutes = Math.floor((total % 3600) / 60)
+      const secs = String(total % 60).padStart(2, '0')
+      return hours > 0
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}`
+        : `${minutes}:${secs}`
+    }
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+    function getDuration () {
+      // duration puede ser NaN (sin metadatos aún) o Infinity (directos)
+      return Number.isFinite(video.duration) ? video.duration : 0
+    }
+
+    // ---------- Acciones ----------
+    // Las acciones solo PIDEN cosas al vídeo. La interfaz se actualiza
+    // cuando el vídeo confirma con un evento (play, pause, volumechange…),
+    // así nunca mostramos un estado que no es real (p. ej. si play() falla)
+
+    async function togglePlay () {
+      if (video.paused || video.ended) {
+        try {
+          await video.play() // devuelve una promesa que puede rechazarse
+        } catch (error) {
+          if (error.name !== 'AbortError') showError('No se ha podido reproducir el vídeo.')
+        }
+      } else {
+        video.pause()
+      }
+    }
+
+    function seekBy (seconds) {
+      video.currentTime = clamp(video.currentTime + seconds, 0, getDuration())
+    }
+
+    function setVolume (value) {
+      video.volume = clamp(value, 0, 1)
+      video.muted = video.volume === 0
+    }
+
+    function toggleMute () {
+      // Si estaba a 0, al quitar el silencio subimos un poco el volumen
+      if (video.muted && video.volume === 0) video.volume = 0.5
+      video.muted = !video.muted
+    }
+
+    async function toggleFullscreen () {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen()
+        } else {
+          // Ponemos a pantalla completa el CONTENEDOR (no el <video>) para
+          // conservar nuestros controles personalizados
+          await (player.requestFullscreen?.() ?? player.webkitRequestFullscreen?.())
+        }
+      } catch {
+        showToastInTitle('La pantalla completa no está disponible aquí')
+      }
+    }
+
+    async function togglePictureInPicture () {
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture()
+        } else {
+          await video.requestPictureInPicture()
+        }
+      } catch {
+        showToastInTitle('Picture-in-Picture no está disponible')
+      }
+    }
+
+    function showToastInTitle (message) {
+      sourceLabel.textContent = `⚠️ ${message}`
+      setTimeout(updateSourceLabel, 2500)
+    }
+
+    function showError (message) {
+      player.classList.add('error')
+      $('.message').textContent = message
+    }
+
+    // ---------- Pintar estado a partir del vídeo ----------
+
+    function renderProgress (time = video.currentTime) {
+      const duration = getDuration()
+      const ratio = duration ? time / duration : 0
+      progress.style.setProperty('--played', `${ratio * 100}%`)
+      progress.setAttribute('aria-valuenow', Math.round(time))
+      progress.setAttribute('aria-valuetext', `${formatTime(time)} de ${formatTime(duration)}`)
+      timeLabel.textContent = `${formatTime(time)} / ${formatTime(duration)}`
+    }
+
+    // video.buffered es un TimeRanges: una lista de tramos [inicio, fin]
+    // ya descargados. Puede haber varios si el usuario salta por el vídeo
+    function renderBuffered () {
+      const duration = getDuration()
+      if (!duration) return
+      const ranges = []
+      for (let i = 0; i < video.buffered.length; i++) {
+        const start = video.buffered.start(i) / duration * 100
+        const end = video.buffered.end(i) / duration * 100
+        const segment = document.createElement('span')
+        segment.style.left = `${start}%`
+        segment.style.width = `${end - start}%`
+        ranges.push(segment)
+      }
+      buffered.replaceChildren(...ranges)
+    }
+
+    function renderVolume () {
+      const muted = video.muted || video.volume === 0
+      muteButton.dataset.state = muted ? 'off' : 'on'
+      muteButton.setAttribute('aria-label', muted ? 'Activar sonido (M)' : 'Silenciar (M)')
+      volumeInput.value = video.muted ? 0 : video.volume
+    }
+
+    function renderPlayState () {
+      const paused = video.paused
+      player.classList.toggle('paused', paused)
+      playButton.dataset.state = paused ? 'paused' : 'playing'
+      playButton.setAttribute('aria-label', paused ? 'Reproducir (K)' : 'Pausar (K)')
+      if (paused) showControls()
+    }
+
+    // timeupdate solo llega unas 4 veces por segundo: para que la barra se
+    // mueva fluida, mientras se reproduce la repintamos en cada frame
+    function progressLoop () {
+      if (!isDragging) renderProgress()
+      rafId = requestAnimationFrame(progressLoop)
+    }
+
+    // ---------- Arrastrar en la barra de progreso ----------
+
+    function getTimeFromPointer (event) {
+      const rect = progress.getBoundingClientRect()
+      const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+      return { time: ratio * getDuration(), ratio }
+    }
+
+    function handleProgressDown (event) {
+      if (!getDuration()) return
+      isDragging = true
+      wasPlayingBeforeDrag = !video.paused
+      video.pause()
+      progress.classList.add('dragging')
+      progress.setPointerCapture(event.pointerId)
+      handleProgressMove(event)
+    }
+
+    function handleProgressMove (event) {
+      const { time, ratio } = getTimeFromPointer(event)
+      tooltip.textContent = formatTime(time)
+      progress.style.setProperty('--hover', `${ratio * 100}%`)
+
+      if (isDragging) {
+        renderProgress(time)
+        video.currentTime = time // búsqueda en vivo mientras arrastramos
+      }
+    }
+
+    function handleProgressUp () {
+      if (!isDragging) return
+      isDragging = false
+      progress.classList.remove('dragging')
+      if (wasPlayingBeforeDrag) togglePlay()
+    }
+
+    function handleProgressKeys (event) {
+      const actions = {
+        ArrowLeft: () => seekBy(-SEEK_STEP),
+        ArrowRight: () => seekBy(SEEK_STEP),
+        Home: () => { video.currentTime = 0 },
+        End: () => { video.currentTime = getDuration() }
+      }
+      if (!actions[event.key]) return
+      event.preventDefault()
+      event.stopPropagation()
+      actions[event.key]()
+    }
+
+    // ---------- Ocultar controles por inactividad ----------
+
+    function showControls () {
+      player.classList.remove('idle')
+      clearTimeout(idleTimeout)
+      idleTimeout = setTimeout(() => {
+        // Solo los escondemos si se está reproduciendo y no se arrastra
+        if (!video.paused && !isDragging && !$('.controls').matches(':hover')) {
+          player.classList.add('idle')
+        }
+      }, IDLE_DELAY)
+    }
+
+    // ---------- Atajos de teclado ----------
+
+    function handleKeydown (event) {
+      if (event.target.matches('input, select, textarea')) return
+      if (event.target.matches('button') && (event.key === ' ' || event.key === 'Enter')) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      const key = event.key.toLowerCase()
+      const shortcuts = {
+        ' ': togglePlay,
+        k: togglePlay,
+        j: () => seekBy(-JUMP_STEP),
+        l: () => seekBy(JUMP_STEP),
+        arrowleft: () => seekBy(-SEEK_STEP),
+        arrowright: () => seekBy(SEEK_STEP),
+        arrowup: () => setVolume(video.volume + VOLUME_STEP),
+        arrowdown: () => setVolume(video.volume - VOLUME_STEP),
+        m: toggleMute,
+        f: toggleFullscreen,
+        p: togglePictureInPicture
+      }
+
+      // Las teclas 0-9 saltan al 0%, 10%… 90% del vídeo
+      if (/^[0-9]$/.test(key)) {
+        video.currentTime = getDuration() * Number(key) / 10
+      } else if (shortcuts[key]) {
+        shortcuts[key]()
+      } else {
+        return
+      }
+
+      event.preventDefault()
+      showControls()
+    }
+
+    // ---------- Fuente del vídeo ----------
+
+    function loadFile (file) {
+      if (!file || !file.type.startsWith('video/')) {
+        showToastInTitle('Elige un archivo de vídeo')
+        return
+      }
+      // Liberamos la URL anterior para no dejar el archivo en memoria
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      objectUrl = URL.createObjectURL(file)
+      player.classList.remove('error')
+      video.src = objectUrl
+      video.dataset.name = file.name
+      updateSourceLabel()
+      togglePlay()
+    }
+
+    function updateSourceLabel () {
+      sourceLabel.textContent = `▶ ${video.dataset.name ?? 'flower.mp4 (MDN, CC0)'}`
+    }
+
+    // ---------- Monitor de eventos ----------
+
+    function renderEventsList () {
+      eventsList.replaceChildren(...WATCHED_EVENTS.map(name => {
+        const item = document.createElement('li')
+        item.dataset.event = name
+        item.innerHTML = `<span>${name}</span><span>0</span>`
+        return item
+      }))
+    }
+
+    function trackEvent (event) {
+      const count = (eventCounts.get(event.type) ?? 0) + 1
+      eventCounts.set(event.type, count)
+      const item = eventsList.querySelector(`[data-event="${event.type}"]`)
+      item.lastElementChild.textContent = count
+      // Web Animations API: un destello cada vez que llega el evento
+      item.animate(
+        [{ background: 'rgba(255, 61, 90, .45)' }, { background: 'rgba(255, 255, 255, .03)' }],
+        { duration: 600, easing: 'ease-out' }
+      )
+    }
+
+    // ---------- Eventos ----------
+
+    function bindMediaEvents () {
+      WATCHED_EVENTS.forEach(name => video.addEventListener(name, trackEvent))
+
+      video.addEventListener('play', () => {
+        renderPlayState()
+        cancelAnimationFrame(rafId)
+        rafId = requestAnimationFrame(progressLoop)
+      })
+      video.addEventListener('pause', () => {
+        renderPlayState()
+        cancelAnimationFrame(rafId)
+        renderProgress()
+      })
+      video.addEventListener('ended', renderPlayState)
+      video.addEventListener('timeupdate', () => { if (!isDragging) renderProgress() })
+      video.addEventListener('loadedmetadata', () => {
+        progress.setAttribute('aria-valuemax', Math.round(getDuration()))
+        renderProgress()
+      })
+      video.addEventListener('durationchange', () => renderProgress())
+      video.addEventListener('progress', renderBuffered)
+      video.addEventListener('seeked', renderBuffered)
+      video.addEventListener('volumechange', renderVolume)
+      video.addEventListener('ratechange', () => { speedSelect.value = String(video.playbackRate) })
+      video.addEventListener('waiting', () => player.classList.add('waiting'))
+      video.addEventListener('playing', () => player.classList.remove('waiting'))
+      video.addEventListener('canplay', () => player.classList.remove('waiting'))
+      video.addEventListener('error', () => {
+        player.classList.remove('waiting')
+        showError('No se ha podido cargar el vídeo. Prueba con otro archivo.')
+      })
+      video.addEventListener('enterpictureinpicture', () => pipButton.setAttribute('aria-pressed', 'true'))
+      video.addEventListener('leavepictureinpicture', () => pipButton.setAttribute('aria-pressed', 'false'))
+
+      document.addEventListener('fullscreenchange', () => {
+        const active = document.fullscreenElement === player
+        fullscreenButton.dataset.state = active ? 'on' : 'off'
+        fullscreenButton.setAttribute('aria-label', active ? 'Salir de pantalla completa (F)' : 'Pantalla completa (F)')
+      })
+    }
+
+    function bindControls () {
+      playButton.addEventListener('click', togglePlay)
+      $('.big-play').addEventListener('click', togglePlay)
+      video.addEventListener('click', togglePlay)
+      video.addEventListener('dblclick', toggleFullscreen)
+      muteButton.addEventListener('click', toggleMute)
+      volumeInput.addEventListener('input', () => setVolume(Number(volumeInput.value)))
+      speedSelect.addEventListener('change', () => { video.playbackRate = Number(speedSelect.value) })
+      loopButton.addEventListener('click', () => {
+        video.loop = !video.loop
+        loopButton.setAttribute('aria-pressed', String(video.loop))
+      })
+      pipButton.addEventListener('click', togglePictureInPicture)
+      fullscreenButton.addEventListener('click', toggleFullscreen)
+
+      progress.addEventListener('pointerdown', handleProgressDown)
+      progress.addEventListener('pointermove', handleProgressMove)
+      progress.addEventListener('pointerup', handleProgressUp)
+      progress.addEventListener('pointercancel', handleProgressUp)
+      progress.addEventListener('keydown', handleProgressKeys)
+
+      // Tras pulsar un botón con el ratón, devolvemos el foco al reproductor
+      // para que los atajos de teclado sigan funcionando
+      $('.controls').addEventListener('click', (event) => {
+        if (event.detail > 0 && event.target.closest('button')) player.focus({ preventScroll: true })
+      })
+
+      player.addEventListener('pointermove', showControls)
+      player.addEventListener('pointerleave', () => { if (!video.paused) player.classList.add('idle') })
+      player.addEventListener('focusin', showControls)
+      document.addEventListener('keydown', handleKeydown)
+
+      fileInput.addEventListener('change', () => loadFile(fileInput.files[0]))
+      player.addEventListener('dragover', event => event.preventDefault())
+      player.addEventListener('drop', (event) => {
+        event.preventDefault()
+        loadFile(event.dataTransfer.files[0])
+      })
+    }
+
+    function init () {
+      // Algunas APIs no existen en todos los navegadores: escondemos sus botones
+      if (!document.pictureInPictureEnabled) pipButton.hidden = true
+      if (!document.fullscreenEnabled && !document.webkitFullscreenEnabled) fullscreenButton.hidden = true
+
+      renderEventsList()
+      bindMediaEvents()
+      bindControls()
+      renderVolume()
+      renderPlayState()
+      renderProgress()
+      updateSourceLabel()
+      video.src = DEFAULT_SOURCE
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <main class="stage">
+    <div class="player paused" tabindex="0" aria-label="Reproductor de vídeo">
+      <video preload="auto" playsinline></video>
+
+      <button class="big-play" aria-label="Reproducir">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </button>
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="message" role="alert"></div>
+
+      <div class="controls">
+        <div class="progress" role="slider" tabindex="0" aria-label="Progreso del vídeo" aria-valuemin="0"
+          aria-valuemax="0" aria-valuenow="0">
+          <div class="track">
+            <div class="buffered"></div>
+            <div class="played"></div>
+            <div class="thumb"></div>
+          </div>
+          <span class="tooltip">0:00</span>
+        </div>
+
+        <div class="bar">
+          <button id="play" data-state="paused" aria-label="Reproducir (K)">
+            <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+            <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+          </button>
+
+          <div class="volume-group">
+            <button id="mute" data-state="on" aria-label="Silenciar (M)">
+              <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.47 4.47 0 0 0 2.5-4zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z" /></svg>
+              <svg class="icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.18l2.45 2.45c.03-.2.05-.41.05-.63zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a9 9 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" /></svg>
+            </button>
+            <input class="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volumen">
+          </div>
+
+          <span class="time">0:00 / 0:00</span>
+          <span class="spacer"></span>
+
+          <label>
+            <span class="speed-label" style="font-size: 12px; color: #aab">Velocidad</span>
+            <select id="speed" aria-label="Velocidad de reproducción">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+
+          <button id="loop" aria-pressed="false" aria-label="Repetir">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" /></svg>
+          </button>
+          <button id="pip" aria-pressed="false" aria-label="Picture-in-Picture (P)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" /></svg>
+          </button>
+          <button id="fullscreen" data-state="off" aria-label="Pantalla completa (F)">
+            <svg class="icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" /></svg>
+            <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside>
+    <div>
+      <h1>🎬 Reproductor de vídeo</h1>
+      <p>Controles propios sobre la API HTMLMediaElement.</p>
+    </div>
+
+    <div>
+      <label class="file-button" for="file-input">📂 Cargar un vídeo de tu equipo</label>
+      <input id="file-input" type="file" accept="video/*">
+      <p class="source"></p>
+    </div>
+
+    <section>
+      <h2>Eventos del &lt;video&gt;</h2>
+      <ul class="events"></ul>
+    </section>
+
+    <section>
+      <h2>Atajos de teclado</h2>
+      <dl class="shortcuts">
+        <dt><kbd>Espacio</kbd> <kbd>K</kbd></dt>
+        <dd>Reproducir / pausar</dd>
+        <dt><kbd>J</kbd> <kbd>L</kbd></dt>
+        <dd>−10 s / +10 s</dd>
+        <dt><kbd>←</kbd> <kbd>→</kbd></dt>
+        <dd>−5 s / +5 s</dd>
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt>
+        <dd>Volumen</dd>
+        <dt><kbd>M</kbd> <kbd>F</kbd> <kbd>P</kbd></dt>
+        <dd>Silencio · Pantalla completa · PiP</dd>
+        <dt><kbd>0</kbd>…<kbd>9</kbd></dt>
+        <dd>Saltar al 0 %…90 %</dd>
+      </dl>
+    </section>
+  </aside>
+</body>
+
+</html>

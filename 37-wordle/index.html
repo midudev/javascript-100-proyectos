@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>37 - Wordle</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #121213;
+      --text: #f8f8f8;
+      --muted: #818384;
+      --border: #3a3a3c;
+      --key: #818384;
+      --correct: #538d4e;
+      --present: #b59f3b;
+      --absent: #3a3a3c;
+      --tile: min(60px, 7.4dvh, 17vw);
+      --key-height: min(56px, 7.6dvh);
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(22px, 4dvh, 32px);
+      letter-spacing: 2px;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    .modes {
+      justify-self: end;
+      display: flex;
+      gap: 4px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+    }
+
+    .modes button,
+    .help-button {
+      padding: 6px 12px;
+      white-space: nowrap;
+      border: 0;
+      border-radius: 99px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .modes button[aria-pressed='true'] {
+      background: var(--text);
+      color: var(--bg);
+    }
+
+    .help-button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 2px solid var(--muted);
+      font-size: 16px;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      place-content: center;
+      min-height: 0;
+      padding: 8px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-rows: repeat(6, var(--tile));
+      gap: 6px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, var(--tile));
+      gap: 6px;
+    }
+
+    .tile {
+      display: grid;
+      place-content: center;
+      border: 2px solid var(--border);
+      font-size: calc(var(--tile) * .55);
+      font-weight: 800;
+      text-transform: uppercase;
+      user-select: none;
+    }
+
+    .tile.filled {
+      border-color: var(--muted);
+      animation: pop .1s ease-out;
+    }
+
+    .tile[data-state] {
+      border-color: transparent;
+    }
+
+    .tile[data-state='correct'] {
+      background: var(--correct);
+    }
+
+    .tile[data-state='present'] {
+      background: var(--present);
+    }
+
+    .tile[data-state='absent'] {
+      background: var(--absent);
+    }
+
+    .tile.flip {
+      animation: flip .5s ease-in-out;
+    }
+
+    .tile.win {
+      animation: bounce .6s ease;
+    }
+
+    .row.shake {
+      animation: shake .5s;
+    }
+
+    .keyboard {
+      display: grid;
+      gap: 8px;
+      width: min(500px, 100%);
+      padding: 0 8px 12px;
+    }
+
+    .keyboard-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .key {
+      flex: 1;
+      height: var(--key-height);
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: var(--key);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .key.wide {
+      flex: 1.5;
+      font-size: 12px;
+    }
+
+    .key:active {
+      filter: brightness(.85);
+    }
+
+    .key[data-state='correct'] {
+      background: var(--correct);
+    }
+
+    .key[data-state='present'] {
+      background: var(--present);
+    }
+
+    .key[data-state='absent'] {
+      background: var(--absent);
+      color: #aaa;
+    }
+
+    .toast {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      translate: -50% 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      border-radius: 8px;
+      background: var(--text);
+      color: var(--bg);
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgb(0 0 0 / .4);
+      transition: opacity .3s;
+    }
+
+    .toast[hidden] {
+      display: flex;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .toast button {
+      padding: 6px 12px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--correct);
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .help {
+      position: fixed;
+      top: 50%;
+      right: 32px;
+      translate: 0 -50%;
+      width: 280px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #1a1a1b;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .help h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .help p {
+      margin: 8px 0;
+      color: #d7dadc;
+    }
+
+    .example {
+      display: flex;
+      gap: 4px;
+      margin-top: 12px;
+    }
+
+    .example .tile {
+      width: 34px;
+      height: 34px;
+      font-size: 18px;
+    }
+
+    .close-help {
+      display: none;
+    }
+
+    @media (width < 1100px) {
+      .help {
+        display: none;
+        right: 50%;
+        translate: 50% -50%;
+        z-index: 10;
+        box-shadow: 0 20px 60px rgb(0 0 0 / .6);
+      }
+
+      .help.is-open {
+        display: block;
+      }
+
+      .close-help {
+        display: block;
+        margin: 16px auto 0;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--text);
+        color: var(--bg);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    }
+
+    @media (width < 420px) {
+      .modes button {
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+    }
+
+    @media (width >= 1100px) {
+      .help-button {
+        visibility: hidden;
+      }
+    }
+
+    @keyframes pop {
+      50% {
+        scale: 1.12;
+      }
+    }
+
+    @keyframes flip {
+      50% {
+        transform: rotateX(-90deg);
+      }
+    }
+
+    @keyframes bounce {
+
+      0%,
+      100% {
+        translate: 0 0;
+      }
+
+      40% {
+        translate: 0 -30%;
+      }
+
+      60% {
+        translate: 0 5%;
+      }
+    }
+
+    @keyframes shake {
+
+      10%,
+      90% {
+        translate: -2px 0;
+      }
+
+      20%,
+      80% {
+        translate: 4px 0;
+      }
+
+      30%,
+      50%,
+      70% {
+        translate: -6px 0;
+      }
+
+      40%,
+      60% {
+        translate: 6px 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <button class="help-button" id="help-button" aria-label="Cómo jugar">?</button>
+    <h1>WORDLE</h1>
+    <div class="modes" id="modes">
+      <button data-mode="daily" aria-pressed="true">Del día</button>
+      <button data-mode="random" aria-pressed="false">Aleatoria</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="board" id="board"></div>
+  </main>
+
+  <div class="keyboard" id="keyboard"></div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <aside class="help" id="help">
+    <h2>Cómo jugar</h2>
+    <p>Adivina la palabra oculta de <strong>5 letras</strong> en <strong>6 intentos</strong>. Cada intento debe ser una palabra válida.</p>
+    <div class="example">
+      <div class="tile" data-state="correct">g</div>
+      <div class="tile filled">a</div>
+      <div class="tile filled">t</div>
+      <div class="tile filled">o</div>
+      <div class="tile filled">s</div>
+    </div>
+    <p>La <strong>G</strong> está en la palabra y en su sitio.</p>
+    <div class="example">
+      <div class="tile filled">p</div>
+      <div class="tile filled">l</div>
+      <div class="tile" data-state="present">a</div>
+      <div class="tile filled">y</div>
+      <div class="tile filled">a</div>
+    </div>
+    <p>La <strong>A</strong> está en la palabra pero en otro sitio.</p>
+    <div class="example">
+      <div class="tile filled">m</div>
+      <div class="tile filled">u</div>
+      <div class="tile filled">n</div>
+      <div class="tile" data-state="absent">d</div>
+      <div class="tile filled">o</div>
+    </div>
+    <p>La <strong>D</strong> no está en la palabra.</p>
+    <button class="close-help" id="close-help">Entendido</button>
+  </aside>
+
+  <script type="module">
+    const WORD_LENGTH = 5
+    const MAX_ATTEMPTS = 6
+    const FLIP_DELAY = 300
+    const STORAGE_KEY = 'wordle-daily'
+
+    // Palabras comunes de 5 letras sin tildes (la Ñ cuenta como letra)
+    const WORDS = `
+abajo abeja abril abrir acero actor aguja ahora almas altar amigo amiga ancho antes
+apoyo arena arroz asado atlas ayuda baile bajar balas banco banda barco barro besos
+bicho blusa bolsa bomba borde botas brazo broma bruja bueno buena burro busca cable
+cabra cacao cajas calle calma calor camas campo canal canoa canto capaz carne carta
+casas causa cazar cebra ceder cerca cerdo cesta chica chico chile choza cielo cinco
+circo cisne civil clase clave clima cobre coche cofre color comer conde copas coral
+corte costa crema creer cruce cueva cuero culpa curso curva dados danza datos deber
+decir dedos dejar delta desde deseo dicho dieta disco doble dolor donde drama ducha
+dudas dueño dulce duque durar enano enero entre error estar etapa extra falda falla
+falso falta fango farol fauna favor feliz feria fibra ficha fiera filas final firma
+flaco flora flota fondo forma fotos freno fresa fruta fuego fuera fumar funda gafas
+gallo ganar garra gasto gatos genio gente globo golpe gordo gorra gotas grado gramo
+grano grasa grave gripe grito grupo guapo guiar gusto haber habla hacer hacha hacia
+harto hasta hecho hielo hiena higos hijos hilos himno hogar hojas hongo honor horas
+horno hotel hueco huevo humor ideal igual islas jarra jaula jefes joven joyas juego
+jugar jugos julio junio junta junto jurar justo labio lados lagos largo latas lavar
+lazos leche lejos lento leona letra libre libro lista litro llama llave lleno lobos
+local locos lucha luces lugar lunes madre magia mando manga mango manos manta mapas
+marca mares marzo masas matar mayor medio mejor menos mente menta mesas metal metro
+miedo mirar mismo mitad modas mojar molde monte moral morir mosca motor mover mucho
+mudar muela mujer mundo museo muslo nacer nadar nariz necio negro nieto nieve niñas
+niños noble noche norte notas novia novio nubes nuera nuevo nunca obras ocaso odiar
+oeste olivo ollas orden oreja otoño otros padre pagar pagos palma palos panda papel
+parar pared pasar paseo pasta patas patio patos pausa pavos pecho pedal pedir peine
+pelea pelos perla perro pesar pesca piano picar pieza pilas pinta pinza pipas pisos
+pista placa plano plata plato playa plaza plazo plomo pluma pobre pocos poder poema
+poeta polvo pollo poner posar potro prado preso primo prisa prosa pulga pulpo punto
+puños puros queso quien radio rampa ramas rango rayos recto redes regla reina reloj
+remar renta resto reyes rezar ricos riego rifle rigor rimas risas ritmo robar robot
+rocas rodar rodeo rojos rollo rombo ronda ropas rosas rubio rueda ruido rumbo rumor
+rural saber sabio sabor sacar salas salir salsa salto salud salvo santo sapos secar
+selva senda señal señor sello siglo silla sitio sobre socio solar soles sopas sordo
+suave subir sucio sudor suelo sueño suero sumar surco tabla tacos talla tanto tapas
+tarde tarea tarta tazas techo tecla tejer telas temas temor tenaz tener tenis texto
+tigre tinta tipos tirar tocar todos tomar tonto toque torre torta total trago traje
+trama trato tramo tribu trigo tripa trono tropa trozo truco tumba turno usado usted
+vacas valle valor vapor vasos velas veloz venir venta verde verbo verso viaje vidas
+viejo vigor villa vinos virus vista viuda vivir volar votar vuelo yates yegua yerba
+yemas yerno zanja zarpa zorro zumos zurdo zonas abuso agudo ajeno aleta algas alias
+altos alzar amado ambos ancla andar anexo anual apodo apuro araña arcos arder arduo
+armar aroma asilo astro atajo audio autor avena aviso ayuno azada bajos balsa bando
+barba barra bases basta bello besar bingo bocas bodas bolos bravo breve brisa bruto
+bucle buque burla caldo calvo canas canje caoba capas cargo carro casco caspa cazos
+cenar censo cerco cerro chapa ciego cifra citar claro clavo cobra coger colas combo
+coser costo crudo cubos cuota cutis dagas damas dardo denso deuda diosa duelo dunas
+duros echar ellas ellos enojo erizo estos etnia euros fallo faros fatal feroz fideo
+fijar filme flema fobia focas fonda forro frase fruto fugaz furia galgo gamba ganso
+garza gemir girar goles gomas gorro gozar grifo gruta guiso habas hadas helar hueso
+humos hurto jerga labor lacio lanza latir legal lemas lenta leyes ligar lijar limbo
+lince lucir lunar macho mafia malla malos mamut manso marco mareo matiz mecha medir
+menor meses metas micro mimos minas misil mitos mixto mocos moler momia monja monos
+multa muros nardo natal naves nexos nicho nidos nivel nodos nudos oasis ondas opaco
+optar oruga osado ostra oveja pacto palco panal paños papas pardo parte pasas pasos
+pavor pegar peces pelar penas perno pesas pesos picos pinos pisar pizza plaga plena
+pleno pompa porra poros prima pudor pulir pulso pumas punta rabia racha radar rasgo
+ratas raros razas recta regar reino remos retar retos rival rizos roble roles rosca
+rubia ruina rutas sable sacos saldo salmo sanar sanos sauce savia secos sedal serie
+serio sesgo sidra sobra sodio solos sonar suela sueco sutil tacto talco tango tapar
+tapiz tasas tejas tenue tesis tibio tieso tinte tiras tonos topos toros tosco trapo
+trazo trece tubos tumor turbo ultra urnas usual usura vagos vaina vales vejez veces
+venas verja vetar vicio vigas viral visor vital viudo vocal voces vodka voraz yogur
+`.trim().split(/\s+/)
+
+    // Un Set permite comprobar si una palabra existe en O(1)
+    const VALID_WORDS = new Set(WORDS)
+
+    const KEYBOARD_ROWS = [
+      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ñ'],
+      ['enter', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'backspace']
+    ]
+
+    const STATE_PRIORITY = { absent: 1, present: 2, correct: 3 }
+
+    const $board = document.querySelector('#board')
+    const $keyboard = document.querySelector('#keyboard')
+    const $toast = document.querySelector('#toast')
+    const $modes = document.querySelector('#modes')
+    const $help = document.querySelector('#help')
+
+    let mode = 'daily'
+    let solution = ''
+    let guesses = []
+    let currentGuess = ''
+    let isRevealing = false
+    let isOver = false
+    let toastTimeout = null
+
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+    // ---------- PALABRA DEL DÍA ----------
+    function getDayNumber(date = new Date()) {
+      // Usamos la fecha local (año, mes, día) para que la palabra cambie a medianoche
+      const today = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+      return Math.floor((today - Date.UTC(2024, 0, 1)) / 86_400_000)
+    }
+
+    function getDailyWord() {
+      // Multiplicar por un número primo "salta" por la lista: así las palabras
+      // de días consecutivos no van en orden alfabético. Es determinista:
+      // todo el mundo tiene la misma palabra el mismo día
+      const index = (getDayNumber() * 7919) % WORDS.length
+      return WORDS[index]
+    }
+
+    function getRandomWord() {
+      let word
+      do {
+        word = WORDS[Math.floor(Math.random() * WORDS.length)]
+      } while (word === solution && WORDS.length > 1)
+      return word
+    }
+
+    // ---------- ALGORITMO DE PISTAS ----------
+    // La parte delicada son las letras repetidas. Ejemplo: solución "perro",
+    // intento "error". Si coloreáramos letra a letra sin más, marcaríamos
+    // tres R en amarillo/verde aunque la solución solo tiene dos.
+    // Solución: dos pasadas.
+    //  1. Marcamos las VERDES (letra correcta en su sitio) y contamos cuántas
+    //     letras de la solución quedan "sin emparejar".
+    //  2. Recorremos el resto: una letra es AMARILLA solo si aún queda alguna
+    //     de ese tipo sin emparejar. Al usarla, descontamos el contador.
+    function evaluateGuess(guess, answer) {
+      const result = Array(WORD_LENGTH).fill('absent')
+      const remaining = {}
+
+      for (let i = 0; i < WORD_LENGTH; i++) {
+        if (guess[i] === answer[i]) {
+          result[i] = 'correct'
+        } else {
+          remaining[answer[i]] = (remaining[answer[i]] ?? 0) + 1
+        }
+      }
+
+      for (let i = 0; i < WORD_LENGTH; i++) {
+        if (result[i] === 'correct') continue
+        const letter = guess[i]
+        if (remaining[letter] > 0) {
+          result[i] = 'present'
+          remaining[letter]--
+        }
+      }
+
+      return result
+    }
+
+    // ---------- RENDER ----------
+    function createBoard() {
+      $board.replaceChildren()
+      for (let r = 0; r < MAX_ATTEMPTS; r++) {
+        const $row = document.createElement('div')
+        $row.className = 'row'
+        for (let c = 0; c < WORD_LENGTH; c++) {
+          const $tile = document.createElement('div')
+          $tile.className = 'tile'
+          $row.append($tile)
+        }
+        $board.append($row)
+      }
+    }
+
+    function createKeyboard() {
+      $keyboard.replaceChildren(...KEYBOARD_ROWS.map((row) => {
+        const $row = document.createElement('div')
+        $row.className = 'keyboard-row'
+        for (const key of row) {
+          const $key = document.createElement('button')
+          $key.className = 'key'
+          $key.dataset.key = key
+          if (key === 'enter') {
+            $key.textContent = 'Enviar'
+            $key.classList.add('wide')
+          } else if (key === 'backspace') {
+            $key.textContent = '⌫'
+            $key.setAttribute('aria-label', 'Borrar')
+            $key.classList.add('wide')
+          } else {
+            $key.textContent = key
+          }
+          $row.append($key)
+        }
+        return $row
+      }))
+    }
+
+    function getRow(index) {
+      return $board.children[index]
+    }
+
+    function renderCurrentRow() {
+      const $row = getRow(guesses.length)
+      if (!$row) return
+      Array.from($row.children).forEach(($tile, i) => {
+        const letter = currentGuess[i] ?? ''
+        $tile.textContent = letter
+        $tile.classList.toggle('filled', letter !== '')
+      })
+    }
+
+    function updateKeyboard(guess, result) {
+      // Una tecla solo "mejora" de estado: si ya es verde no la bajamos a amarilla
+      guess.split('').forEach((letter, i) => {
+        const $key = $keyboard.querySelector(`[data-key="${letter}"]`)
+        const current = $key.dataset.state
+        if (!current || STATE_PRIORITY[result[i]] > STATE_PRIORITY[current]) {
+          $key.dataset.state = result[i]
+        }
+      })
+    }
+
+    function showToast(message, { duration = 1600, action } = {}) {
+      clearTimeout(toastTimeout)
+      $toast.replaceChildren(message)
+      if (action) {
+        const $button = document.createElement('button')
+        $button.textContent = action.label
+        $button.addEventListener('click', action.onClick)
+        $toast.append($button)
+      }
+      $toast.hidden = false
+      if (duration) toastTimeout = setTimeout(() => { $toast.hidden = true }, duration)
+    }
+
+    // ---------- LÓGICA DEL JUEGO ----------
+    async function revealRow(rowIndex, guess, animate = true) {
+      const result = evaluateGuess(guess, solution)
+      const tiles = [...getRow(rowIndex).children]
+
+      tiles.forEach(($tile, i) => {
+        $tile.textContent = guess[i]
+        $tile.classList.add('filled')
+      })
+
+      if (animate) {
+        for (let i = 0; i < WORD_LENGTH; i++) {
+          const $tile = tiles[i]
+          $tile.classList.add('flip')
+          // Cambiamos el color justo a mitad del giro (cuando la casilla
+          // está de canto y no se ve), como en el Wordle original
+          setTimeout(() => { $tile.dataset.state = result[i] }, 250)
+          await sleep(FLIP_DELAY)
+        }
+        await sleep(250)
+      } else {
+        tiles.forEach(($tile, i) => { $tile.dataset.state = result[i] })
+      }
+
+      updateKeyboard(guess, result)
+      return result
+    }
+
+    function celebrate(rowIndex) {
+      const tiles = [...getRow(rowIndex).children]
+      tiles.forEach(($tile, i) => {
+        $tile.classList.remove('flip')
+        $tile.style.animationDelay = `${i * 100}ms`
+        $tile.classList.add('win')
+      })
+    }
+
+    function shakeRow() {
+      const $row = getRow(guesses.length)
+      $row.classList.remove('shake')
+      void $row.offsetWidth // reinicia la animación si ya estaba puesta
+      $row.classList.add('shake')
+    }
+
+    function saveDaily() {
+      if (mode !== 'daily') return
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ day: getDayNumber(), guesses }))
+      } catch {}
+    }
+
+    function loadDailyGuesses() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        if (saved?.day === getDayNumber() && Array.isArray(saved.guesses)) {
+          return saved.guesses.filter(guess => VALID_WORDS.has(guess)).slice(0, MAX_ATTEMPTS)
+        }
+      } catch {}
+      return []
+    }
+
+    function finishGame(won) {
+      isOver = true
+      const messages = ['¡Genio!', '¡Magnífico!', '¡Impresionante!', '¡Espléndido!', '¡Muy bien!', '¡Por los pelos!']
+      const text = won ? messages[guesses.length - 1] : `La palabra era ${solution.toUpperCase()}`
+      showToast(text, {
+        duration: 0,
+        action: { label: 'Jugar otra', onClick: () => startGame('random') }
+      })
+    }
+
+    async function submitGuess() {
+      if (currentGuess.length < WORD_LENGTH) {
+        shakeRow()
+        showToast('Faltan letras')
+        return
+      }
+      if (!VALID_WORDS.has(currentGuess)) {
+        shakeRow()
+        showToast('No está en la lista de palabras')
+        return
+      }
+
+      const guess = currentGuess
+      const rowIndex = guesses.length
+      isRevealing = true
+      guesses.push(guess)
+      currentGuess = ''
+      saveDaily()
+
+      await revealRow(rowIndex, guess)
+      isRevealing = false
+
+      if (guess === solution) {
+        celebrate(rowIndex)
+        finishGame(true)
+      } else if (guesses.length === MAX_ATTEMPTS) {
+        finishGame(false)
+      }
+    }
+
+    function handleKey(key) {
+      if (isRevealing || isOver) return
+
+      if (key === 'enter') {
+        submitGuess()
+      } else if (key === 'backspace') {
+        currentGuess = currentGuess.slice(0, -1)
+        renderCurrentRow()
+      } else if (/^[a-zñ]$/.test(key) && currentGuess.length < WORD_LENGTH) {
+        currentGuess += key
+        renderCurrentRow()
+      }
+    }
+
+    function normalizeKey(key) {
+      const lower = key.toLowerCase()
+      if (lower === 'ñ') return 'ñ'
+      // Quitamos tildes: "á" -> "a". NFD separa la letra de su tilde
+      // (que es un carácter aparte) y luego eliminamos las marcas diacríticas
+      return lower.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    }
+
+    function startGame(newMode = mode) {
+      mode = newMode
+      $modes.querySelectorAll('button').forEach(($button) => {
+        $button.setAttribute('aria-pressed', $button.dataset.mode === mode)
+      })
+
+      solution = mode === 'daily' ? getDailyWord() : getRandomWord()
+      guesses = []
+      currentGuess = ''
+      isOver = false
+      isRevealing = false
+      $toast.hidden = true
+      createBoard()
+      createKeyboard()
+
+      // En el modo diario recuperamos la partida de hoy si ya habíamos jugado
+      if (mode === 'daily') {
+        for (const guess of loadDailyGuesses()) {
+          guesses.push(guess)
+          revealRow(guesses.length - 1, guess, false)
+          if (guess === solution) break
+        }
+        const last = guesses.at(-1)
+        if (last === solution) finishGame(true)
+        else if (guesses.length === MAX_ATTEMPTS) finishGame(false)
+      }
+    }
+
+    // ---------- EVENTOS ----------
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        handleKey('enter')
+      } else if (event.key === 'Backspace') {
+        handleKey('backspace')
+      } else if (event.key.length === 1) {
+        handleKey(normalizeKey(event.key))
+      }
+    })
+
+    $keyboard.addEventListener('click', (event) => {
+      const $key = event.target.closest('.key')
+      if (!$key) return
+      $key.blur() // evita que Enter vuelva a "pulsar" la última tecla clicada
+      handleKey($key.dataset.key)
+    })
+
+    $modes.addEventListener('click', (event) => {
+      const $button = event.target.closest('button')
+      if ($button) {
+        $button.blur()
+        startGame($button.dataset.mode)
+      }
+    })
+
+    $board.addEventListener('animationend', (event) => {
+      event.target.classList.remove('shake')
+    })
+
+    document.querySelector('#help-button').addEventListener('click', () => $help.classList.add('is-open'))
+    document.querySelector('#close-help').addEventListener('click', () => $help.classList.remove('is-open'))
+
+    startGame('daily')
+  </script>
+</body>
+
+</html>

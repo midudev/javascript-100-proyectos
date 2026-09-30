@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>70 - Dino Runner</title>
+  <style>
+    :root {
+      --bg: #f7f7f7;
+      --fg: #535353;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .title {
+      position: fixed;
+      top: 18px;
+      left: 24px;
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .help {
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      translate: -50% 0;
+      margin: 0;
+      width: max-content;
+      max-width: calc(100% - 32px);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.8;
+      opacity: .75;
+      pointer-events: none;
+      transition: opacity .4s;
+    }
+
+    .help kbd {
+      padding: 1px 7px;
+      border: 2px solid currentColor;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 12px;
+    }
+
+    .help.is-hidden {
+      opacity: 0;
+    }
+
+    .duck-button {
+      display: none;
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 3px solid var(--fg);
+      background: transparent;
+      color: var(--fg);
+      font-size: 28px;
+      touch-action: none;
+    }
+
+    /* Botón para agacharse solo en pantallas táctiles */
+    @media (pointer: coarse) {
+      .duck-button {
+        display: block;
+      }
+
+      .help .keys {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+  <h1 class="title">Dino Runner</h1>
+  <p class="help" id="help">
+    <span class="keys"><kbd>Espacio</kbd> / <kbd>↑</kbd> saltar (mantén para saltar más) · <kbd>↓</kbd> agacharse<br></span>
+    Pulsa <strong>espacio</strong> o toca la pantalla para jugar
+  </p>
+  <button class="duck-button" id="duck" type="button" aria-label="Agacharse">⬇</button>
+
+  <script type="module">
+    // Tamaño (en unidades lógicas) de cada "píxel" de los sprites
+    const PIXEL = 3
+
+    // --- Sprites en pixel art: cada '#' es un "píxel" del sprite ---
+    const DINO_STAND = [
+      '...........########.',
+      '..........##.#######',
+      '..........##########',
+      '..........##########',
+      '..........##########',
+      '..........#####.....',
+      '..........########..',
+      '#.........#####.....',
+      '#........######.....',
+      '##.....##########...',
+      '###..##########.#...',
+      '###############.....',
+      '.#############......',
+      '..############......',
+      '...##########.......',
+      '....########........',
+      '.....######.........'
+    ]
+    const LEGS_STAND = [
+      '.....###..###.......',
+      '.....##....##.......',
+      '.....#......#.......',
+      '.....##.....##......'
+    ]
+    const LEGS_RUN_1 = [
+      '.....###..###.......',
+      '.....##....###......',
+      '.....#..............',
+      '.....##.............'
+    ]
+    const LEGS_RUN_2 = [
+      '.....###..###.......',
+      '....###....##.......',
+      '............#.......',
+      '............##......'
+    ]
+    const DUCK_BODY = [
+      '..................########',
+      '#.......#######..##.######',
+      '##..#####################.',
+      '#########################.',
+      '.########################.',
+      '..################........',
+      '...#############.######...',
+      '....###########...........',
+      '.....#########.#..........'
+    ]
+    const DUCK_LEGS_1 = [
+      '......###..###............',
+      '......##....##............',
+      '......#......#............',
+      '......##.....##...........'
+    ]
+    const DUCK_LEGS_2 = [
+      '......###..###............',
+      '.....###....##............',
+      '.............#............',
+      '.............##...........'
+    ]
+    const CACTUS_SMALL = [
+      '....#....',
+      '...###...',
+      '...###...',
+      '#..###...',
+      '#..###..#',
+      '#..###..#',
+      '#..###..#',
+      '##.###..#',
+      '.#####.##',
+      '..######.',
+      '...###...',
+      '...###...',
+      '...###...',
+      '...###...',
+      '...###...',
+      '...###...',
+      '...###...'
+    ]
+    const CACTUS_LARGE = [
+      '......#......',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.#...###.....',
+      '###..###.....',
+      '###..###..#..',
+      '###..###.###.',
+      '###..###.###.',
+      '###..###.###.',
+      '###..###.###.',
+      '###..###.###.',
+      '.#######.###.',
+      '.....#######.',
+      '.....######..',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....',
+      '.....###.....'
+    ]
+    const BIRD_UP = [
+      '.......#..............',
+      '.......##.............',
+      '.......###............',
+      '.......####...........',
+      '....#..#####..........',
+      '...##..######.........',
+      '..###..#######........',
+      '######################',
+      '....##################',
+      '.......###########....',
+      '.........######.......',
+      '......................',
+      '......................',
+      '......................',
+      '......................',
+      '......................'
+    ]
+    const BIRD_DOWN = [
+      '......................',
+      '......................',
+      '......................',
+      '......................',
+      '....#.................',
+      '...##.................',
+      '..###.................',
+      '######################',
+      '....##################',
+      '.......###########....',
+      '.......######.........',
+      '.......#####..........',
+      '.......####...........',
+      '.......###............',
+      '.......##.............',
+      '.......#..............'
+    ]
+    const CLOUD = [
+      '......######.......',
+      '....##......##.....',
+      '..##..........#....',
+      '.#.............###.',
+      '#.................#',
+      '###################'
+    ]
+    const MOON = [
+      '..###...',
+      '...###..',
+      '....###.',
+      '....###.',
+      '....####',
+      '....####',
+      '....###.',
+      '....###.',
+      '...###..',
+      '..###...'
+    ]
+
+    // Cada sprite se "compila" una vez en tramos horizontales para dibujar
+    // con pocos fillRect. Las hitboxes van en píxeles del sprite y son
+    // algo más pequeñas que el dibujo: un choque "por un píxel" frustra.
+    const SPRITES = {
+      run1: compileSprite([...DINO_STAND, ...LEGS_RUN_1], [[11, 0, 8, 6], [2, 7, 13, 8], [5, 15, 8, 5]]),
+      run2: compileSprite([...DINO_STAND, ...LEGS_RUN_2], [[11, 0, 8, 6], [2, 7, 13, 8], [5, 15, 8, 5]]),
+      stand: compileSprite([...DINO_STAND, ...LEGS_STAND], [[11, 0, 8, 6], [2, 7, 13, 8], [5, 15, 8, 5]]),
+      blink: compileSprite([...DINO_STAND.map((row, i) => (i === 1 ? '..........##########' : row)), ...LEGS_STAND], []),
+      dead: compileSprite([...DINO_STAND.map((row, i) => (
+        i === 1 ? '..........#.#.######' : i === 2 ? '..........##.#######' : i === 3 ? '..........#.#.######' : row
+      )), ...LEGS_STAND], []),
+      duck1: compileSprite([...DUCK_BODY, ...DUCK_LEGS_1], [[1, 1, 24, 7], [6, 8, 9, 4]]),
+      duck2: compileSprite([...DUCK_BODY, ...DUCK_LEGS_2], [[1, 1, 24, 7], [6, 8, 9, 4]]),
+      cactusSmall: compileSprite(CACTUS_SMALL, [[3, 0, 3, 17], [0, 3, 9, 6]]),
+      cactusLarge: compileSprite(CACTUS_LARGE, [[5, 0, 3, 25], [0, 5, 12, 9]]),
+      birdUp: compileSprite(BIRD_UP, [[2, 5, 12, 2], [0, 7, 22, 3]]),
+      birdDown: compileSprite(BIRD_DOWN, [[2, 5, 12, 2], [0, 7, 22, 3]]),
+      cloud: compileSprite(CLOUD, []),
+      moon: compileSprite(MOON, [])
+    }
+
+    // --- Constantes del juego (unidades lógicas y segundos) ---
+    const REFERENCE_WIDTH = 820
+    const REFERENCE_HEIGHT = 400
+    const DINO_X = 60
+    const GRAVITY = 2400
+    const JUMP_VELOCITY = 820
+    const DROP_VELOCITY = 300
+    const MIN_JUMP_HEIGHT = 55
+    const FAST_FALL_GRAVITY = 5000
+    const START_SPEED = 380
+    const MAX_SPEED = 1000
+    const ACCELERATION = 7
+    const SCORE_PER_UNIT = 0.025
+    const NIGHT_EVERY = 700
+    const BIRD_MIN_SCORE = 250
+    const BIRD_EXTRA_SPEED = 40
+    // Altura del sprite del pájaro sobre el suelo: bajo (hay que saltar),
+    // medio (agacharse o saltar) y alto (pasa por encima si no saltas)
+    const BIRD_LEVELS = [6, 30, 60]
+    const RECORD_KEY = 'dino-runner:record'
+    const COLORS = {
+      day: { bg: [247, 247, 247], fg: [83, 83, 83], soft: [200, 200, 200] },
+      night: { bg: [32, 33, 36], fg: [214, 214, 214], soft: [95, 99, 104] }
+    }
+
+    const canvas = document.querySelector('#canvas')
+    const ctx = canvas.getContext('2d')
+    const $help = document.querySelector('#help')
+
+    // Tamaño del mundo en unidades lógicas y factor de escala a píxeles reales
+    let worldWidth = REFERENCE_WIDTH
+    let worldHeight = REFERENCE_HEIGHT
+    let groundY = 300
+    let pixelScale = 1
+
+    let state
+    let record = loadRecord()
+    let lastTime = performance.now()
+    let stars = []
+
+    function compileSprite(rows, hitboxes) {
+      const runs = []
+      rows.forEach((row, y) => {
+        let x = 0
+        while (x < row.length) {
+          if (row[x] !== '#') {
+            x++
+            continue
+          }
+          const start = x
+          while (row[x] === '#') x++
+          runs.push([start, y, x - start])
+        }
+      })
+      return {
+        runs,
+        width: Math.max(...rows.map(row => row.length)) * PIXEL,
+        height: rows.length * PIXEL,
+        hitboxes: hitboxes.map(([x, y, w, h]) => ({ x: x * PIXEL, y: y * PIXEL, w: w * PIXEL, h: h * PIXEL }))
+      }
+    }
+
+    function loadRecord() {
+      try {
+        return Number(localStorage.getItem(RECORD_KEY)) || 0
+      } catch {
+        return 0
+      }
+    }
+
+    function saveRecord(value) {
+      record = value
+      try {
+        localStorage.setItem(RECORD_KEY, String(value))
+      } catch { }
+    }
+
+    // --- Estado ---
+
+    function createState(mode) {
+      return {
+        mode,
+        speed: START_SPEED,
+        score: 0,
+        flashTimer: 0,
+        obstacles: [],
+        clouds: [
+          { x: worldWidth * 0.3, y: groundY * 0.35 },
+          { x: worldWidth * 0.65, y: groundY * 0.28 },
+          { x: worldWidth * 0.9, y: groundY * 0.45 }
+        ],
+        pebbles: Array.from({ length: 40 }, () => createPebble(Math.random() * worldWidth)),
+        nextObstacleIn: worldWidth * 0.45,
+        night: 0,
+        overTime: 0,
+        dino: {
+          height: 0,
+          velocity: 0,
+          grounded: true,
+          ducking: false,
+          jumpHeld: false,
+          animTimer: 0,
+          frame: 0,
+          blinkTimer: 2
+        }
+      }
+    }
+
+    function createPebble(x) {
+      return { x, y: 4 + Math.random() * 14, w: Math.random() < 0.2 ? 6 : 2 + Math.random() * 3 }
+    }
+
+    function createObstacle() {
+      const canBird = state.score > BIRD_MIN_SCORE || state.mode === 'demo'
+      if (canBird && Math.random() < 0.28) {
+        const level = BIRD_LEVELS[Math.floor(Math.random() * BIRD_LEVELS.length)]
+        return {
+          type: 'bird', sprite: SPRITES.birdUp, x: worldWidth + 20, bottom: level,
+          count: 1, step: 0, width: SPRITES.birdUp.width, flapTimer: 0
+        }
+      }
+
+      /*
+        DIFICULTAD PROGRESIVA: además de que la velocidad sube poco a poco,
+        los grupos de 3 cactus solo aparecen cuando ya vamos rápido
+        (a más velocidad, más distancia recorremos en el aire).
+      */
+      const sprite = Math.random() < 0.45 ? SPRITES.cactusLarge : SPRITES.cactusSmall
+      const maxGroup = state.speed > 520 ? 3 : 2
+      const count = 1 + Math.floor(Math.random() * maxGroup)
+      const step = sprite.width - PIXEL
+      return { type: 'cactus', sprite, x: worldWidth + 20, bottom: 0, count, step, width: step * (count - 1) + sprite.width }
+    }
+
+    // --- Entrada ---
+
+    function startGame() {
+      state = createState('playing')
+      $help.classList.add('is-hidden')
+      jump()
+    }
+
+    function jump() {
+      const dino = state.dino
+      dino.jumpHeld = true
+      if (!dino.grounded || dino.ducking) return
+      dino.velocity = JUMP_VELOCITY
+      dino.grounded = false
+    }
+
+    function releaseJump() {
+      state.dino.jumpHeld = false
+    }
+
+    function setDucking(isDucking) {
+      state.dino.ducking = isDucking
+    }
+
+    function pressAction() {
+      if (state.mode === 'demo') return startGame()
+      if (state.mode === 'over') {
+        // Pequeña espera para no reiniciar sin querer al seguir pulsando
+        if (performance.now() - state.overTime > 400) startGame()
+        return
+      }
+      jump()
+    }
+
+    // --- Actualización (delta time) ---
+
+    /*
+      DELTA TIME: cada frame medimos cuántos segundos han pasado (dt) y
+      multiplicamos todas las velocidades por él. Así el dinosaurio corre
+      igual en una pantalla de 60 Hz que en una de 144 Hz, y si un frame
+      tarda más, el siguiente compensa moviendo más.
+    */
+    function update(dt) {
+      updateNight(dt)
+      if (state.mode === 'over') return
+
+      if (state.mode === 'demo') autopilot()
+
+      state.speed = Math.min(MAX_SPEED, state.speed + ACCELERATION * dt)
+      const previousScore = state.score
+      state.score += state.speed * dt * SCORE_PER_UNIT
+      if (state.mode === 'playing' && Math.floor(state.score / 100) > Math.floor(previousScore / 100)) {
+        state.flashTimer = 0.9
+      }
+      state.flashTimer = Math.max(0, state.flashTimer - dt)
+
+      updateDino(dt)
+      updateObstacles(dt)
+      updateScenery(dt)
+
+      if (checkCollision()) gameOver()
+    }
+
+    function updateNight(dt) {
+      // Cada NIGHT_EVERY puntos alternamos entre día y noche
+      const target = Math.floor(state.score / NIGHT_EVERY) % 2
+      state.night += Math.sign(target - state.night) * Math.min(Math.abs(target - state.night), dt * 0.8)
+    }
+
+    function updateDino(dt) {
+      const dino = state.dino
+
+      if (!dino.grounded) {
+        // Salto variable: si sueltas pronto, cortamos la velocidad de subida
+        if (!dino.jumpHeld && dino.height > MIN_JUMP_HEIGHT && dino.velocity > DROP_VELOCITY) {
+          dino.velocity = DROP_VELOCITY
+        }
+        // Agacharse en el aire = caer más rápido
+        const gravity = dino.ducking ? FAST_FALL_GRAVITY : GRAVITY
+        dino.velocity -= gravity * dt
+        dino.height += dino.velocity * dt
+        if (dino.height <= 0) {
+          dino.height = 0
+          dino.velocity = 0
+          dino.grounded = true
+        }
+      }
+
+      // La animación de correr va más rápida cuanto más rápido corremos
+      dino.animTimer += dt * state.speed / START_SPEED
+      if (dino.animTimer > 0.1) {
+        dino.animTimer = 0
+        dino.frame = 1 - dino.frame
+      }
+    }
+
+    function updateObstacles(dt) {
+      for (const obstacle of state.obstacles) {
+        const extra = obstacle.type === 'bird' ? BIRD_EXTRA_SPEED : 0
+        obstacle.x -= (state.speed + extra) * dt
+        if (obstacle.type === 'bird') {
+          obstacle.flapTimer += dt
+          obstacle.sprite = Math.floor(obstacle.flapTimer / 0.18) % 2 ? SPRITES.birdDown : SPRITES.birdUp
+        }
+      }
+      state.obstacles = state.obstacles.filter(obstacle => obstacle.x + obstacle.width > -20)
+
+      state.nextObstacleIn -= state.speed * dt
+      if (state.nextObstacleIn <= 0) {
+        const obstacle = createObstacle()
+        state.obstacles.push(obstacle)
+        // Hueco mínimo en TIEMPO (no en píxeles): siempre da tiempo a saltar
+        state.nextObstacleIn = obstacle.width + state.speed * (0.8 + Math.random() * 0.9)
+      }
+    }
+
+    function updateScenery(dt) {
+      // Parallax: las nubes (lejanas) se mueven mucho más despacio que el suelo
+      for (const cloud of state.clouds) cloud.x -= state.speed * 0.12 * dt
+      state.clouds = state.clouds.filter(cloud => cloud.x > -SPRITES.cloud.width)
+      const lastCloud = state.clouds.at(-1)
+      if (!lastCloud || lastCloud.x < worldWidth - 180 - Math.random() * 400) {
+        state.clouds.push({ x: worldWidth + 20, y: groundY * (0.25 + Math.random() * 0.35) })
+      }
+
+      for (const pebble of state.pebbles) {
+        pebble.x -= state.speed * dt
+        if (pebble.x < -10) Object.assign(pebble, createPebble(worldWidth + Math.random() * 60))
+      }
+    }
+
+    // --- Colisiones ---
+
+    function getDinoSprite() {
+      const { dino, mode } = state
+      if (mode === 'over') return SPRITES.dead
+      if (dino.ducking && dino.grounded) return dino.frame ? SPRITES.duck2 : SPRITES.duck1
+      if (!dino.grounded) return SPRITES.stand
+      return dino.frame ? SPRITES.run2 : SPRITES.run1
+    }
+
+    function getRects(sprite, x, bottom) {
+      const top = groundY - bottom - sprite.height
+      return sprite.hitboxes.map(box => ({ x: x + box.x, y: top + box.y, w: box.w, h: box.h }))
+    }
+
+    function getObstacleRects(obstacle) {
+      const rects = []
+      for (let i = 0; i < obstacle.count; i++) {
+        rects.push(...getRects(obstacle.sprite, obstacle.x + i * obstacle.step, obstacle.bottom))
+      }
+      return rects
+    }
+
+    function overlaps(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+    }
+
+    function checkCollision() {
+      const dinoSprite = getDinoSprite()
+      const dinoRects = getRects(dinoSprite, DINO_X, state.dino.height)
+      return state.obstacles.some(obstacle => {
+        // Descarte rápido: si ni siquiera se solapan en X, no miramos más
+        if (obstacle.x > DINO_X + dinoSprite.width || obstacle.x + obstacle.width < DINO_X) return false
+        const obstacleRects = getObstacleRects(obstacle)
+        return dinoRects.some(a => obstacleRects.some(b => overlaps(a, b)))
+      })
+    }
+
+    function gameOver() {
+      if (state.mode === 'demo') {
+        // En la demo simplemente volvemos a empezar
+        state = createState('demo')
+        return
+      }
+      state.mode = 'over'
+      state.overTime = performance.now()
+      state.dino.ducking = false
+      const score = Math.floor(state.score)
+      if (score > record) saveRecord(score)
+    }
+
+    // --- Piloto automático para la demo inicial ---
+
+    function autopilot() {
+      const dino = state.dino
+      const next = state.obstacles.find(obstacle => obstacle.x + obstacle.width > DINO_X)
+      if (!next) {
+        dino.ducking = false
+        return
+      }
+
+      const closingSpeed = state.speed + (next.type === 'bird' ? BIRD_EXTRA_SPEED : 0)
+      const timeToCenter = (next.x + next.width / 2 - (DINO_X + 30)) / closingSpeed
+
+      if (next.type === 'bird' && next.bottom === BIRD_LEVELS[2]) {
+        dino.ducking = false
+      } else if (next.type === 'bird' && next.bottom === BIRD_LEVELS[1]) {
+        dino.ducking = timeToCenter < 0.4
+      } else if (timeToCenter < JUMP_VELOCITY / GRAVITY) {
+        // Saltamos para estar en lo más alto justo encima del obstáculo
+        dino.ducking = false
+        jump()
+      }
+    }
+
+    // --- Dibujo ---
+
+    function mix(a, b, t) {
+      return `rgb(${a.map((value, i) => Math.round(value + (b[i] - value) * t)).join(', ')})`
+    }
+
+    // Convertimos coordenadas lógicas a píxeles reales redondeando,
+    // para que los "píxeles" del sprite no tengan huecos ni bordes borrosos
+    function fillRect(x, y, w, h) {
+      const x0 = Math.round(x * pixelScale)
+      const y0 = Math.round(y * pixelScale)
+      ctx.fillRect(x0, y0, Math.round((x + w) * pixelScale) - x0, Math.round((y + h) * pixelScale) - y0)
+    }
+
+    function drawSprite(sprite, x, bottom) {
+      const top = groundY - bottom - sprite.height
+      for (const [col, row, length] of sprite.runs) {
+        fillRect(x + col * PIXEL, top + row * PIXEL, length * PIXEL, PIXEL)
+      }
+    }
+
+    function drawText(text, x, y, size, align = 'left') {
+      ctx.font = `bold ${Math.round(size * pixelScale)}px ui-monospace, Menlo, Consolas, monospace`
+      ctx.textAlign = align
+      ctx.fillText(text, Math.round(x * pixelScale), Math.round(y * pixelScale))
+    }
+
+    function draw() {
+      const { day, night } = COLORS
+      const t = state.night
+      const bg = mix(day.bg, night.bg, t)
+      const fg = mix(day.fg, night.fg, t)
+      const soft = mix(day.soft, night.soft, t)
+
+      document.body.style.setProperty('--bg', bg)
+      document.body.style.setProperty('--fg', fg)
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      if (t > 0) drawNightSky(t, fg)
+
+      ctx.fillStyle = soft
+      for (const cloud of state.clouds) drawSprite(SPRITES.cloud, cloud.x, groundY - cloud.y)
+
+      ctx.fillStyle = fg
+      fillRect(0, groundY - 1, worldWidth, 2)
+      for (const pebble of state.pebbles) fillRect(pebble.x, groundY + pebble.y, pebble.w, 2)
+
+      for (const obstacle of state.obstacles) {
+        for (let i = 0; i < obstacle.count; i++) drawSprite(obstacle.sprite, obstacle.x + i * obstacle.step, obstacle.bottom)
+      }
+
+      drawDino()
+      drawHud()
+    }
+
+    function drawNightSky(t, fg) {
+      ctx.globalAlpha = t
+      ctx.fillStyle = fg
+      drawSprite(SPRITES.moon, worldWidth * 0.78, groundY * 0.62)
+      const now = performance.now() / 1000
+      for (const star of stars) {
+        ctx.globalAlpha = t * (0.5 + 0.5 * Math.sin(now * 2 + star.phase))
+        fillRect(star.x * worldWidth, star.y * groundY, 3, 3)
+      }
+      ctx.globalAlpha = 1
+    }
+
+    function drawDino() {
+      const dino = state.dino
+      let sprite = getDinoSprite()
+      // Parpadeo ocasional mientras está en la demo o quieto
+      if (state.mode !== 'over' && dino.grounded && !dino.ducking) {
+        dino.blinkTimer -= 1 / 60
+        if (dino.blinkTimer < 0.12 && state.mode === 'demo') sprite = SPRITES.blink
+        if (dino.blinkTimer < 0) dino.blinkTimer = 2 + Math.random() * 3
+      }
+      drawSprite(sprite, DINO_X, dino.height)
+    }
+
+    function drawHud() {
+      const score = String(Math.floor(state.score)).padStart(5, '0')
+      const best = String(record).padStart(5, '0')
+      // Al llegar a cada centena la puntuación parpadea
+      const hideScore = state.flashTimer > 0 && Math.floor(state.flashTimer * 8) % 2 === 0
+      drawText(`HI ${best}  ${hideScore ? '     ' : score}`, worldWidth - 24, 42, 20, 'right')
+
+      if (state.mode === 'over') {
+        drawText('G A M E   O V E R', worldWidth / 2, groundY * 0.5, 26, 'center')
+        drawText('Pulsa espacio o toca para reiniciar', worldWidth / 2, groundY * 0.5 + 36, 14, 'center')
+      }
+    }
+
+    // --- Bucle principal ---
+
+    function frame(now) {
+      // Limitamos dt: si la pestaña estuvo oculta no queremos un salto enorme
+      const dt = Math.min((now - lastTime) / 1000, 1 / 30)
+      lastTime = now
+      update(dt)
+      draw()
+      requestAnimationFrame(frame)
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const cssWidth = window.innerWidth
+      const cssHeight = window.innerHeight
+      // El mundo mide al menos REFERENCE_WIDTH x REFERENCE_HEIGHT unidades
+      // En móviles en vertical usamos un mundo algo más estrecho para que el dino no sea diminuto
+      const referenceWidth = cssWidth < 700 ? 560 : REFERENCE_WIDTH
+      const scale = Math.min(cssWidth / referenceWidth, cssHeight / REFERENCE_HEIGHT)
+      canvas.width = Math.round(cssWidth * dpr)
+      canvas.height = Math.round(cssHeight * dpr)
+      pixelScale = scale * dpr
+      worldWidth = cssWidth / scale
+      worldHeight = cssHeight / scale
+      groundY = Math.min(worldHeight * 0.68, worldHeight / 2 + 160)
+      ctx.textBaseline = 'middle'
+    }
+
+    // --- Eventos ---
+
+    const JUMP_KEYS = ['Space', 'ArrowUp', 'KeyW']
+    const DUCK_KEYS = ['ArrowDown', 'KeyS']
+
+    document.addEventListener('keydown', (event) => {
+      if (JUMP_KEYS.includes(event.code)) {
+        event.preventDefault()
+        if (!event.repeat) pressAction()
+      } else if (DUCK_KEYS.includes(event.code)) {
+        event.preventDefault()
+        if (state.mode === 'playing') setDucking(true)
+      }
+    })
+
+    document.addEventListener('keyup', (event) => {
+      if (JUMP_KEYS.includes(event.code) && state.mode === 'playing') releaseJump()
+      if (DUCK_KEYS.includes(event.code) && state.mode === 'playing') setDucking(false)
+    })
+
+    canvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault()
+      pressAction()
+    })
+    canvas.addEventListener('pointerup', () => {
+      if (state.mode === 'playing') releaseJump()
+    })
+
+    const $duck = document.querySelector('#duck')
+    $duck.addEventListener('pointerdown', (event) => {
+      event.preventDefault()
+      if (state.mode === 'playing') setDucking(true)
+      else pressAction()
+    })
+    $duck.addEventListener('pointerup', () => setDucking(false))
+    $duck.addEventListener('pointercancel', () => setDucking(false))
+
+    window.addEventListener('resize', resize)
+
+    resize()
+    stars = Array.from({ length: 30 }, () => ({ x: Math.random(), y: Math.random() * 0.7, phase: Math.random() * Math.PI * 2 }))
+    state = createState('demo')
+    // En la demo adelantamos un poco la escena para que ya haya obstáculos
+    for (let i = 0; i < 90; i++) update(1 / 60)
+    requestAnimationFrame(frame)
+  </script>
+</body>
+
+</html>

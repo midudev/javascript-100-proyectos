@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>31 - Buscaminas</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: light;
+      --gray: #c0c0c0;
+      --light: #ffffff;
+      --dark: #808080;
+      --bevel: 3px;
+      /* El tamaño de celda se adapta al nivel y a la pantalla */
+      --cell: max(22px, min(30px, calc((100vw - 72px) / var(--cols)), calc((100dvh - 250px) / var(--rows))));
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 20% 20%, #7fd6d0 0 20%, transparent 50%),
+        #008080;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Bordes en relieve al estilo Windows 95 */
+    .raised {
+      border: var(--bevel) solid;
+      border-color: var(--light) var(--dark) var(--dark) var(--light);
+    }
+
+    .sunken {
+      border: var(--bevel) solid;
+      border-color: var(--dark) var(--light) var(--light) var(--dark);
+    }
+
+    .window {
+      max-width: 100%;
+      background: var(--gray);
+      box-shadow: 0 20px 50px #0005;
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 6px;
+      background: linear-gradient(90deg, #000080, #1084d0);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .titlebar span:last-child {
+      font-weight: 400;
+      font-size: 12px;
+      opacity: .8;
+    }
+
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 6px;
+    }
+
+    .menu button {
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 10px;
+      background: var(--gray);
+      cursor: pointer;
+    }
+
+    .menu button[aria-pressed="true"] {
+      border-color: var(--dark) var(--light) var(--light) var(--dark);
+      background: #d4d4d4;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 0 6px 6px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+    }
+
+    .lcd {
+      min-width: 64px;
+      padding: 2px 4px;
+      background: #000;
+      color: #ff1a1a;
+      font-family: 'Courier New', ui-monospace, monospace;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 2px;
+      text-align: center;
+      text-shadow: 0 0 6px #ff000088;
+      border: 2px solid;
+      border-color: var(--dark) var(--light) var(--light) var(--dark);
+    }
+
+    .face {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      font-size: 24px;
+      line-height: 1;
+      background: var(--gray);
+      cursor: pointer;
+    }
+
+    .face:active {
+      border-color: var(--dark) var(--light) var(--light) var(--dark);
+    }
+
+    .board-wrapper {
+      max-width: calc(100vw - 44px);
+      overflow: auto;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(var(--cols), var(--cell));
+      grid-auto-rows: var(--cell);
+      width: max-content;
+      user-select: none;
+      -webkit-user-select: none;
+      /* Evita el menú al mantener pulsado en móvil (lo usamos para las banderas) */
+      -webkit-touch-callout: none;
+    }
+
+    .cell {
+      display: grid;
+      place-items: center;
+      padding: 0;
+      font: 800 calc(var(--cell) * .6) / 1 system-ui, sans-serif;
+      background: var(--gray);
+      border: calc(var(--cell) * .12) solid;
+      border-color: var(--light) var(--dark) var(--dark) var(--light);
+      cursor: pointer;
+    }
+
+    .cell.revealed {
+      border: 0;
+      border-right: 1px solid var(--dark);
+      border-bottom: 1px solid var(--dark);
+      background: #bdbdbd;
+      cursor: default;
+    }
+
+    .cell.flagged {
+      font-size: calc(var(--cell) * .5);
+    }
+
+    .cell.mine {
+      font-size: calc(var(--cell) * .55);
+    }
+
+    .cell.exploded {
+      background: #ff2d2d;
+    }
+
+    /* Colores clásicos de los números */
+    .cell[data-n="1"] { color: #0000ff }
+    .cell[data-n="2"] { color: #008000 }
+    .cell[data-n="3"] { color: #ff0000 }
+    .cell[data-n="4"] { color: #000080 }
+    .cell[data-n="5"] { color: #800000 }
+    .cell[data-n="6"] { color: #008080 }
+    .cell[data-n="7"] { color: #000000 }
+    .cell[data-n="8"] { color: #808080 }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 13px;
+    }
+
+    .footer p {
+      margin: 0;
+      min-height: 1.2em;
+    }
+
+    .footer button {
+      font: inherit;
+      font-size: 13px;
+      padding: 3px 10px;
+      background: var(--gray);
+      cursor: pointer;
+    }
+
+    .footer button[aria-pressed="true"] {
+      border-color: var(--dark) var(--light) var(--light) var(--dark);
+      background: #ffe7a3;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="window raised">
+    <div class="titlebar">
+      <span>💣 Buscaminas</span>
+      <span>F2: nueva partida</span>
+    </div>
+
+    <nav class="menu" id="levels" aria-label="Nivel">
+      <button class="raised" data-level="beginner">Principiante</button>
+      <button class="raised" data-level="intermediate">Intermedio</button>
+      <button class="raised" data-level="expert">Experto</button>
+    </nav>
+
+    <div class="content">
+      <div class="status sunken">
+        <output class="lcd" id="mines-left" aria-label="Minas restantes">010</output>
+        <button class="face raised" id="face" aria-label="Nueva partida">🙂</button>
+        <output class="lcd" id="timer" aria-label="Tiempo">000</output>
+      </div>
+
+      <div class="board-wrapper sunken">
+        <div class="board" id="board"></div>
+      </div>
+
+      <div class="footer">
+        <p id="message">Clic: descubrir · Clic derecho: bandera</p>
+        <button class="raised" id="flag-mode" aria-pressed="false" title="Para pantallas táctiles">🚩 Modo bandera</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const LEVELS = {
+      beginner: { rows: 9, cols: 9, mines: 10 },
+      intermediate: { rows: 16, cols: 16, mines: 40 },
+      expert: { rows: 16, cols: 30, mines: 99 }
+    }
+    const FACES = { playing: '🙂', pressing: '😮', lost: '😵', won: '😎' }
+    const MAX_TIME = 999
+    const BEST_KEY = 'minesweeper-best'
+
+    const $board = $('#board')
+    const $face = $('#face')
+    const $minesLeft = $('#mines-left')
+    const $timer = $('#timer')
+    const $message = $('#message')
+    const $flagMode = $('#flag-mode')
+
+    let level = 'intermediate'
+    let rows, cols, totalMines
+    let cells = [] // { mine, adjacent, state: 'hidden' | 'revealed' | 'flagged', wrong }
+    let status = 'ready' // ready | playing | won | lost
+    let flags = 0
+    let revealed = 0
+    let seconds = 0
+    let timerId = null
+    let flagMode = false
+
+    /* ---------- Matriz ---------- */
+
+    // Guardamos el tablero como un array plano: la celda (x, y) está en
+    // el índice y * cols + x. Es más sencillo de recorrer que una matriz.
+    const toIndex = (x, y) => y * cols + x
+
+    // Las (hasta) 8 celdas vecinas, sin salirnos de los bordes
+    function neighbors(index) {
+      const x = index % cols
+      const y = Math.floor(index / cols)
+      const result = []
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue
+          const nx = x + dx
+          const ny = y + dy
+          if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) result.push(toIndex(nx, ny))
+        }
+      }
+      return result
+    }
+
+    // Las minas se colocan DESPUÉS del primer clic, excluyendo esa celda
+    // y sus vecinas: así el primer clic nunca es mina y siempre abre zona
+    function placeMines(safeIndex) {
+      const safe = new Set([safeIndex, ...neighbors(safeIndex)])
+      // Si no cupieran las minas, al menos protegemos la celda pulsada
+      if (cells.length - safe.size < totalMines) {
+        safe.clear()
+        safe.add(safeIndex)
+      }
+
+      const candidates = cells.map((_, index) => index).filter(index => !safe.has(index))
+
+      // Barajamos con Fisher-Yates y nos quedamos con las primeras
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+      }
+      candidates.slice(0, totalMines).forEach(index => { cells[index].mine = true })
+
+      // Precalculamos cuántas minas tiene alrededor cada celda
+      cells.forEach((cell, index) => {
+        cell.adjacent = neighbors(index).filter(n => cells[n].mine).length
+      })
+    }
+
+    /* ---------- Revelar (flood fill) ---------- */
+
+    // Al descubrir una celda sin minas alrededor (0) se descubren sus
+    // vecinas, y si alguna también es 0, las suyas... (flood fill).
+    // Lo natural sería una función recursiva, pero cada llamada ocupa
+    // espacio en la pila y en tableros enormes daría "Maximum call stack
+    // size exceeded". Con una pila propia (un array) no hay ese límite.
+    function reveal(start) {
+      const stack = [start]
+      while (stack.length > 0) {
+        const index = stack.pop()
+        const cell = cells[index]
+        if (cell.state !== 'hidden') continue // ya revelada o con bandera
+
+        cell.state = 'revealed'
+        revealed++
+        renderCell(index)
+
+        if (cell.adjacent === 0 && !cell.mine) stack.push(...neighbors(index))
+      }
+    }
+
+    function openCell(index) {
+      const cell = cells[index]
+      if (cell.state !== 'hidden') return
+
+      if (status === 'ready') {
+        placeMines(index)
+        startTimer()
+        status = 'playing'
+      }
+
+      if (cell.mine) return lose(index)
+      reveal(index)
+      checkWin()
+    }
+
+    // "Chord": clic en un número que ya tiene a su alrededor tantas
+    // banderas como indica → descubre el resto de vecinas de golpe
+    function chord(index) {
+      const cell = cells[index]
+      if (cell.state !== 'revealed' || cell.adjacent === 0) return
+
+      const around = neighbors(index)
+      const flagged = around.filter(n => cells[n].state === 'flagged').length
+      if (flagged !== cell.adjacent) return
+
+      for (const n of around) {
+        if (cells[n].state !== 'hidden') continue
+        if (cells[n].mine) return lose(n) // ¡alguna bandera estaba mal!
+        reveal(n)
+      }
+      checkWin()
+    }
+
+    function toggleFlag(index) {
+      const cell = cells[index]
+      if (cell.state === 'revealed') return
+      cell.state = cell.state === 'flagged' ? 'hidden' : 'flagged'
+      flags += cell.state === 'flagged' ? 1 : -1
+      renderCell(index)
+      updateCounter()
+    }
+
+    /* ---------- Fin de partida ---------- */
+
+    function lose(index) {
+      status = 'lost'
+      stopTimer()
+      cells.forEach((cell, i) => {
+        // Mostramos todas las minas y marcamos las banderas incorrectas
+        if (cell.mine && cell.state !== 'flagged') cell.state = 'revealed'
+        else if (!cell.mine && cell.state === 'flagged') cell.wrong = true
+        renderCell(i)
+      })
+      $board.children[index].classList.add('exploded')
+      $face.textContent = FACES.lost
+      $message.textContent = '💥 ¡Boom! Pulsa la carita para volver a jugar'
+    }
+
+    function checkWin() {
+      if (status !== 'playing' || revealed !== cells.length - totalMines) return
+      status = 'won'
+      stopTimer()
+      // Al ganar, las minas que queden se marcan con bandera
+      cells.forEach((cell, index) => {
+        if (cell.mine && cell.state !== 'flagged') {
+          cell.state = 'flagged'
+          renderCell(index)
+        }
+      })
+      flags = totalMines
+      updateCounter()
+      $face.textContent = FACES.won
+
+      const best = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}')
+      const isRecord = !best[level] || seconds < best[level]
+      if (isRecord) {
+        best[level] = seconds
+        localStorage.setItem(BEST_KEY, JSON.stringify(best))
+      }
+      $message.textContent = isRecord
+        ? `🏆 ¡Nuevo récord! ${seconds} s`
+        : `🎉 ¡Ganaste en ${seconds} s! (récord: ${best[level]} s)`
+    }
+
+    /* ---------- Contadores ---------- */
+
+    // Formato de 3 dígitos como en el original (admite negativos: -05)
+    function formatLcd(value) {
+      if (value < 0) return `-${String(Math.min(99, -value)).padStart(2, '0')}`
+      return String(Math.min(MAX_TIME, value)).padStart(3, '0')
+    }
+
+    function updateCounter() {
+      $minesLeft.textContent = formatLcd(totalMines - flags)
+    }
+
+    function startTimer() {
+      seconds = 0
+      timerId = setInterval(() => {
+        seconds = Math.min(MAX_TIME, seconds + 1)
+        $timer.textContent = formatLcd(seconds)
+      }, 1000)
+    }
+
+    function stopTimer() {
+      clearInterval(timerId)
+      timerId = null
+    }
+
+    /* ---------- Render ---------- */
+
+    function renderCell(index) {
+      const cell = cells[index]
+      const element = $board.children[index]
+      const isRevealed = cell.state === 'revealed'
+
+      element.className = 'cell'
+      element.removeAttribute('data-n')
+      element.textContent = ''
+      // Ojo: toggle(clase, undefined) alterna la clase; pasamos siempre un booleano
+      element.classList.toggle('revealed', Boolean(isRevealed || cell.wrong))
+
+      if (cell.wrong) {
+        element.textContent = '❌'
+      } else if (cell.state === 'flagged') {
+        element.classList.add('flagged')
+        element.textContent = '🚩'
+      } else if (isRevealed && cell.mine) {
+        element.classList.add('mine')
+        element.textContent = '💣'
+      } else if (isRevealed && cell.adjacent > 0) {
+        element.dataset.n = cell.adjacent
+        element.textContent = cell.adjacent
+      }
+    }
+
+    function newGame(newLevel = level) {
+      level = newLevel
+      const config = LEVELS[level]
+      rows = config.rows
+      cols = config.cols
+      totalMines = config.mines
+      stopTimer()
+      status = 'ready'
+      flags = 0
+      revealed = 0
+      seconds = 0
+      cells = Array.from({ length: rows * cols }, () => ({ mine: false, adjacent: 0, state: 'hidden', wrong: false }))
+
+      document.documentElement.style.setProperty('--cols', cols)
+      document.documentElement.style.setProperty('--rows', rows)
+
+      const fragment = document.createDocumentFragment()
+      cells.forEach((_, index) => {
+        const button = document.createElement('button')
+        button.className = 'cell'
+        button.dataset.index = index
+        fragment.append(button)
+      })
+      $board.replaceChildren(fragment)
+
+      document.querySelectorAll('[data-level]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.level === level)
+      })
+      $face.textContent = FACES.playing
+      $timer.textContent = formatLcd(0)
+      $message.textContent = 'Clic: descubrir · Clic derecho: bandera'
+      updateCounter()
+    }
+
+    /* ---------- Eventos (delegación en el tablero) ---------- */
+
+    const isOver = () => status === 'won' || status === 'lost'
+    const getIndex = (event) => {
+      const cell = event.target.closest('.cell')
+      return cell ? Number(cell.dataset.index) : null
+    }
+
+    $board.addEventListener('click', (event) => {
+      const index = getIndex(event)
+      if (index === null || isOver()) return
+
+      if (flagMode) return toggleFlag(index)
+      if (cells[index].state === 'revealed') chord(index)
+      else openCell(index)
+    })
+
+    // Clic derecho: evitamos el menú contextual del navegador con
+    // preventDefault y lo usamos para poner o quitar banderas.
+    // (En móvil, mantener pulsado también lanza "contextmenu")
+    $board.addEventListener('contextmenu', (event) => {
+      event.preventDefault()
+      const index = getIndex(event)
+      if (index === null || isOver()) return
+      toggleFlag(index)
+    })
+
+    // La carita pone cara de susto mientras mantienes pulsado
+    $board.addEventListener('pointerdown', (event) => {
+      if (event.button === 0 && !isOver()) $face.textContent = FACES.pressing
+    })
+
+    window.addEventListener('pointerup', () => {
+      if (!isOver()) $face.textContent = FACES.playing
+    })
+
+    $face.addEventListener('click', () => newGame())
+
+    $('#levels').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-level]')
+      if (button) newGame(button.dataset.level)
+    })
+
+    $flagMode.addEventListener('click', () => {
+      flagMode = !flagMode
+      $flagMode.setAttribute('aria-pressed', flagMode)
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'F2') {
+        event.preventDefault()
+        newGame()
+      }
+    })
+
+    newGame()
+  </script>
+</body>
+
+</html>

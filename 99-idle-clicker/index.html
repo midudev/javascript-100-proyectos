@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>99 - Juego incremental</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --card: #fffdf8;
+      --text: #1c1917;
+      --muted: #78716c;
+      --line: #e7e1d5;
+      --accent: #f7df1e;
+      --accent-dark: #c9b200;
+      --ink: #1c1917;
+      --green: #15803d;
+      --editor: #1e1b16;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      user-select: none;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+    }
+
+    .game {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 0.9fr);
+      gap: 16px;
+      height: 100dvh;
+      padding: 16px;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ---------- Estudio: contador y botón ---------- */
+    .studio {
+      overflow: hidden;
+    }
+
+    .counter {
+      text-align: center;
+    }
+
+    .counter p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .counter h1 {
+      margin: 2px 0;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .counter .lps {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .clicker-area {
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: 18px 0;
+    }
+
+    .clicker {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      width: 190px;
+      height: 190px;
+      border: 0;
+      border-radius: 44px;
+      background: var(--accent);
+      box-shadow: 0 10px 0 var(--accent-dark), 0 20px 40px -10px rgb(160 130 0 / 60%);
+      cursor: pointer;
+      transition: transform 0.06s, box-shadow 0.06s;
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    .clicker:active {
+      transform: translateY(8px);
+      box-shadow: 0 2px 0 var(--accent-dark), 0 8px 20px -10px rgb(160 130 0 / 60%);
+    }
+
+    @keyframes breathe {
+      50% {
+        scale: 1.03;
+      }
+    }
+
+    .clicker-icon {
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 3.2rem;
+      font-weight: 800;
+    }
+
+    .clicker-label {
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .floating {
+      position: absolute;
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 1.2rem;
+      pointer-events: none;
+      animation: float-up 0.9s ease-out forwards;
+    }
+
+    @keyframes float-up {
+      to {
+        opacity: 0;
+        transform: translateY(-80px);
+      }
+    }
+
+    .editor {
+      flex: 1;
+      min-height: 150px;
+      border-radius: 14px;
+      background: var(--editor);
+      color: #e7e5e4;
+      overflow: hidden;
+    }
+
+    .editor-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #2a261f;
+      color: #a8a29e;
+      font-size: 0.75rem;
+    }
+
+    .editor-bar i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--dot);
+    }
+
+    .editor-bar span {
+      margin-left: 8px;
+    }
+
+    .editor ol {
+      margin: 0;
+      padding: 8px 0;
+      list-style: none;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+    }
+
+    .editor li {
+      display: flex;
+      gap: 12px;
+      padding: 0 12px;
+      white-space: nowrap;
+      animation: type-in 0.25s ease-out;
+    }
+
+    @keyframes type-in {
+      from {
+        opacity: 0;
+        transform: translateX(-6px);
+      }
+    }
+
+    .editor .ln {
+      flex-shrink: 0;
+      min-width: 76px;
+      color: #57534e;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .editor .kw {
+      color: #f7df1e;
+    }
+
+    .editor .str {
+      color: #86efac;
+    }
+
+    .editor .cm {
+      color: #78716c;
+    }
+
+    .banner {
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #dcfce7;
+      color: #14532d;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .banner[hidden] {
+      display: none;
+    }
+
+    /* ---------- Tienda ---------- */
+    .amounts {
+      display: flex;
+      gap: 2px;
+      padding: 2px;
+      border-radius: 8px;
+      background: #efe9dd;
+    }
+
+    .amounts button {
+      padding: 2px 8px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .amounts [aria-pressed='true'] {
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+    }
+
+    .shop {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .generator {
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.08s, border-color 0.15s, opacity 0.15s;
+    }
+
+    .generator:hover:not(:disabled) {
+      border-color: var(--accent-dark);
+    }
+
+    .generator:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .generator:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .generator-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #f5f0e4;
+      font-size: 1.5rem;
+    }
+
+    .generator-name {
+      display: block;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .generator-info {
+      display: block;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .generator-cost {
+      display: block;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .generator-owned {
+      display: block;
+      color: var(--muted);
+      font-size: 1.3rem;
+      font-weight: 800;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- Mejoras y logros ---------- */
+    .upgrades {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .upgrade {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px dashed var(--accent-dark);
+      border-radius: 12px;
+      background: #fffbe0;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .upgrade:disabled {
+      border-color: var(--line);
+      background: #fff;
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .upgrade .emoji {
+      font-size: 1.3rem;
+    }
+
+    .upgrade strong {
+      display: block;
+      font-size: 0.85rem;
+    }
+
+    .upgrade small {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .upgrade .price {
+      margin-left: auto;
+      font-weight: 700;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .owned-upgrades {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .owned-upgrades span {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: #f5f0e4;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .achievements {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .achievement {
+      display: grid;
+      place-items: center;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      background: #efe9dd;
+      font-size: 1.2rem;
+      filter: grayscale(1);
+      opacity: 0.35;
+    }
+
+    .achievement.is-unlocked {
+      background: #fff3b0;
+      filter: none;
+      opacity: 1;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 12px;
+      margin: 0;
+      font-size: 0.82rem;
+    }
+
+    .stats dt {
+      color: var(--muted);
+    }
+
+    .stats dd {
+      margin: 0;
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .reset {
+      width: 100%;
+      margin-top: 12px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .reset.is-armed {
+      border-color: #dc2626;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .toasts {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 0.85rem;
+      box-shadow: 0 10px 30px -10px rgb(0 0 0 / 40%);
+      animation: toast-in 0.3s ease-out;
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+    }
+
+    @media (width < 980px) {
+      body {
+        height: auto;
+      }
+
+      .game {
+        grid-template-columns: minmax(0, 1fr);
+        height: auto;
+      }
+
+      .column {
+        overflow: visible;
+      }
+
+      .editor {
+        max-height: 220px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="game">
+    <section class="column">
+      <div class="card studio">
+        <div class="counter">
+          <p>Líneas de código</p>
+          <h1 id="lines">0</h1>
+          <p class="lps" id="lps">0 por segundo</p>
+        </div>
+        <div class="clicker-area" id="clicker-area">
+          <button class="clicker" id="clicker" aria-label="Escribir código">
+            <span class="clicker-icon">&lt;/&gt;</span>
+            <span class="clicker-label">Escribir código</span>
+          </button>
+        </div>
+        <p class="hint" style="text-align: center">Haz click o teclea para programar</p>
+      </div>
+      <p class="banner" id="banner" hidden></p>
+      <div class="editor" aria-hidden="true">
+        <div class="editor-bar"><i style="--dot: #f87171"></i><i style="--dot: #fbbf24"></i><i style="--dot: #4ade80"></i><span>proyecto-100.js</span></div>
+        <ol id="editor"></ol>
+      </div>
+    </section>
+
+    <section class="column">
+      <div class="card">
+        <h2>Generadores
+          <span class="amounts" id="amounts">
+            <button data-amount="1" aria-pressed="true">x1</button>
+            <button data-amount="10" aria-pressed="false">x10</button>
+            <button data-amount="max" aria-pressed="false">Máx</button>
+          </span>
+        </h2>
+        <ul class="shop" id="shop"></ul>
+      </div>
+    </section>
+
+    <section class="column">
+      <div class="card">
+        <h2>Mejoras <span id="upgrade-count"></span></h2>
+        <div class="upgrades" id="upgrades"></div>
+        <div class="owned-upgrades" id="owned-upgrades"></div>
+      </div>
+      <div class="card">
+        <h2>Logros <span id="achievement-count"></span></h2>
+        <div class="achievements" id="achievements"></div>
+      </div>
+      <div class="card">
+        <h2>Estadísticas</h2>
+        <dl class="stats" id="stats"></dl>
+        <button class="reset" id="reset">Reiniciar partida</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    const SAVE_KEY = 'idle-clicker-save'
+    const AUTOSAVE_INTERVAL = 10000
+    const COST_GROWTH = 1.15 // cada compra encarece la siguiente un 15 %
+    const MAX_OFFLINE_SECONDS = 8 * 60 * 60 // como mucho recuperamos 8 horas de ausencia
+    const EDITOR_LINES = 12
+
+    const GENERATORS = [
+      { id: 'intern', name: 'Becario', icon: '🧑‍🎓', baseCost: 15, production: 0.1, info: 'Copia y pega de Stack Overflow' },
+      { id: 'keyboard', name: 'Teclado mecánico', icon: '⌨️', baseCost: 100, production: 1, info: 'Clac, clac, clac…' },
+      { id: 'copilot', name: 'Autocompletado IA', icon: '🤖', baseCost: 1100, production: 8, info: 'Pulsa Tab y reza' },
+      { id: 'junior', name: 'Dev junior', icon: '👩‍💻', baseCost: 12000, production: 47, info: 'Lleno de energía y de bugs' },
+      { id: 'senior', name: 'Dev senior', icon: '🧙', baseCost: 130000, production: 260, info: 'Borra más código del que escribe' },
+      { id: 'framework', name: 'Framework nuevo', icon: '📦', baseCost: 1.4e6, production: 1400, info: 'Cada semana sale uno' },
+      { id: 'ci', name: 'Granja de CI', icon: '🏭', baseCost: 2e7, production: 7800, info: 'Tests en verde 24/7' },
+      { id: 'agi', name: 'IA que programa IAs', icon: '🧠', baseCost: 3.3e8, production: 44000, info: '¿Seguimos haciendo falta?' }
+    ]
+
+    // target: 'click', el id de un generador o 'all'. requires: cuándo aparece en la tienda
+    const UPGRADES = [
+      { id: 'coffee', name: 'Café doble', icon: '☕', cost: 100, target: 'click', multiplier: 2, requires: s => s.totalLines >= 30 },
+      { id: 'intern-ts', name: 'Becarios con TypeScript', icon: '🎓', cost: 150, target: 'intern', multiplier: 2, requires: s => s.owned.intern >= 1 },
+      { id: 'shortcuts', name: 'Atajos de teclado', icon: '⚡', cost: 600, target: 'click', multiplier: 2, requires: s => s.clicks >= 80 },
+      { id: 'rgb', name: 'Luces RGB en el teclado', icon: '🌈', cost: 1000, target: 'keyboard', multiplier: 2, requires: s => s.owned.keyboard >= 1 },
+      { id: 'intern-docs', name: 'Becarios que leen la documentación', icon: '📚', cost: 2000, target: 'intern', multiplier: 2, requires: s => s.owned.intern >= 10 },
+      { id: 'context', name: 'Más contexto para la IA', icon: '🧩', cost: 11000, target: 'copilot', multiplier: 2, requires: s => s.owned.copilot >= 1 },
+      { id: 'monorepo', name: 'Monorepo', icon: '🗂️', cost: 25000, target: 'all', multiplier: 1.5, requires: s => s.totalLines >= 10000 },
+      { id: 'vim', name: 'Aprender Vim', icon: '🟩', cost: 50000, target: 'click', multiplier: 5, requires: s => s.clicks >= 500 },
+      { id: 'mentoring', name: 'Mentoría para juniors', icon: '🤝', cost: 120000, target: 'junior', multiplier: 2, requires: s => s.owned.junior >= 1 },
+      { id: 'meetings', name: 'Cancelar reuniones', icon: '📅', cost: 1.3e6, target: 'senior', multiplier: 2, requires: s => s.owned.senior >= 1 },
+      { id: 'bundler', name: 'Bundler en Rust', icon: '🦀', cost: 1.4e7, target: 'framework', multiplier: 2, requires: s => s.owned.framework >= 1 },
+      { id: 'friday', name: 'Desplegar en viernes', icon: '🔥', cost: 5e7, target: 'all', multiplier: 2, requires: s => s.totalLines >= 1e7 }
+    ]
+
+    const ACHIEVEMENTS = [
+      { id: 'hello', name: 'Hola mundo', icon: '👋', check: s => s.totalLines >= 1 },
+      { id: 'hundred', name: '100 líneas', icon: '💯', check: s => s.totalLines >= 100 },
+      { id: 'thousand', name: '1.000 líneas', icon: '📄', check: s => s.totalLines >= 1e3 },
+      { id: 'legacy', name: 'Código legacy: 1 M de líneas', icon: '🦕', check: s => s.totalLines >= 1e6 },
+      { id: 'monolith', name: 'Monolito: 1.000 M de líneas', icon: '🗿', check: s => s.totalLines >= 1e9 },
+      { id: 'clicks', name: '100 clicks', icon: '👆', check: s => s.clicks >= 100 },
+      { id: 'tendinitis', name: 'Tendinitis: 1.000 clicks', icon: '🩹', check: s => s.clicks >= 1000 },
+      { id: 'team', name: 'Un equipo: 10 generadores', icon: '👥', check: s => totalOwned(s) >= 10 },
+      { id: 'startup', name: 'Startup: 50 generadores', icon: '🚀', check: s => totalOwned(s) >= 50 },
+      { id: 'speed', name: '10 líneas por segundo', icon: '🏃', check: () => getLinesPerSecond() >= 10 },
+      { id: 'turbo', name: '1.000 líneas por segundo', icon: '🏎️', check: () => getLinesPerSecond() >= 1000 },
+      { id: 'refactor', name: 'Refactor: 5 mejoras', icon: '🔧', check: s => s.upgrades.length >= 5 }
+    ]
+
+    const CODE_SNIPPETS = [
+      "import { useState } from 'react'",
+      'const app = express()',
+      "app.get('/', (req, res) => res.send('Hola'))",
+      'function sum(a, b) { return a + b }',
+      '// TODO: refactorizar esto algún día',
+      'const data = await fetch(API).then(r => r.json())',
+      'export default function App() {',
+      '  const [count, setCount] = useState(0)',
+      "console.log('¡Funciona!')",
+      "if (!user) throw new Error('No autorizado')",
+      'const ids = items.map(item => item.id)',
+      "document.querySelector('#app').append(node)",
+      '// no tocar: funciona y no sé por qué',
+      'const isEven = n => n % 2 === 0',
+      'class Dev extends Human {}',
+      'while (bugs > 0) bugs = fix(bugs) + 1',
+      'const [first, ...rest] = lines',
+      "localStorage.setItem('save', JSON.stringify(state))",
+      'return new Promise(resolve => setTimeout(resolve, 100))',
+      'try { deploy() } catch { rollback() }',
+      'Object.freeze(config)',
+      "if (isFriday) deploy() // 🔥"
+    ]
+
+    // Intl.NumberFormat con notation 'compact' abrevia: 1,2 mil · 3,4 M · 5,6 B (billones)
+    const compactFormatter = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
+    const smallFormatter = new Intl.NumberFormat('es', { maximumFractionDigits: 1 })
+    const integerFormatter = new Intl.NumberFormat('es', { maximumFractionDigits: 0 })
+
+    let state = createInitialState()
+    let buyAmount = 1
+    let lastTick = performance.now()
+    let lastEditorUpdate = 0
+    let lastSlowRender = 0
+    let snippetIndex = 0
+    let editorLines = []
+    let resetTimeout = null
+
+    // ---------- Estado ----------
+
+    function createInitialState() {
+      return {
+        lines: 0,
+        totalLines: 0,
+        clicks: 0,
+        owned: Object.fromEntries(GENERATORS.map(generator => [generator.id, 0])),
+        upgrades: [],
+        achievements: [],
+        startedAt: Date.now(),
+        lastSaved: Date.now()
+      }
+    }
+
+    function totalOwned(s = state) {
+      return Object.values(s.owned).reduce((total, count) => total + count, 0)
+    }
+
+    function getMultiplier(target) {
+      return UPGRADES
+        .filter(upgrade => state.upgrades.includes(upgrade.id) && (upgrade.target === target || (upgrade.target === 'all' && target !== 'click')))
+        .reduce((total, upgrade) => total * upgrade.multiplier, 1)
+    }
+
+    function getProduction(generator) {
+      return generator.production * state.owned[generator.id] * getMultiplier(generator.id)
+    }
+
+    function getLinesPerSecond() {
+      return GENERATORS.reduce((total, generator) => total + getProduction(generator), 0)
+    }
+
+    function getClickValue() {
+      return getMultiplier('click')
+    }
+
+    function addLines(amount) {
+      state.lines += amount
+      state.totalLines += amount
+    }
+
+    // ---------- Costes exponenciales ----------
+
+    function getCost(generator, amount) {
+      // coste de la siguiente unidad = base * 1.15^n (n = cuántas tienes ya).
+      // Para comprar varias sumamos una serie geométrica: base * 1.15^n * (1.15^k - 1) / 0.15
+      const owned = state.owned[generator.id]
+      const first = generator.baseCost * COST_GROWTH ** owned
+      return Math.ceil(first * (COST_GROWTH ** amount - 1) / (COST_GROWTH - 1))
+    }
+
+    function getMaxAffordable(generator) {
+      // Despejamos k de la fórmula anterior: cuántas unidades podemos pagar con lo que tenemos
+      const first = generator.baseCost * COST_GROWTH ** state.owned[generator.id]
+      let amount = Math.floor(Math.log(state.lines * (COST_GROWTH - 1) / first + 1) / Math.log(COST_GROWTH))
+      // El redondeo de Math.ceil en el coste puede dejarnos una unidad por encima
+      while (amount > 0 && getCost(generator, amount) > state.lines) amount--
+      return amount
+    }
+
+    function getPurchase(generator) {
+      const amount = buyAmount === 'max' ? Math.max(1, getMaxAffordable(generator)) : buyAmount
+      return { amount, cost: getCost(generator, amount) }
+    }
+
+    function buyGenerator(id) {
+      const generator = GENERATORS.find(item => item.id === id)
+      const { amount, cost } = getPurchase(generator)
+      if (cost > state.lines) return
+      state.lines -= cost
+      state.owned[id] += amount
+      renderShop()
+      renderSlow()
+    }
+
+    function buyUpgrade(id) {
+      const upgrade = UPGRADES.find(item => item.id === id)
+      if (!upgrade || state.upgrades.includes(id) || upgrade.cost > state.lines) return
+      state.lines -= upgrade.cost
+      state.upgrades.push(id)
+      showToast(`${upgrade.icon} Mejora comprada: ${upgrade.name}`)
+      renderUpgrades()
+      renderShop()
+    }
+
+    // ---------- Formato de números ----------
+
+    function formatNumber(value) {
+      if (value < 1000) return value < 10 ? smallFormatter.format(value) : integerFormatter.format(Math.floor(value))
+      return compactFormatter.format(value)
+    }
+
+    function formatLines(value) {
+      // Las líneas "enteras": no tiene sentido ver 12,7 líneas escritas
+      return value < 1000 ? integerFormatter.format(Math.floor(value)) : compactFormatter.format(value)
+    }
+
+    function formatDuration(seconds) {
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      if (hours > 0) return `${hours} h ${minutes} min`
+      if (minutes > 0) return `${minutes} min`
+      return `${Math.floor(seconds)} s`
+    }
+
+    // ---------- Game loop con tiempo real ----------
+
+    function tick() {
+      // Delta time: producimos según el tiempo REAL transcurrido, no por fotograma.
+      // Así da igual ir a 30 o a 144 fps, y si la pestaña estaba en segundo plano
+      // (requestAnimationFrame se pausa) el primer fotograma al volver recupera todo lo pendiente
+      const now = performance.now()
+      const seconds = (now - lastTick) / 1000
+      lastTick = now
+      addLines(getLinesPerSecond() * seconds)
+    }
+
+    function loop(now) {
+      tick()
+      renderCounter()
+      updateEditor(now)
+      if (now - lastSlowRender > 250) renderSlow()
+      requestAnimationFrame(loop)
+    }
+
+    // ---------- Guardado ----------
+
+    function save() {
+      tick() // contamos lo producido hasta este instante antes de guardar
+      // Guardamos con Date.now() (hora real) y no con performance.now(), que vuelve a 0 en cada carga
+      state.lastSaved = Date.now()
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(state))
+      } catch {
+        // almacenamiento no disponible: se juega igual, pero sin guardar
+      }
+    }
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY))
+        if (!saved) return
+        const initial = createInitialState()
+        state = { ...initial, ...saved, owned: { ...initial.owned, ...saved.owned } }
+      } catch {
+        state = createInitialState()
+      }
+
+      // Progreso offline: lo que tus generadores habrían escrito desde el último guardado
+      const secondsAway = Math.min((Date.now() - state.lastSaved) / 1000, MAX_OFFLINE_SECONDS)
+      const earned = getLinesPerSecond() * secondsAway
+      if (secondsAway > 5 && earned >= 1) {
+        addLines(earned)
+        showBanner(`👋 ¡Bienvenido! Mientras no estabas (${formatDuration(secondsAway)}) tu equipo escribió ${formatLines(earned)} líneas.`)
+      }
+    }
+
+    function resetGame() {
+      state = createInitialState()
+      editorLines = []
+      try {
+        localStorage.removeItem(SAVE_KEY)
+      } catch {
+        // nada que borrar
+      }
+      renderAll()
+    }
+
+    // ---------- Render ----------
+
+    function renderCounter() {
+      $('#lines').textContent = formatLines(state.lines)
+      $('#lps').textContent = `${formatNumber(getLinesPerSecond())} por segundo · ${formatNumber(getClickValue())} por click`
+    }
+
+    function renderShop() {
+      $('#shop').innerHTML = GENERATORS.map(generator => {
+        const { amount, cost } = getPurchase(generator)
+        const production = generator.production * getMultiplier(generator.id)
+        return `
+          <li>
+            <button class="generator" data-id="${generator.id}" ${cost > state.lines ? 'disabled' : ''} title="${generator.info}">
+              <span class="generator-icon">${generator.icon}</span>
+              <span>
+                <span class="generator-name">${generator.name}<span class="generator-amount">${amount > 1 ? ` ×${amount}` : ''}</span></span>
+                <span class="generator-info">+${formatNumber(production)}/s cada uno · ${generator.info}</span>
+              </span>
+              <span>
+                <span class="generator-owned">${state.owned[generator.id]}</span>
+                <span class="generator-cost">${formatLines(cost)} 📝</span>
+              </span>
+            </button>
+          </li>
+        `
+      }).join('')
+    }
+
+    function updateShop() {
+      // Solo tocamos lo que cambia (precio, cantidad y si se puede comprar). Rehacer todo el HTML
+      // varias veces por segundo sería un desperdicio y además "se comería" algún click a medias
+      document.querySelectorAll('.generator').forEach(button => {
+        const generator = GENERATORS.find(item => item.id === button.dataset.id)
+        const { amount, cost } = getPurchase(generator)
+        button.disabled = cost > state.lines
+        button.querySelector('.generator-amount').textContent = amount > 1 ? ` ×${amount}` : ''
+        button.querySelector('.generator-cost').textContent = `${formatLines(cost)} 📝`
+      })
+      document.querySelectorAll('.upgrade').forEach(button => {
+        button.disabled = UPGRADES.find(item => item.id === button.dataset.id).cost > state.lines
+      })
+    }
+
+    function getAvailableUpgrades() {
+      return UPGRADES.filter(upgrade => !state.upgrades.includes(upgrade.id) && upgrade.requires(state))
+    }
+
+    function renderUpgrades() {
+      const available = getAvailableUpgrades()
+      const hidden = UPGRADES.length - available.length - state.upgrades.length
+      $('#upgrade-count').textContent = `${state.upgrades.length}/${UPGRADES.length}`
+
+      $('#upgrades').innerHTML = available.length === 0
+        ? `<p class="hint">🔒 ${hidden} mejoras por descubrir. ¡Sigue programando!</p>`
+        : available.map(upgrade => `
+          <button class="upgrade" data-id="${upgrade.id}" ${upgrade.cost > state.lines ? 'disabled' : ''}>
+            <span class="emoji">${upgrade.icon}</span>
+            <span><strong>${upgrade.name}</strong><small>${describeUpgrade(upgrade)}</small></span>
+            <span class="price">${formatLines(upgrade.cost)} 📝</span>
+          </button>
+        `).join('')
+
+      $('#owned-upgrades').innerHTML = state.upgrades
+        .map(id => UPGRADES.find(upgrade => upgrade.id === id))
+        .map(upgrade => `<span title="${upgrade.name}">${upgrade.icon}</span>`)
+        .join('')
+    }
+
+    function describeUpgrade({ target, multiplier }) {
+      const times = `×${multiplier}`
+      if (target === 'click') return `${times} líneas por click`
+      if (target === 'all') return `${times} a todos los generadores`
+      return `${times} a ${GENERATORS.find(generator => generator.id === target).name}`
+    }
+
+    function renderAchievements() {
+      $('#achievement-count').textContent = `${state.achievements.length}/${ACHIEVEMENTS.length}`
+      $('#achievements').innerHTML = ACHIEVEMENTS.map(achievement => {
+        const unlocked = state.achievements.includes(achievement.id)
+        return `<span class="achievement ${unlocked ? 'is-unlocked' : ''}" title="${unlocked ? achievement.name : '???'}">${achievement.icon}</span>`
+      }).join('')
+    }
+
+    function checkAchievements() {
+      let changed = false
+      for (const achievement of ACHIEVEMENTS) {
+        if (state.achievements.includes(achievement.id) || !achievement.check(state)) continue
+        state.achievements.push(achievement.id)
+        showToast(`🏆 Logro desbloqueado: ${achievement.name}`)
+        changed = true
+      }
+      if (changed) renderAchievements()
+    }
+
+    function renderStats() {
+      const played = (Date.now() - state.startedAt) / 1000
+      const items = [
+        ['Líneas escritas en total', formatLines(state.totalLines)],
+        ['Clicks', integerFormatter.format(state.clicks)],
+        ['Generadores', totalOwned()],
+        ['Tiempo jugado', formatDuration(played)]
+      ]
+      $('#stats').innerHTML = items.map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`).join('')
+    }
+
+    let knownUpgrades = ''
+
+    function renderSlow() {
+      lastSlowRender = performance.now()
+      updateShop()
+      checkAchievements()
+      renderStats()
+      // Si aparecen mejoras nuevas, repintamos la lista
+      const available = getAvailableUpgrades().map(upgrade => upgrade.id).join()
+      if (available !== knownUpgrades) {
+        knownUpgrades = available
+        renderUpgrades()
+      }
+    }
+
+    function renderAll() {
+      renderCounter()
+      renderShop()
+      renderUpgrades()
+      renderAchievements()
+      renderStats()
+      renderEditor()
+    }
+
+    // ---------- Editor decorativo ----------
+
+    function highlightCode(code) {
+      const escaped = code.replace(/[&<>]/g, char => `&#${char.charCodeAt(0)};`)
+      if (escaped.trim().startsWith('//')) return `<span class="cm">${escaped}</span>`
+      // Una sola pasada con alternativas: así no coloreamos palabras dentro de los <span> ya creados
+      return escaped.replace(
+        /('[^']*')|\b(const|let|function|return|if|import|from|export|default|await|new|class|extends|while|try|catch|throw)\b/g,
+        (match, string) => `<span class="${string ? 'str' : 'kw'}">${match}</span>`
+      )
+    }
+
+    function addEditorLine() {
+      editorLines.push({ number: Math.floor(state.totalLines), code: CODE_SNIPPETS[snippetIndex++ % CODE_SNIPPETS.length] })
+      editorLines = editorLines.slice(-EDITOR_LINES)
+      renderEditor()
+    }
+
+    function renderEditor() {
+      $('#editor').innerHTML = editorLines.map(({ number, code }) => `
+        <li><span class="ln">${number < 1e7 ? integerFormatter.format(number) : compactFormatter.format(number)}</span><code>${highlightCode(code)}</code></li>
+      `).join('')
+    }
+
+    function updateEditor(now) {
+      // Como mucho una línea nueva cada 120 ms para que se pueda leer
+      const lastNumber = editorLines.at(-1)?.number ?? 0
+      if (now - lastEditorUpdate < 120 || Math.floor(state.totalLines) <= lastNumber) return
+      lastEditorUpdate = now
+      addEditorLine()
+    }
+
+    // ---------- Interacción ----------
+
+    function spawnFloatingText(x, y, text) {
+      const floating = document.createElement('span')
+      floating.className = 'floating'
+      floating.textContent = text
+      floating.style.left = `${x}px`
+      floating.style.top = `${y}px`
+      $('#clicker-area').append(floating)
+      floating.addEventListener('animationend', () => floating.remove())
+    }
+
+    function writeCode(x, y) {
+      const value = getClickValue()
+      addLines(value)
+      state.clicks++
+      const area = $('#clicker-area').getBoundingClientRect()
+      spawnFloatingText(x - area.left - 10 + (Math.random() * 20 - 10), y - area.top - 20, `+${formatNumber(value)}`)
+      renderCounter()
+    }
+
+    function showToast(text) {
+      const toast = document.createElement('div')
+      toast.className = 'toast'
+      toast.textContent = text
+      const container = $('#toasts')
+      container.append(toast)
+      // Como mucho 3 avisos a la vez: si llegan muchos logros juntos, quitamos los más antiguos
+      while (container.children.length > 3) container.firstElementChild.remove()
+      setTimeout(() => toast.remove(), 3500)
+    }
+
+    function showBanner(text) {
+      const banner = $('#banner')
+      banner.textContent = text
+      banner.hidden = false
+      setTimeout(() => { banner.hidden = true }, 9000)
+    }
+
+    $('#clicker').addEventListener('click', event => {
+      // Con teclado (Enter/Espacio) el click no trae coordenadas: usamos el centro del botón
+      const rect = event.currentTarget.getBoundingClientRect()
+      const x = event.detail === 0 ? rect.left + rect.width / 2 : event.clientX
+      const y = event.detail === 0 ? rect.top + rect.height / 3 : event.clientY
+      writeCode(x, y)
+    })
+
+    // Teclear cualquier letra también escribe código (sin contar la repetición automática)
+    document.addEventListener('keydown', event => {
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key.length !== 1 || event.key === ' ') return
+      const rect = $('#clicker').getBoundingClientRect()
+      writeCode(rect.left + Math.random() * rect.width, rect.top + rect.height / 3)
+    })
+
+    $('#shop').addEventListener('click', event => {
+      const button = event.target.closest('.generator')
+      if (button) buyGenerator(button.dataset.id)
+    })
+
+    $('#upgrades').addEventListener('click', event => {
+      const button = event.target.closest('.upgrade')
+      if (button) buyUpgrade(button.dataset.id)
+    })
+
+    $('#amounts').addEventListener('click', event => {
+      const button = event.target.closest('button')
+      if (!button) return
+      buyAmount = button.dataset.amount === 'max' ? 'max' : Number(button.dataset.amount)
+      document.querySelectorAll('#amounts button').forEach(item => item.setAttribute('aria-pressed', item === button))
+      renderShop()
+    })
+
+    // Reiniciar pide una segunda confirmación en el mismo botón
+    $('#reset').addEventListener('click', event => {
+      const button = event.currentTarget
+      if (!button.classList.contains('is-armed')) {
+        button.classList.add('is-armed')
+        button.textContent = '¿Seguro? Pulsa otra vez para borrarlo todo'
+        resetTimeout = setTimeout(() => {
+          button.classList.remove('is-armed')
+          button.textContent = 'Reiniciar partida'
+        }, 3000)
+        return
+      }
+      clearTimeout(resetTimeout)
+      button.classList.remove('is-armed')
+      button.textContent = 'Reiniciar partida'
+      resetGame()
+    })
+
+    setInterval(save, AUTOSAVE_INTERVAL)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) save()
+    })
+    window.addEventListener('pagehide', save)
+
+    load()
+    // Unas líneas de código de partida para que el editor no empiece vacío
+    for (let i = 0; i < 5; i++) {
+      editorLines.push({ number: i + 1, code: CODE_SNIPPETS[snippetIndex++] })
+    }
+    renderAll()
+    requestAnimationFrame(loop)
+  </script>
+</body>
+
+</html>

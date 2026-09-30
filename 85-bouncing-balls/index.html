@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>85 - Física de pelotas</title>
+  <style>
+    :root {
+      --glass: rgba(18, 16, 34, .75);
+      --border: rgba(255, 255, 255, .1);
+      --text: #efeaff;
+      --muted: #9a93b8;
+      --accent: #ff5c8a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 0%, #1d1838, #0a0914 70%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 270px;
+      padding: 14px 16px;
+      display: grid;
+      gap: 12px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    h1 small {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    label {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    label span {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    label output {
+      color: var(--text);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .check input {
+      accent-color: var(--accent);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, .06);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, .12);
+    }
+
+    button[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: rgba(255, 92, 138, .18);
+    }
+
+    .stats {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 16px;
+      padding: 10px 16px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      backdrop-filter: blur(10px);
+    }
+
+    .stats strong {
+      display: block;
+      font-size: 18px;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hint {
+      position: fixed;
+      top: 86px;
+      right: 18px;
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    /* En móvil el panel va arriba y compacto: el "suelo" queda libre */
+    @media (width < 640px) {
+      .panel {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+
+      .panel h1 small,
+      .hint,
+      .stats,
+      .check {
+        display: none;
+      }
+
+      .buttons {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .buttons button {
+        padding: 6px 4px;
+        font-size: 11px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const ctx = canvas.getContext('2d')
+
+    const gravityInput = document.querySelector('#gravity')
+    const gravityOutput = document.querySelector('#gravity-value')
+    const bounceInput = document.querySelector('#bounce')
+    const bounceOutput = document.querySelector('#bounce-value')
+    const vectorsInput = document.querySelector('#vectors')
+    const flipButton = document.querySelector('#flip')
+    const countLabel = document.querySelector('#count')
+    const energyLabel = document.querySelector('#energy')
+    const fpsLabel = document.querySelector('#fps')
+
+    // CONSTANTES
+    const SUBSTEPS = 8 // dividimos cada frame en 8 pasos pequeños
+    const MAX_BALLS = 160
+    const INITIAL_BALLS = 28
+    const MIN_RADIUS = 12
+    const MAX_RADIUS = 38
+    const MAX_THROW_SPEED = 3500 // px/s
+    const FLOOR_FRICTION = 0.998 // rozamiento al rodar por una pared
+    const REST_SPEED = 15 // por debajo de esto, un rebote en la pared se anula
+    const COLORS = ['#ff5c8a', '#ffb547', '#4de1c1', '#5b8cff', '#c77dff', '#ffe066', '#7cf29c']
+
+    // ESTADO
+    let width = 0
+    let height = 0
+    let balls = []
+    let gravityDirection = 1
+    let grab = null
+    let lastTime = performance.now()
+    let fpsFrames = 0
+    let fpsTime = 0
+
+    // ---------- Creación de pelotas ----------
+
+    function createBall ({ x, y, vx = 0, vy = 0, radius }) {
+      const r = radius ?? MIN_RADIUS + Math.random() * (MAX_RADIUS - MIN_RADIUS)
+      const ball = {
+        x,
+        y,
+        vx,
+        vy,
+        r,
+        // La masa depende del tamaño: usamos el área (r²), que en 2D es
+        // el equivalente al volumen. Una pelota el doble de grande pesa 4 veces más
+        mass: r * r,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)]
+      }
+      balls.push(ball)
+      if (balls.length > MAX_BALLS) balls.shift() // eliminamos la más antigua
+      return ball
+    }
+
+    function spawnRandom (amount) {
+      for (let i = 0; i < amount; i++) {
+        createBall({
+          x: MAX_RADIUS + Math.random() * (width - MAX_RADIUS * 2),
+          y: MAX_RADIUS + Math.random() * height * 0.6,
+          vx: (Math.random() - 0.5) * 900,
+          vy: (Math.random() - 0.5) * 900
+        })
+      }
+    }
+
+    // ---------- Física ----------
+
+    // Las pelotas agarradas tienen "masa infinita" (masa inversa 0):
+    // empujan a las demás pero nadie las mueve a ellas
+    function inverseMass (ball) {
+      return ball === grab?.ball ? 0 : 1 / ball.mass
+    }
+
+    function applyGravity (ball, dt) {
+      if (ball === grab?.ball) return
+      // Integración de Euler semi-implícita: primero velocidad, luego posición
+      ball.vy += Number(gravityInput.value) * gravityDirection * dt
+      ball.x += ball.vx * dt
+      ball.y += ball.vy * dt
+    }
+
+    function collideWithWalls (ball, restitution) {
+      // Si la pelota atraviesa una pared la devolvemos dentro y reflejamos
+      // la componente de la velocidad perpendicular a esa pared, perdiendo
+      // energía según el coeficiente de restitución (1 = rebote perfecto)
+      if (ball.x - ball.r < 0) {
+        ball.x = ball.r
+        if (ball.vx < 0) ball.vx = -ball.vx * restitution
+      } else if (ball.x + ball.r > width) {
+        ball.x = width - ball.r
+        if (ball.vx > 0) ball.vx = -ball.vx * restitution
+      }
+
+      const touchesTop = ball.y - ball.r <= 0
+      const touchesBottom = ball.y + ball.r >= height
+
+      if (touchesTop) {
+        ball.y = ball.r
+        if (ball.vy < 0) ball.vy = -ball.vy * restitution
+      } else if (touchesBottom) {
+        ball.y = height - ball.r
+        if (ball.vy > 0) ball.vy = -ball.vy * restitution
+      }
+
+      // Si está apoyada en el "suelo" (según hacia dónde apunte la gravedad)
+      // frenamos un poco la velocidad horizontal y cortamos los micro-rebotes
+      const onFloor = gravityDirection > 0 ? touchesBottom : touchesTop
+      if (onFloor) {
+        ball.vx *= FLOOR_FRICTION
+        if (Math.abs(ball.vy) < REST_SPEED) ball.vy = 0
+      }
+    }
+
+    function collideBalls (a, b, restitution) {
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const minDistance = a.r + b.r
+      const distanceSq = dx * dx + dy * dy
+
+      // Comparamos distancias al cuadrado para ahorrarnos la raíz cuadrada
+      // en el caso más habitual: que no se toquen
+      if (distanceSq >= minDistance * minDistance) return
+
+      const invA = inverseMass(a)
+      const invB = inverseMass(b)
+      const invSum = invA + invB
+      if (invSum === 0) return
+
+      const distance = Math.sqrt(distanceSq)
+      // Vector normal: dirección unitaria que une los dos centros.
+      // Si coinciden exactamente, elegimos una dirección cualquiera
+      const nx = distance > 0 ? dx / distance : 1
+      const ny = distance > 0 ? dy / distance : 0
+
+      // 1) Resolver la superposición: separamos las pelotas a lo largo de
+      // la normal. La más ligera se mueve más (reparto según masa inversa)
+      const overlap = minDistance - distance
+      a.x -= nx * overlap * (invA / invSum)
+      a.y -= ny * overlap * (invA / invSum)
+      b.x += nx * overlap * (invB / invSum)
+      b.y += ny * overlap * (invB / invSum)
+
+      // 2) Velocidad relativa proyectada sobre la normal (producto escalar)
+      const relativeSpeed = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny
+      // Si ya se están alejando no hacemos nada (evita que se queden pegadas)
+      if (relativeSpeed > 0) return
+
+      // 3) Impulso: el cambio de momento (m·v) que se transmiten. Solo actúa
+      // en el eje normal; la componente tangencial no cambia. Así el momento
+      // total se conserva: lo que gana una pelota lo pierde la otra.
+      // Con restitución 1 equivale a la fórmula clásica del choque elástico:
+      // v1' = ((m1 − m2)·v1 + 2·m2·v2) / (m1 + m2)
+      const impulse = -(1 + restitution) * relativeSpeed / invSum
+      a.vx -= impulse * nx * invA
+      a.vy -= impulse * ny * invA
+      b.vx += impulse * nx * invB
+      b.vy += impulse * ny * invB
+    }
+
+    function step (dt) {
+      const restitution = Number(bounceInput.value)
+
+      for (const ball of balls) applyGravity(ball, dt)
+
+      if (grab) moveGrabbedBall()
+
+      // Comprobamos cada pareja una sola vez (j empieza en i + 1)
+      for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+          collideBalls(balls[i], balls[j], restitution)
+        }
+      }
+
+      for (const ball of balls) collideWithWalls(ball, restitution)
+    }
+
+    // Con un solo paso por frame, una pelota rápida podría atravesar a otra
+    // o las pilas de pelotas "temblarían". Varios subpasos pequeños hacen la
+    // simulación mucho más estable a cambio de un poco más de cálculo
+    function simulate (frameDt) {
+      const dt = frameDt / SUBSTEPS
+      for (let i = 0; i < SUBSTEPS; i++) step(dt)
+    }
+
+    // ---------- Arrastrar y lanzar ----------
+
+    function getPointer (event) {
+      return { x: event.clientX, y: event.clientY, t: performance.now() }
+    }
+
+    function findBallAt ({ x, y }) {
+      // Recorremos al revés para coger la que está dibujada encima
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const ball = balls[i]
+        if (Math.hypot(ball.x - x, ball.y - y) <= ball.r) return ball
+      }
+      return null
+    }
+
+    function handlePointerDown (event) {
+      const point = getPointer(event)
+      // Si no hay pelota debajo, creamos una nueva y la agarramos: así un
+      // click suelta una pelota y un click + arrastre la lanza
+      const ball = findBallAt(point) ?? createBall({ x: point.x, y: point.y })
+
+      grab = {
+        ball,
+        offsetX: ball.x - point.x,
+        offsetY: ball.y - point.y,
+        target: point,
+        samples: [point]
+      }
+      canvas.setPointerCapture(event.pointerId)
+      canvas.style.cursor = 'grabbing'
+    }
+
+    function handlePointerMove (event) {
+      if (!grab) {
+        canvas.style.cursor = findBallAt(getPointer(event)) ? 'grab' : 'crosshair'
+        return
+      }
+
+      const point = getPointer(event)
+      grab.target = point
+      grab.samples.push(point)
+      // Solo nos interesan los últimos 100 ms para calcular la velocidad
+      grab.samples = grab.samples.filter(sample => point.t - sample.t < 100)
+    }
+
+    // Velocidad del puntero = distancia recorrida / tiempo transcurrido
+    function getPointerVelocity () {
+      const first = grab.samples[0]
+      const last = grab.samples.at(-1)
+      const seconds = (last.t - first.t) / 1000
+      // Si el puntero lleva un rato quieto, la velocidad es cero
+      const idle = performance.now() - last.t > 100
+      if (seconds <= 0 || idle) return { vx: 0, vy: 0 }
+
+      const vx = (last.x - first.x) / seconds
+      const vy = (last.y - first.y) / seconds
+      const speed = Math.hypot(vx, vy)
+      const factor = speed > MAX_THROW_SPEED ? MAX_THROW_SPEED / speed : 1
+      return { vx: vx * factor, vy: vy * factor }
+    }
+
+    function moveGrabbedBall () {
+      const { ball, target, offsetX, offsetY } = grab
+      ball.x = target.x + offsetX
+      ball.y = target.y + offsetY
+      // Mientras la arrastramos le damos la velocidad del puntero para que
+      // golpee a las demás pelotas de forma realista
+      const { vx, vy } = getPointerVelocity()
+      ball.vx = vx
+      ball.vy = vy
+    }
+
+    function handlePointerUp () {
+      if (!grab) return
+      // Al soltar, la pelota sale con la velocidad que llevaba el puntero
+      const { vx, vy } = getPointerVelocity()
+      grab.ball.vx = vx
+      grab.ball.vy = vy
+      grab = null
+      canvas.style.cursor = 'grab'
+    }
+
+    // ---------- Dibujo ----------
+
+    function resize () {
+      const dpr = window.devicePixelRatio || 1
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    function drawBall (ball) {
+      const { x, y, r, color } = ball
+
+      // Sombra suave y brillo con un degradado radial desplazado
+      const gradient = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r)
+      gradient.addColorStop(0, '#ffffff')
+      gradient.addColorStop(0.25, color)
+      gradient.addColorStop(1, shade(color))
+
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fillStyle = gradient
+      ctx.shadowColor = color
+      ctx.shadowBlur = ball === grab?.ball ? 30 : 12
+      ctx.fill()
+      ctx.shadowBlur = 0
+
+      if (ball === grab?.ball) {
+        ctx.lineWidth = 2
+        ctx.strokeStyle = '#fff'
+        ctx.stroke()
+      }
+    }
+
+    function shade (hex) {
+      const value = parseInt(hex.slice(1), 16)
+      const r = (value >> 16) * 0.35
+      const g = ((value >> 8) & 255) * 0.35
+      const b = (value & 255) * 0.35
+      return `rgb(${r}, ${g}, ${b})`
+    }
+
+    // El vector velocidad dibujado como una flecha (escalado para que se vea)
+    function drawVector (ball) {
+      const scale = 0.12
+      const endX = ball.x + ball.vx * scale
+      const endY = ball.y + ball.vy * scale
+      const length = Math.hypot(endX - ball.x, endY - ball.y)
+      if (length < 4) return
+
+      const angle = Math.atan2(endY - ball.y, endX - ball.x)
+      ctx.strokeStyle = ctx.fillStyle = 'rgba(255, 255, 255, .85)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(ball.x, ball.y)
+      ctx.lineTo(endX, endY)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(endX, endY)
+      ctx.lineTo(endX - Math.cos(angle - 0.45) * 9, endY - Math.sin(angle - 0.45) * 9)
+      ctx.lineTo(endX - Math.cos(angle + 0.45) * 9, endY - Math.sin(angle + 0.45) * 9)
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    function drawGravityArrow () {
+      const x = width - 40
+      const y = height / 2
+      ctx.save()
+      ctx.translate(x, y)
+      if (gravityDirection < 0) ctx.rotate(Math.PI)
+      ctx.globalAlpha = 0.25
+      ctx.fillStyle = '#fff'
+      ctx.beginPath()
+      ctx.moveTo(-6, -30)
+      ctx.lineTo(6, -30)
+      ctx.lineTo(6, 10)
+      ctx.lineTo(16, 10)
+      ctx.lineTo(0, 30)
+      ctx.lineTo(-16, 10)
+      ctx.lineTo(-6, 10)
+      ctx.fill()
+      ctx.restore()
+    }
+
+    function draw () {
+      ctx.clearRect(0, 0, width, height)
+      drawGravityArrow()
+      balls.forEach(drawBall)
+      if (vectorsInput.checked) balls.forEach(drawVector)
+    }
+
+    // ---------- Estadísticas ----------
+
+    function updateStats (frameDt) {
+      // Energía cinética total: suma de ½·m·v². Con restitución 1 y sin
+      // gravedad se mantiene casi constante: prueba a comprobarlo
+      const energy = balls.reduce((total, ball) => total + 0.5 * ball.mass * (ball.vx ** 2 + ball.vy ** 2), 0)
+      countLabel.textContent = balls.length
+      energyLabel.textContent = `${(energy / 1e6).toFixed(1)} M`
+
+      fpsFrames++
+      fpsTime += frameDt
+      if (fpsTime >= 0.5) {
+        fpsLabel.textContent = Math.round(fpsFrames / fpsTime)
+        fpsFrames = 0
+        fpsTime = 0
+      }
+    }
+
+    function loop (time) {
+      // Limitamos dt: si la pestaña estuvo oculta no queremos un salto enorme
+      const frameDt = Math.min((time - lastTime) / 1000, 1 / 30)
+      lastTime = time
+
+      simulate(frameDt)
+      draw()
+      updateStats(frameDt)
+      requestAnimationFrame(loop)
+    }
+
+    // ---------- Controles ----------
+
+    function updateOutputs () {
+      gravityOutput.textContent = `${gravityInput.value} px/s²`
+      bounceOutput.textContent = Number(bounceInput.value).toFixed(2)
+    }
+
+    function flipGravity () {
+      gravityDirection *= -1
+      flipButton.setAttribute('aria-pressed', String(gravityDirection < 0))
+    }
+
+    function explode () {
+      const cx = width / 2
+      const cy = height / 2
+      for (const ball of balls) {
+        const angle = Math.atan2(ball.y - cy, ball.x - cx)
+        // Mismo impulso para todas: las ligeras salen más disparadas (Δv = J / m)
+        const impulse = 500 * 25 * 25
+        ball.vx += Math.cos(angle) * impulse / ball.mass
+        ball.vy += Math.sin(angle) * impulse / ball.mass
+      }
+    }
+
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointermove', handlePointerMove)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerUp)
+    window.addEventListener('resize', resize)
+    gravityInput.addEventListener('input', updateOutputs)
+    bounceInput.addEventListener('input', updateOutputs)
+    flipButton.addEventListener('click', flipGravity)
+    document.querySelector('#add').addEventListener('click', () => spawnRandom(10))
+    document.querySelector('#explode').addEventListener('click', explode)
+    document.querySelector('#clear').addEventListener('click', () => { balls = [] })
+    window.addEventListener('keydown', (event) => {
+      if (event.key.toLowerCase() === 'g' && !event.target.matches('input')) flipGravity()
+    })
+
+    resize()
+    updateOutputs()
+    spawnRandom(INITIAL_BALLS)
+    requestAnimationFrame(loop)
+  </script>
+</head>
+
+<body>
+  <canvas aria-label="Simulación de pelotas. Haz click para crear una y arrástrala para lanzarla"></canvas>
+
+  <section class="panel">
+    <h1>🏀 Física de pelotas <small>Click para crear · arrastra para lanzar</small></h1>
+
+    <label>
+      <span>Gravedad <output id="gravity-value"></output></span>
+      <input id="gravity" type="range" min="0" max="2500" step="50" value="1200">
+    </label>
+
+    <label>
+      <span>Rebote (restitución) <output id="bounce-value"></output></span>
+      <input id="bounce" type="range" min="0" max="1" step="0.01" value="0.85">
+    </label>
+
+    <label class="check">
+      <input id="vectors" type="checkbox"> Mostrar vectores de velocidad
+    </label>
+
+    <div class="buttons">
+      <button id="flip" aria-pressed="false" title="Atajo: G">🔃 Invertir gravedad</button>
+      <button id="add">＋ 10 pelotas</button>
+      <button id="explode">💥 Explosión</button>
+      <button id="clear">🧹 Limpiar</button>
+    </div>
+  </section>
+
+  <div class="stats" aria-live="off">
+    <div>Pelotas <strong id="count">0</strong></div>
+    <div>Energía cinética <strong id="energy">0</strong></div>
+    <div>FPS <strong id="fps">60</strong></div>
+  </div>
+
+  <p class="hint">Consejo: pon el rebote a 1 y la gravedad a 0 para un gas ideal</p>
+</body>
+
+</html>

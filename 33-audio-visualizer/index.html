@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>33 - Visualizador de audio</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: dark;
+      --panel: #12131cd9;
+      --border: #ffffff1f;
+      --muted: #a3a7bd;
+      --accent: #a78bfa;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #07070c;
+      color: #f1f2f8;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ---------- Barra de controles ---------- */
+
+    .controls {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      translate: -50% 0;
+      z-index: 2;
+      width: max-content;
+      max-width: calc(100vw - 32px);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 16px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      font-size: 13px;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 10px;
+      background: #ffffff0f;
+    }
+
+    .segmented button,
+    .controls > button {
+      font: inherit;
+      padding: 5px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--accent);
+      color: #12131c;
+      font-weight: 600;
+    }
+
+    .controls > button {
+      border: 1px solid var(--border);
+      color: inherit;
+    }
+
+    .controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+    }
+
+    .controls output {
+      min-width: 2.2em;
+      color: #f1f2f8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 90px;
+      accent-color: var(--accent);
+    }
+
+    select {
+      font: inherit;
+      padding: 3px 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #1b1d29;
+      color: inherit;
+    }
+
+    .source {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--muted);
+    }
+
+    .source::before {
+      content: '';
+      flex-shrink: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--dot, #555);
+      box-shadow: 0 0 8px var(--dot, transparent);
+    }
+
+    .source.live {
+      --dot: #4ade80;
+    }
+
+    /* ---------- Pantalla inicial ---------- */
+
+    .start {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: radial-gradient(circle at center, #07070c66, #07070ccc);
+    }
+
+    .start[hidden] {
+      display: none;
+    }
+
+    .card {
+      width: min(460px, 100%);
+      padding: 28px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      text-align: center;
+    }
+
+    .card h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    .card p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .options button,
+    .options label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #ffffff0a;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+
+    .options button:hover,
+    .options label:hover {
+      background: #ffffff14;
+      border-color: var(--accent);
+    }
+
+    .options b {
+      font-size: 22px;
+    }
+
+    .options small {
+      display: block;
+      color: var(--muted);
+    }
+
+    .options input {
+      display: none;
+    }
+
+    .error {
+      margin: 16px 0 0 !important;
+      color: #fca5a5 !important;
+      font-size: 14px;
+    }
+
+    audio {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      translate: -50% 0;
+      z-index: 2;
+      width: min(420px, calc(100vw - 32px));
+    }
+
+    audio[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .controls {
+        gap: 8px;
+      }
+
+      .source {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="controls">
+    <div class="segmented" id="modes" role="group" aria-label="Modo de visualización">
+      <button data-mode="bars" aria-pressed="true">Barras</button>
+      <button data-mode="wave" aria-pressed="false">Onda</button>
+      <button data-mode="circle" aria-pressed="false">Circular</button>
+    </div>
+    <label>Suavizado
+      <input type="range" id="smoothing" min="0" max="0.95" step="0.05" value="0.8">
+      <output id="smoothing-value">0.8</output>
+    </label>
+    <label>FFT
+      <select id="fft">
+        <option>256</option>
+        <option>512</option>
+        <option>1024</option>
+        <option selected>2048</option>
+        <option>4096</option>
+        <option>8192</option>
+      </select>
+    </label>
+    <span class="source" id="source">Sin audio</span>
+    <button id="change-source">Cambiar fuente</button>
+  </div>
+
+  <div class="start" id="start">
+    <div class="card">
+      <h1>🎧 Visualizador de audio</h1>
+      <p>Los navegadores no dejan reproducir ni analizar audio hasta que interactúas con la página. Elige una fuente
+        para empezar:</p>
+      <div class="options">
+        <button id="use-mic"><b>🎤</b><span>Micrófono<small>Habla, canta o pon música cerca</small></span></button>
+        <label id="use-file"><b>📁</b><span>Archivo de audio<small>MP3, WAV, OGG… de tu equipo</small></span>
+          <input type="file" id="file-input" accept="audio/*">
+        </label>
+        <button id="use-demo"><b>🎹</b><span>Demo<small>Un sintetizador generado con Web Audio</small></span></button>
+      </div>
+      <p class="error" id="error" hidden></p>
+    </div>
+  </div>
+
+  <audio id="audio" controls hidden></audio>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const MIN_FREQUENCY = 30
+    const MAX_FREQUENCY = 16000
+    const TRAILS = { bars: 1, wave: 0.28, circle: 0.22 } // opacidad del borrado
+    const DEMO_STEP = 0.16 // segundos por paso del secuenciador
+    const DEMO_NOTES = [220, 261.63, 329.63, 392, 440, 392, 329.63, 261.63]
+    const DEMO_BASS = [110, 110, 87.31, 98]
+
+    const $canvas = $('#canvas')
+    const context = $canvas.getContext('2d')
+    const $start = $('#start')
+    const $error = $('#error')
+    const $audio = $('#audio')
+    const $source = $('#source')
+    const $smoothing = $('#smoothing')
+    const $fft = $('#fft')
+
+    let audioContext = null
+    let analyser = null
+    let frequencyData = new Uint8Array(1024)
+    let timeData = new Uint8Array(2048)
+    let mode = 'bars'
+    let hasSource = false
+    let width = 0
+    let height = 0
+
+    // Lo que hay que hacer para parar la fuente actual
+    let stopSource = () => {}
+    let mediaElementSource = null
+
+    /* ---------- Web Audio ---------- */
+
+    // El grafo de audio es: FUENTE → AnalyserNode (→ altavoces).
+    // El AnalyserNode no modifica el sonido: solo nos deja "mirarlo".
+    // Aplica una FFT (transformada rápida de Fourier) que descompone la
+    // señal en frecuencias: graves a la izquierda, agudos a la derecha.
+    async function ensureAudioContext() {
+      if (!audioContext) {
+        audioContext = new AudioContext()
+        analyser = audioContext.createAnalyser()
+        applySettings()
+      }
+      // Si el contexto se creó sin gesto del usuario está "suspended"
+      if (audioContext.state === 'suspended') await audioContext.resume()
+    }
+
+    function applySettings() {
+      if (!analyser) return
+      // fftSize: cuántas muestras analiza. Más grande = más precisión en
+      // frecuencias pero menos en el tiempo. Da fftSize / 2 "bins"
+      analyser.fftSize = Number($fft.value)
+      // smoothingTimeConstant: cuánto se mezcla cada frame con el anterior
+      // (0 = nervioso, 0.95 = muy suave)
+      analyser.smoothingTimeConstant = Number($smoothing.value)
+      frequencyData = new Uint8Array(analyser.frequencyBinCount)
+      timeData = new Uint8Array(analyser.fftSize)
+    }
+
+    function setSourceLabel(text) {
+      hasSource = true
+      $source.textContent = text
+      $source.classList.add('live')
+      $start.hidden = true
+    }
+
+    function showError(message) {
+      $error.textContent = message
+      $error.hidden = false
+    }
+
+    async function useMicrophone() {
+      $error.hidden = true
+      if (!navigator.mediaDevices?.getUserMedia) {
+        return showError('Tu navegador no permite acceder al micrófono (¿estás en https?).')
+      }
+      try {
+        await ensureAudioContext()
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stopSource()
+        const source = audioContext.createMediaStreamSource(stream)
+        // ¡No lo conectamos a los altavoces! Se acoplaría (feedback)
+        source.connect(analyser)
+        stopSource = () => {
+          source.disconnect()
+          stream.getTracks().forEach(track => track.stop())
+        }
+        setSourceLabel('🎤 Micrófono')
+      } catch (error) {
+        const messages = {
+          NotAllowedError: 'Has denegado el permiso del micrófono.',
+          NotFoundError: 'No se ha encontrado ningún micrófono.',
+          NotReadableError: 'El micrófono está siendo usado por otra aplicación.'
+        }
+        showError(messages[error.name] ?? 'No se ha podido acceder al micrófono.')
+      }
+    }
+
+    async function useFile(file) {
+      $error.hidden = true
+      if (!file) return
+      await ensureAudioContext()
+      stopSource()
+
+      // Un <audio> solo puede tener UN MediaElementSource en toda su vida:
+      // lo creamos la primera vez y lo reutilizamos para otros archivos
+      if (!mediaElementSource) mediaElementSource = audioContext.createMediaElementSource($audio)
+      mediaElementSource.connect(analyser)
+      mediaElementSource.connect(audioContext.destination)
+
+      URL.revokeObjectURL($audio.src)
+      $audio.src = URL.createObjectURL(file)
+      $audio.hidden = false
+      $audio.play().catch(() => {}) // si falla, el usuario puede darle al play
+
+      stopSource = () => {
+        $audio.pause()
+        $audio.hidden = true
+        mediaElementSource.disconnect()
+      }
+      setSourceLabel(`🎵 ${file.name}`)
+    }
+
+    /* ---------- Demo: pequeño sintetizador ---------- */
+
+    function playNote(output, time, frequency) {
+      const oscillator = audioContext.createOscillator()
+      const filter = audioContext.createBiquadFilter()
+      const gain = audioContext.createGain()
+      oscillator.type = 'sawtooth'
+      oscillator.frequency.value = frequency
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(2400, time)
+      filter.frequency.exponentialRampToValueAtTime(400, time + 0.3)
+      gain.gain.setValueAtTime(0.0001, time)
+      gain.gain.exponentialRampToValueAtTime(0.35, time + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.35)
+      oscillator.connect(filter).connect(gain).connect(output)
+      oscillator.start(time)
+      oscillator.stop(time + 0.4)
+    }
+
+    function playKick(output, time) {
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+      oscillator.frequency.setValueAtTime(150, time)
+      oscillator.frequency.exponentialRampToValueAtTime(40, time + 0.15)
+      gain.gain.setValueAtTime(1, time)
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3)
+      oscillator.connect(gain).connect(output)
+      oscillator.start(time)
+      oscillator.stop(time + 0.3)
+    }
+
+    function playBass(output, time, frequency) {
+      const oscillator = audioContext.createOscillator()
+      const gain = audioContext.createGain()
+      oscillator.type = 'triangle'
+      oscillator.frequency.value = frequency
+      gain.gain.setValueAtTime(0.5, time)
+      gain.gain.exponentialRampToValueAtTime(0.001, time + DEMO_STEP * 8)
+      oscillator.connect(gain).connect(output)
+      oscillator.start(time)
+      oscillator.stop(time + DEMO_STEP * 8)
+    }
+
+    async function useDemo() {
+      $error.hidden = true
+      await ensureAudioContext()
+      stopSource()
+
+      // El analizador recibe la señal fuerte (se ve mejor la onda)
+      // y a los altavoces le llega más bajita
+      const output = audioContext.createGain()
+      const volume = audioContext.createGain()
+      output.gain.value = 0.6
+      volume.gain.value = 0.4
+      output.connect(analyser)
+      output.connect(volume).connect(audioContext.destination)
+
+      // Programamos las notas con el reloj del audio (muy preciso) un
+      // poco por adelantado, en vez de fiarnos de setInterval
+      let step = 0
+      let nextTime = audioContext.currentTime + 0.05
+      const scheduler = setInterval(() => {
+        while (nextTime < audioContext.currentTime + 0.12) {
+          playNote(output, nextTime, DEMO_NOTES[step % DEMO_NOTES.length] * (step % 16 < 8 ? 1 : 1.5))
+          if (step % 4 === 0) playKick(output, nextTime)
+          if (step % 8 === 0) playBass(output, nextTime, DEMO_BASS[Math.floor(step / 8) % DEMO_BASS.length])
+          nextTime += DEMO_STEP
+          step++
+        }
+      }, 25)
+
+      stopSource = () => {
+        clearInterval(scheduler)
+        output.disconnect()
+        volume.disconnect()
+      }
+      setSourceLabel('🎹 Demo')
+    }
+
+    /* ---------- Datos ---------- */
+
+    // Antes de tener audio generamos datos "falsos" para que la
+    // pantalla inicial no esté vacía
+    function fakeData(time) {
+      const bins = frequencyData.length
+      for (let i = 0; i < bins; i++) {
+        // Posición en escala logarítmica (0 = graves, 1 = agudos)
+        const x = Math.log2(i + 2) / Math.log2(bins + 2)
+        const wave = Math.sin(time * 1.8 + x * 14) * 0.5 + 0.5
+        const pulse = Math.sin(time * 0.9 + x * 5) * 0.5 + 0.5
+        frequencyData[i] = 255 * (1 - x * 0.55) * (0.3 + 0.7 * wave * (0.6 + 0.4 * pulse))
+      }
+      for (let i = 0; i < timeData.length; i++) {
+        const t = i / timeData.length
+        timeData[i] = 128 + Math.sin(t * 24 + time * 3) * 50 * Math.sin(time * 0.7 + t * 3)
+      }
+    }
+
+    function readData(time) {
+      if (!hasSource) return fakeData(time)
+      analyser.getByteFrequencyData(frequencyData) // 0-255 por frecuencia
+      analyser.getByteTimeDomainData(timeData) // la forma de onda (128 = silencio)
+    }
+
+    // Los bins de la FFT están repartidos linealmente (cada uno cubre los
+    // mismos Hz), pero el oído percibe las frecuencias de forma
+    // logarítmica. Agrupamos los bins en escala logarítmica para que los
+    // graves no queden apretujados a la izquierda
+    function getBands(count) {
+      const nyquist = (audioContext?.sampleRate ?? 44100) / 2
+      const bins = frequencyData.length
+      const maxFrequency = Math.min(MAX_FREQUENCY, nyquist)
+      const bands = new Array(count)
+
+      for (let k = 0; k < count; k++) {
+        const from = MIN_FREQUENCY * (maxFrequency / MIN_FREQUENCY) ** (k / count)
+        const to = MIN_FREQUENCY * (maxFrequency / MIN_FREQUENCY) ** ((k + 1) / count)
+        const start = Math.floor(from / nyquist * bins)
+        const end = Math.max(start + 1, Math.ceil(to / nyquist * bins))
+        let max = 0
+        for (let i = start; i < end && i < bins; i++) max = Math.max(max, frequencyData[i])
+        bands[k] = max / 255
+      }
+      return bands
+    }
+
+    /* ---------- Dibujo ---------- */
+
+    // El color depende de la posición: el tono HSL recorre el arcoíris
+    // (de 270 = violeta en los graves a 0 = rojo en los agudos)
+    const colorFor = (ratio) => `hsl(${270 - ratio * 270} 90% 62%)`
+
+    function drawBars() {
+      const count = Math.max(24, Math.min(128, Math.floor(width / 11)))
+      const bands = getBands(count)
+      const gap = 3
+      const barWidth = (width - gap * (count + 1)) / count
+      const baseline = height * 0.78
+
+      bands.forEach((value, k) => {
+        const x = gap + k * (barWidth + gap)
+        const barHeight = Math.max(2, value * baseline * 0.85)
+        context.fillStyle = colorFor(k / count)
+        context.beginPath()
+        context.roundRect(x, baseline - barHeight, barWidth, barHeight, [barWidth / 2, barWidth / 2, 0, 0])
+        context.fill()
+
+        // Reflejo en el "suelo"
+        context.globalAlpha = 0.18
+        context.fillRect(x, baseline + 4, barWidth, barHeight * 0.3)
+        context.globalAlpha = 1
+      })
+    }
+
+    function drawWave() {
+      const centerY = height / 2
+      const gradient = context.createLinearGradient(0, 0, width, 0)
+      for (let stop = 0; stop <= 1; stop += 0.25) gradient.addColorStop(stop, colorFor(stop))
+
+      context.lineWidth = 3
+      context.strokeStyle = gradient
+      context.shadowBlur = 16
+      context.shadowColor = colorFor(0.5)
+      context.beginPath()
+
+      const step = width / (timeData.length - 1)
+      timeData.forEach((value, i) => {
+        // 128 es el silencio; los valores van de 0 a 255
+        const y = centerY + ((value - 128) / 128) * height * 0.38
+        if (i === 0) context.moveTo(0, y)
+        else context.lineTo(i * step, y)
+      })
+      context.stroke()
+      context.shadowBlur = 0
+    }
+
+    function drawCircle(time) {
+      const count = 120
+      const bands = getBands(count)
+      const centerX = width / 2
+      const centerY = height / 2
+      // Los graves (primeras bandas) hacen "latir" el círculo
+      const bass = bands.slice(0, 8).reduce((sum, value) => sum + value, 0) / 8
+      const radius = Math.min(width, height) * (0.16 + bass * 0.05)
+      const maxLength = Math.min(width, height) * 0.26
+
+      context.lineCap = 'round'
+      context.lineWidth = Math.max(2, (Math.PI * 2 * radius) / count * 0.55)
+
+      bands.forEach((value, k) => {
+        const angle = (k / count) * Math.PI * 2 + time * 0.15
+        const length = 4 + value * maxLength
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        context.strokeStyle = colorFor(k / count)
+        context.beginPath()
+        context.moveTo(centerX + cos * radius, centerY + sin * radius)
+        context.lineTo(centerX + cos * (radius + length), centerY + sin * (radius + length))
+        context.stroke()
+      })
+
+      const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius)
+      glow.addColorStop(0, `hsl(280 90% 65% / ${0.15 + bass * 0.5})`)
+      glow.addColorStop(1, 'transparent')
+      context.fillStyle = glow
+      context.beginPath()
+      context.arc(centerX, centerY, radius * 0.92, 0, Math.PI * 2)
+      context.fill()
+    }
+
+    const DRAWERS = { bars: drawBars, wave: drawWave, circle: drawCircle }
+
+    function frame(now) {
+      const time = now / 1000
+      readData(time)
+
+      // En lugar de borrar del todo pintamos un rectángulo semitransparente:
+      // lo anterior se desvanece poco a poco y deja una estela
+      context.fillStyle = `rgb(7 7 12 / ${TRAILS[mode]})`
+      context.fillRect(0, 0, width, height)
+
+      DRAWERS[mode](time)
+      requestAnimationFrame(frame)
+    }
+
+    // Canvas nítido en pantallas retina: más píxeles reales que CSS
+    function resize() {
+      const ratio = window.devicePixelRatio || 1
+      width = window.innerWidth
+      height = window.innerHeight
+      $canvas.width = Math.round(width * ratio)
+      $canvas.height = Math.round(height * ratio)
+      context.setTransform(ratio, 0, 0, ratio, 0, 0)
+    }
+
+    /* ---------- Eventos ---------- */
+
+    $('#use-mic').addEventListener('click', useMicrophone)
+    $('#use-demo').addEventListener('click', useDemo)
+
+    // Creamos el AudioContext en el clic (gesto del usuario) antes de que
+    // se abra el selector de archivos
+    $('#use-file').addEventListener('click', () => ensureAudioContext())
+    $('#file-input').addEventListener('change', (event) => {
+      useFile(event.target.files[0])
+      event.target.value = '' // para poder volver a elegir el mismo archivo
+    })
+
+    $('#change-source').addEventListener('click', () => {
+      $error.hidden = true
+      $start.hidden = false
+    })
+
+    $start.addEventListener('click', (event) => {
+      // Clic fuera de la tarjeta: cerramos si ya hay una fuente activa
+      if (event.target === $start && hasSource) $start.hidden = true
+    })
+
+    $('#modes').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-mode]')
+      if (!button) return
+      mode = button.dataset.mode
+      // Borramos del todo para que no queden restos del modo anterior
+      context.fillStyle = '#07070c'
+      context.fillRect(0, 0, width, height)
+      document.querySelectorAll('[data-mode]').forEach(item => {
+        item.setAttribute('aria-pressed', item === button)
+      })
+    })
+
+    $smoothing.addEventListener('input', () => {
+      $('#smoothing-value').textContent = $smoothing.value
+      if (analyser) analyser.smoothingTimeConstant = Number($smoothing.value)
+    })
+
+    $fft.addEventListener('change', applySettings)
+
+    document.addEventListener('keydown', (event) => {
+      const modes = { 1: 'bars', 2: 'wave', 3: 'circle' }
+      const button = modes[event.key] && document.querySelector(`[data-mode="${modes[event.key]}"]`)
+      if (button && !event.target.closest?.('input, select')) button.click()
+    })
+
+    window.addEventListener('resize', resize)
+
+    resize()
+    requestAnimationFrame(frame)
+  </script>
+</body>
+
+</html>

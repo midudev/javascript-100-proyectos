@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>87 - Galería con View Transitions</title>
+  <style>
+    :root {
+      --bg: #0c0c10;
+      --card: #16161d;
+      --border: #26262f;
+      --text: #f2f0f7;
+      --muted: #8d8a9c;
+      --accent: #c6a4ff;
+      --ease-out: cubic-bezier(.2, .8, .2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scrollbar-gutter: stable;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body.detail-open {
+      overflow: hidden;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    /* ---------- Cabecera y filtros ---------- */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px 24px;
+      padding: 24px 24px 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3.5vw, 34px);
+      letter-spacing: -.03em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    header p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 7px 13px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--card);
+      font-size: 13px;
+      font-weight: 600;
+      transition: border-color .15s, background .15s;
+    }
+
+    .chip:hover {
+      border-color: var(--accent);
+    }
+
+    .chip[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1a0f2e;
+    }
+
+    .divider {
+      width: 1px;
+      height: 22px;
+      background: var(--border);
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .switch input {
+      accent-color: var(--accent);
+    }
+
+    /* ---------- Rejilla ---------- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      grid-auto-rows: 170px;
+      grid-auto-flow: dense;
+      gap: 12px;
+      padding: 0 24px 32px;
+    }
+
+    .card {
+      position: relative;
+      padding: 0;
+      border: 0;
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--card);
+    }
+
+    .card.horizontal {
+      grid-column: span 2;
+    }
+
+    .card.vertical {
+      grid-row: span 2;
+    }
+
+    .card img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: scale .5s var(--ease-out), filter .3s;
+    }
+
+    .card:hover img,
+    .card:focus-visible img {
+      scale: 1.05;
+    }
+
+    .card:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .card figcaption {
+      position: absolute;
+      inset: auto 0 0;
+      padding: 28px 12px 10px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 14px;
+      background: linear-gradient(transparent, rgba(0, 0, 0, .7));
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      color: var(--muted);
+    }
+
+    /* ---------- Vista de detalle ---------- */
+    .detail {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 28px;
+      padding: 28px;
+      background: rgba(8, 8, 12, .96);
+      /* El panel entero tiene nombre propio para que se anime por encima
+         de la rejilla y no se mezcle con el resto de la página */
+      view-transition-name: detail;
+    }
+
+    .detail[hidden] {
+      display: none;
+    }
+
+    .detail-media {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    .detail-media img {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100dvh - 56px);
+      border-radius: 16px;
+      box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8);
+      /* La imagen del detalle SIEMPRE se llama "hero": el navegador la
+         emparejará con la miniatura que tenga el mismo nombre */
+      view-transition-name: hero;
+    }
+
+    .detail-info {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-self: center;
+    }
+
+    .detail-info .counter {
+      font-size: 13px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .detail-info h2 {
+      margin: 0;
+      font-size: 40px;
+      letter-spacing: -.03em;
+    }
+
+    .detail-info p {
+      margin: 0;
+      line-height: 1.6;
+      color: #cfcbe0;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .meta span {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav button {
+      flex: 1;
+      padding: 11px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      font-weight: 600;
+    }
+
+    .nav button:hover {
+      border-color: var(--accent);
+    }
+
+    .close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--card);
+      font-size: 18px;
+    }
+
+    .keys {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    kbd {
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--card);
+    }
+
+    /* ---------- Personalización de las View Transitions ---------- */
+
+    /* La imagen protagonista: vuela con una curva más marcada */
+    ::view-transition-group(hero) {
+      animation-duration: .55s;
+      animation-timing-function: var(--ease-out);
+    }
+
+    /* Mientras vuela, la miniatura (cover) y la imagen grande (contain)
+       tienen proporciones distintas; así evitamos que se deformen */
+    ::view-transition-old(hero),
+    ::view-transition-new(hero) {
+      height: 100%;
+      object-fit: cover;
+    }
+
+    ::view-transition-new(detail) {
+      animation: fade-in .35s ease-out;
+    }
+
+    ::view-transition-old(detail) {
+      animation: fade-out .3s ease-in both;
+    }
+
+    /* Siguiente / anterior: la imagen sale por un lado y entra por el otro */
+    html[data-transition="next"]::view-transition-old(hero) {
+      animation: slide-out-left .4s var(--ease-out) both;
+    }
+
+    html[data-transition="next"]::view-transition-new(hero) {
+      animation: slide-in-right .4s var(--ease-out) both;
+    }
+
+    html[data-transition="prev"]::view-transition-old(hero) {
+      animation: slide-out-right .4s var(--ease-out) both;
+    }
+
+    html[data-transition="prev"]::view-transition-new(hero) {
+      animation: slide-in-left .4s var(--ease-out) both;
+    }
+
+    /* Al filtrar/reordenar, cada tarjeta recibe su propio nombre
+       (card-1, card-2…) para que el navegador anime su cambio de posición */
+    html[data-transition="grid"] .card {
+      view-transition-name: var(--vt-name);
+      view-transition-class: card;
+    }
+
+    ::view-transition-group(.card) {
+      animation-duration: .5s;
+      animation-timing-function: var(--ease-out);
+    }
+
+    /* :only-child = la tarjeta solo existe en uno de los dos estados:
+       si solo hay "new" es que ha aparecido; si solo hay "old", que se ha ido */
+    ::view-transition-new(.card):only-child {
+      animation: pop-in .4s var(--ease-out) both;
+    }
+
+    ::view-transition-old(.card):only-child {
+      animation: pop-out .3s ease-in both;
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+      }
+    }
+
+    @keyframes fade-out {
+      to {
+        opacity: 0;
+      }
+    }
+
+    @keyframes slide-out-left {
+      to {
+        opacity: 0;
+        translate: -80px 0;
+      }
+    }
+
+    @keyframes slide-in-right {
+      from {
+        opacity: 0;
+        translate: 80px 0;
+      }
+    }
+
+    @keyframes slide-out-right {
+      to {
+        opacity: 0;
+        translate: 80px 0;
+      }
+    }
+
+    @keyframes slide-in-left {
+      from {
+        opacity: 0;
+        translate: -80px 0;
+      }
+    }
+
+    @keyframes pop-in {
+      from {
+        opacity: 0;
+        scale: .8;
+      }
+    }
+
+    @keyframes pop-out {
+      to {
+        opacity: 0;
+        scale: .8;
+      }
+    }
+
+    /* Si el sistema pide menos movimiento, desactivamos las animaciones */
+    @media (prefers-reduced-motion: reduce) {
+
+      ::view-transition-group(*),
+      ::view-transition-old(*),
+      ::view-transition-new(*) {
+        animation: none !important;
+      }
+    }
+
+    @media (width < 760px) {
+      header {
+        padding: 18px 14px 14px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+        grid-auto-rows: 130px;
+        padding: 0 14px 24px;
+      }
+
+      .detail {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 16px;
+        padding: 64px 16px 20px;
+      }
+
+      .detail-media img {
+        max-height: 52dvh;
+      }
+
+      .detail-info h2 {
+        font-size: 28px;
+      }
+
+      .keys {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const grid = document.querySelector('.grid')
+    const detail = document.querySelector('.detail')
+    const detailImage = detail.querySelector('img')
+    const transitionsInput = document.querySelector('#use-transitions')
+    const supportNote = document.querySelector('#support')
+
+    // CONSTANTES
+    const SIZES = {
+      horizontal: { width: 960, height: 640, label: 'Horizontal' },
+      vertical: { width: 640, height: 960, label: 'Vertical' },
+      square: { width: 800, height: 800, label: 'Cuadrada' }
+    }
+
+    // Semillas fijas: picsum.photos devuelve siempre la misma foto para
+    // la misma semilla, así la galería es estable entre recargas
+    const PHOTOS = [
+      { id: 1, seed: 'amanecer', title: 'Amanecer', orientation: 'horizontal' },
+      { id: 2, seed: 'bruma', title: 'Bruma', orientation: 'vertical' },
+      { id: 3, seed: 'horizonte', title: 'Horizonte', orientation: 'square' },
+      { id: 4, seed: 'silencio', title: 'Silencio', orientation: 'square' },
+      { id: 5, seed: 'marea', title: 'Marea', orientation: 'vertical' },
+      { id: 6, seed: 'cumbre', title: 'Cumbre', orientation: 'horizontal' },
+      { id: 7, seed: 'sendero', title: 'Sendero', orientation: 'square' },
+      { id: 8, seed: 'reflejo', title: 'Reflejo', orientation: 'vertical' },
+      { id: 9, seed: 'neon', title: 'Neón', orientation: 'horizontal' },
+      { id: 10, seed: 'otono', title: 'Otoño', orientation: 'square' },
+      { id: 11, seed: 'calma', title: 'Calma', orientation: 'square' },
+      { id: 12, seed: 'vertigo', title: 'Vértigo', orientation: 'vertical' },
+      { id: 13, seed: 'deriva', title: 'Deriva', orientation: 'horizontal' },
+      { id: 14, seed: 'eco', title: 'Eco', orientation: 'square' }
+    ]
+
+    const DESCRIPTIONS = [
+      'Una imagen para detenerse un momento y mirar con calma.',
+      'Luz, textura y un encuadre que invita a imaginar la historia detrás.',
+      'Fotografía de la colección de Picsum, cargada siempre con la misma semilla.',
+      'Pulsa las flechas y observa cómo la imagen se desliza a la siguiente.'
+    ]
+
+    // ESTADO
+    let filter = 'all'
+    let order = PHOTOS.map(photo => photo.id)
+    let currentId = null
+    let activeTransition = null
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const supportsViewTransitions = typeof document.startViewTransition === 'function'
+
+    // ---------- La función clave ----------
+
+    // startViewTransition hace una "foto" del estado actual, ejecuta
+    // nuestro callback que cambia el DOM, hace otra "foto" del estado nuevo
+    // y anima entre ambas. Los elementos con el mismo view-transition-name
+    // en los dos estados se animan de una posición/tamaño a la otra.
+    async function withTransition (update, type) {
+      const canAnimate = supportsViewTransitions && transitionsInput.checked && !reducedMotion.matches
+
+      // Fallback: sin soporte (o sin ganas de animaciones) cambiamos el DOM y listo
+      if (!canAnimate) {
+        await update()
+        return
+      }
+
+      // Si el usuario pulsa muy rápido, terminamos al instante la transición
+      // anterior y esperamos a que su callback acabe antes de empezar otra.
+      // Así nunca hay dos callbacks modificando el DOM a la vez
+      if (activeTransition) {
+        activeTransition.skipTransition()
+        await activeTransition.updateCallbackDone.catch(() => {})
+      }
+
+      // Guardamos el tipo en <html> para usarlo en los selectores CSS
+      document.documentElement.dataset.transition = type
+      const transition = document.startViewTransition(update)
+      activeTransition = transition
+
+      try {
+        await transition.finished
+      } finally {
+        // Solo limpiamos si no ha empezado otra transición mientras tanto
+        if (activeTransition === transition) {
+          activeTransition = null
+          delete document.documentElement.dataset.transition
+        }
+      }
+    }
+
+    // ---------- Rejilla ----------
+
+    function getImageUrl ({ seed, orientation }) {
+      const { width, height } = SIZES[orientation]
+      return `https://picsum.photos/seed/${seed}/${width}/${height}`
+    }
+
+    function getVisiblePhotos () {
+      return order
+        .map(id => PHOTOS.find(photo => photo.id === id))
+        .filter(photo => filter === 'all' || photo.orientation === filter)
+    }
+
+    function renderGrid () {
+      const photos = getVisiblePhotos()
+
+      if (photos.length === 0) {
+        grid.innerHTML = '<p class="empty">No hay fotos con este filtro.</p>'
+        return
+      }
+
+      grid.replaceChildren(...photos.map(photo => {
+        const { width, height } = SIZES[photo.orientation]
+        const card = document.createElement('button')
+        card.className = `card ${photo.orientation}`
+        card.dataset.id = photo.id
+        card.setAttribute('aria-label', `Ver ${photo.title}`)
+        // Nombre único por tarjeta, se usa solo durante las transiciones de rejilla
+        card.style.setProperty('--vt-name', `card-${photo.id}`)
+        card.innerHTML = `
+          <figure style="margin: 0; height: 100%">
+            <img src="${getImageUrl(photo)}" alt="" width="${width}" height="${height}" loading="lazy">
+            <figcaption>${photo.title}</figcaption>
+          </figure>
+        `
+        card.addEventListener('click', () => openDetail(photo.id))
+        return card
+      }))
+    }
+
+    function getCardImage (id) {
+      return grid.querySelector(`.card[data-id="${id}"] img`)
+    }
+
+    function setFilter (value) {
+      if (value === filter) return
+      withTransition(() => {
+        filter = value
+        document.querySelectorAll('[data-filter]').forEach(button => {
+          button.setAttribute('aria-pressed', String(button.dataset.filter === value))
+        })
+        renderGrid()
+      }, 'grid')
+    }
+
+    function shuffle () {
+      // Fisher-Yates: recorremos desde el final intercambiando cada
+      // elemento con otro aleatorio de los anteriores
+      const shuffled = [...order]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      withTransition(() => {
+        order = shuffled
+        renderGrid()
+      }, 'grid')
+    }
+
+    function sortByTitle () {
+      withTransition(() => {
+        order = [...PHOTOS]
+          .sort((a, b) => a.title.localeCompare(b.title, 'es'))
+          .map(photo => photo.id)
+        renderGrid()
+      }, 'grid')
+    }
+
+    // ---------- Detalle ----------
+
+    async function fillDetail (id) {
+      const photo = PHOTOS.find(item => item.id === id)
+      const photos = getVisiblePhotos()
+      const { width, height, label } = SIZES[photo.orientation]
+      const index = photos.findIndex(item => item.id === id)
+
+      currentId = id
+      detailImage.src = getImageUrl(photo)
+      detailImage.alt = photo.title
+      detailImage.width = width
+      detailImage.height = height
+      detail.querySelector('h2').textContent = photo.title
+      detail.querySelector('.counter').textContent = `${index + 1} / ${photos.length}`
+      detail.querySelector('.description').textContent = DESCRIPTIONS[photo.id % DESCRIPTIONS.length]
+      detail.querySelector('.meta').innerHTML = `
+        <span>${label}</span><span>${width} × ${height}</span><span>semilla: ${photo.seed}</span>
+      `
+
+      // Esperamos a que la imagen esté decodificada para que la "foto" del
+      // nuevo estado no salga en blanco (ya está en caché por la miniatura)
+      await detailImage.decode().catch(() => {})
+    }
+
+    function openDetail (id) {
+      const cardImage = getCardImage(id)
+      // 1) Antes de la transición, la miniatura elegida se llama "hero"
+      cardImage.style.viewTransitionName = 'hero'
+
+      withTransition(async () => {
+        // 2) Dentro del callback se lo quitamos (no puede haber dos "hero"
+        // a la vez) y mostramos el detalle, cuya imagen también es "hero"
+        cardImage.style.viewTransitionName = ''
+        detail.hidden = false
+        document.body.classList.add('detail-open')
+        detail.querySelector('.next').focus({ preventScroll: true })
+        await fillDetail(id)
+      }, 'open')
+    }
+
+    function closeDetail () {
+      if (detail.hidden) return
+      const cardImage = getCardImage(currentId)
+
+      withTransition(() => {
+        // El camino inverso: ocultamos el detalle y la miniatura recupera
+        // el nombre "hero" para que la imagen vuele de vuelta a su sitio
+        detail.hidden = true
+        document.body.classList.remove('detail-open')
+        cardImage.style.viewTransitionName = 'hero'
+        cardImage.closest('.card').scrollIntoView({ block: 'nearest' })
+      }, 'close').finally(() => {
+        cardImage.style.viewTransitionName = ''
+        cardImage.closest('.card').focus({ preventScroll: true })
+      })
+    }
+
+    function navigate (step) {
+      withTransition(() => {
+        // Calculamos la siguiente foto DENTRO del callback: si se encadenan
+        // varias pulsaciones, cada una parte de la foto que dejó la anterior
+        const photos = getVisiblePhotos()
+        const index = photos.findIndex(photo => photo.id === currentId)
+        // El módulo con suma evita índices negativos al ir hacia atrás
+        const next = photos[(index + step + photos.length) % photos.length]
+        return fillDetail(next.id)
+      }, step > 0 ? 'next' : 'prev')
+    }
+
+    function handleKeydown (event) {
+      if (detail.hidden) return
+      if (event.key === 'Escape') closeDetail()
+      if (event.key === 'ArrowRight') navigate(1)
+      if (event.key === 'ArrowLeft') navigate(-1)
+    }
+
+    // ---------- Inicio ----------
+
+    function init () {
+      if (!supportsViewTransitions) {
+        supportNote.textContent = 'Tu navegador no soporta View Transitions: la galería funciona igual, pero sin animaciones.'
+        transitionsInput.checked = false
+        transitionsInput.disabled = true
+      } else if (reducedMotion.matches) {
+        supportNote.textContent = 'Tienes activado "reducir movimiento": las transiciones están desactivadas.'
+      }
+
+      document.querySelectorAll('[data-filter]').forEach(button => {
+        button.addEventListener('click', () => setFilter(button.dataset.filter))
+      })
+      document.querySelector('#shuffle').addEventListener('click', shuffle)
+      document.querySelector('#sort').addEventListener('click', sortByTitle)
+      detail.querySelector('.close').addEventListener('click', closeDetail)
+      detail.querySelector('.prev').addEventListener('click', () => navigate(-1))
+      detail.querySelector('.next').addEventListener('click', () => navigate(1))
+      document.addEventListener('keydown', handleKeydown)
+
+      renderGrid()
+    }
+
+    init()
+  </script>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>Galería con <span>View Transitions</span></h1>
+      <p id="support">Haz click en una foto y mira cómo vuela hasta su sitio.</p>
+    </div>
+
+    <div class="toolbar">
+      <button class="chip" data-filter="all" aria-pressed="true">Todas</button>
+      <button class="chip" data-filter="horizontal" aria-pressed="false">Horizontales</button>
+      <button class="chip" data-filter="vertical" aria-pressed="false">Verticales</button>
+      <button class="chip" data-filter="square" aria-pressed="false">Cuadradas</button>
+      <span class="divider"></span>
+      <button class="chip" id="shuffle">🔀 Barajar</button>
+      <button class="chip" id="sort">A–Z</button>
+      <span class="divider"></span>
+      <label class="switch"><input id="use-transitions" type="checkbox" checked> Transiciones</label>
+    </div>
+  </header>
+
+  <main class="grid" aria-label="Fotos"></main>
+
+  <section class="detail" role="dialog" aria-modal="true" aria-label="Detalle de la foto" hidden>
+    <div class="detail-media">
+      <img alt="">
+    </div>
+    <div class="detail-info">
+      <span class="counter"></span>
+      <h2></h2>
+      <div class="meta"></div>
+      <p class="description"></p>
+      <div class="nav">
+        <button class="prev">← Anterior</button>
+        <button class="next">Siguiente →</button>
+      </div>
+      <span class="keys"><kbd>←</kbd> <kbd>→</kbd> para navegar · <kbd>Esc</kbd> para volver</span>
+    </div>
+    <button class="close" aria-label="Cerrar">✕</button>
+  </section>
+</body>
+
+</html>

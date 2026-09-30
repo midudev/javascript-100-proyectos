@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>78 - Torres de Hanói</title>
+  <style>
+    :root {
+      --bg: #0c0e1a;
+      --panel: #151a2e;
+      --border: #262d4a;
+      --text: #e9ecf8;
+      --muted: #8a93b8;
+      --accent: #a78bfa;
+      --ok: #4ade80;
+      --bad: #fb7185;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(ellipse at 50% 0%, #2a1f5c55 0%, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .game {
+      width: min(980px, 100%);
+      display: grid;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -.01em;
+    }
+
+    h1 small {
+      display: block;
+      font-size: .85rem;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+    }
+
+    .stat {
+      min-width: 96px;
+      padding: 8px 14px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .stat small {
+      display: block;
+      color: var(--muted);
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .stat strong {
+      font-size: 1.35rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .segmented {
+      display: flex;
+      padding: 3px;
+      border-radius: 11px;
+      background: #0e1224;
+    }
+
+    .segmented button {
+      width: 34px;
+      height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--accent);
+      color: #150c33;
+    }
+
+    .button {
+      height: 38px;
+      padding: 0 16px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: #1c2340;
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      border: 0;
+      background: linear-gradient(135deg, #c4b5fd, var(--accent));
+      color: #150c33;
+    }
+
+    .button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .speed {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    .speed input {
+      accent-color: var(--accent);
+      width: 120px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    /* --- Tablero --- */
+    .board {
+      position: relative;
+      height: min(56dvh, 440px);
+      min-height: 260px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, #12172b, #0f1325);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .tower {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: calc(100% / 3);
+      cursor: pointer;
+    }
+
+    .tower::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 34px;
+      width: 10px;
+      height: 72%;
+      translate: -50% 0;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(90deg, #3a4270, #5a6399, #3a4270);
+    }
+
+    .tower::after {
+      content: attr(data-label);
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 8px;
+      text-align: center;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--muted);
+    }
+
+    .tower.is-selected::before {
+      background: linear-gradient(90deg, #7c5cf0, #c4b5fd, #7c5cf0);
+      box-shadow: 0 0 20px #a78bfa88;
+    }
+
+    .tower.is-goal::after {
+      color: var(--accent);
+    }
+
+    .base {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 30px;
+      height: 6px;
+      border-radius: 4px;
+      background: #3a4270;
+    }
+
+    .disk {
+      position: absolute;
+      top: 0;
+      left: 0;
+      border-radius: 999px;
+      background: linear-gradient(180deg, hsl(var(--hue) 90% 72%), hsl(var(--hue) 75% 52%));
+      box-shadow: inset 0 -3px 0 #0003, 0 4px 12px -4px hsl(var(--hue) 80% 50% / .6);
+      display: grid;
+      place-items: center;
+      color: #0c0e1acc;
+      font-weight: 800;
+      font-size: .8rem;
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    .disk.is-dragging {
+      box-shadow: 0 16px 30px -8px hsl(var(--hue) 80% 50% / .8);
+      z-index: 2;
+    }
+
+    .message {
+      min-height: 1.5em;
+      text-align: center;
+      margin: 0;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .message.win {
+      color: var(--ok);
+      font-size: 1.1rem;
+    }
+
+    .message.error {
+      color: var(--bad);
+      animation: shake .3s;
+    }
+
+    @keyframes shake {
+
+      25%,
+      75% {
+        transform: translateX(-6px);
+      }
+
+      50% {
+        transform: translateX(6px);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .speed {
+        margin-left: 0;
+      }
+
+      .stat {
+        min-width: 80px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game">
+    <header>
+      <h1>Torres de Hanói <small>Lleva todos los discos a la torre C</small></h1>
+      <div class="stats">
+        <div class="stat"><small>Movimientos</small><strong id="moves">0</strong></div>
+        <div class="stat"><small>Mínimo</small><strong id="minimum">31</strong></div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <span class="label">Discos</span>
+      <div class="segmented" id="disk-count"></div>
+      <button class="button" id="reset">↺ Reiniciar</button>
+      <button class="button primary" id="solve">▶ Resolver</button>
+      <button class="button" id="pause" disabled>⏸ Pausar</button>
+      <label class="speed">🐢 <input type="range" id="speed" min="1" max="10" value="5" aria-label="Velocidad"> 🐇</label>
+    </div>
+
+    <div class="board" id="board">
+      <div class="base"></div>
+    </div>
+
+    <p class="message" id="message" aria-live="polite">Haz clic en una torre y luego en otra, o arrastra el disco de arriba</p>
+  </div>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    const TOWER_COUNT = 3
+    const TOWER_LABELS = ['A', 'B', 'C']
+    const GOAL_TOWER = 2
+    const MIN_DISKS = 3
+    const MAX_DISKS = 8
+    const BASE_OFFSET = 36 // px desde abajo hasta la base de los discos
+    const DRAG_THRESHOLD = 6
+
+    // ESTADO
+    let diskCount = 5
+    let towers = [] // cada torre es un array de tamaños, de abajo a arriba
+    let moves = 0
+    let selectedTower = null
+    let drag = null
+    let isAnimating = false
+
+    // Estado del solucionador automático
+    let solving = false
+    let paused = false
+    let solveToken = 0
+    let resumeSolver = null
+
+    const board = $('#board')
+    const diskElements = new Map() // tamaño → elemento
+
+    // --- Algoritmo ---
+
+    // Generador recursivo: en lugar de calcular y devolver los 2^n - 1 movimientos
+    // de golpe, los va entregando (yield) de uno en uno cuando se le piden con next().
+    // yield* delega en otro generador: "entrega todos los valores que produzca este".
+    function* hanoi(n, from, to, via) {
+      if (n === 0) return // caso base: no hay nada que mover
+      yield* hanoi(n - 1, from, via, to) // 1. aparta los n-1 discos de encima a la torre auxiliar
+      yield [from, to] // 2. mueve el disco más grande (el n) a su destino
+      yield* hanoi(n - 1, via, to, from) // 3. vuelve a poner los n-1 discos encima de él
+    }
+
+    // Variante que resuelve desde CUALQUIER posición válida (por si ya has movido discos).
+    // Como el generador es perezoso, consulta dónde está cada disco justo en el
+    // momento de calcular el siguiente movimiento, cuando los anteriores ya se han hecho.
+    function* solveFrom(n, to) {
+      if (n === 0) return
+      const from = towerOf(n)
+      if (from === to) {
+        yield* solveFrom(n - 1, to) // el disco n ya está en su sitio: seguimos con los menores
+        return
+      }
+      const via = TOWER_COUNT - from - to // la torre que no es ni origen ni destino (0+1+2 = 3)
+      yield* solveFrom(n - 1, via) // junta los discos menores en la torre libre
+      yield [from, to]
+      yield* hanoi(n - 1, via, to, from) // y a partir de aquí es el caso clásico
+    }
+
+    const towerOf = (disk) => towers.findIndex((tower) => tower.includes(disk))
+    const topDisk = (index) => towers[index].at(-1)
+    const minimumMoves = () => 2 ** diskCount - 1
+
+    function isInitialState() {
+      return towers[0].length === diskCount
+    }
+
+    function isSolved() {
+      return towers[GOAL_TOWER].length === diskCount
+    }
+
+    // Un movimiento es válido si hay disco en el origen y no cae sobre uno menor
+    function validateMove(from, to) {
+      const disk = topDisk(from)
+      if (disk === undefined) return 'Esa torre está vacía'
+      const target = topDisk(to)
+      if (target !== undefined && target < disk) return 'No puedes poner un disco sobre otro más pequeño'
+      return ''
+    }
+
+    // --- Geometría ---
+
+    function getMetrics() {
+      const width = board.clientWidth
+      const height = board.clientHeight
+      const slot = width / TOWER_COUNT
+      const diskHeight = Math.min(30, (height * 0.72 - 10) / diskCount)
+      return { width, height, slot, diskHeight }
+    }
+
+    function diskWidth(size, { slot }) {
+      const min = slot * 0.3
+      const max = slot * 0.92
+      return min + ((size - 1) / Math.max(1, diskCount - 1)) * (max - min)
+    }
+
+    // Posición (esquina superior izquierda) de un disco en una torre y altura dada
+    function diskPosition(size, tower, level, metrics = getMetrics()) {
+      const width = diskWidth(size, metrics)
+      const x = metrics.slot * tower + metrics.slot / 2 - width / 2
+      const y = metrics.height - BASE_OFFSET - (level + 1) * metrics.diskHeight
+      return { x, y }
+    }
+
+    const translate = ({ x, y }) => `translate(${x}px, ${y}px)`
+
+    // --- Render ---
+
+    function createBoard() {
+      board.querySelectorAll('.tower, .disk').forEach((element) => element.remove())
+      diskElements.clear()
+
+      TOWER_LABELS.forEach((label, index) => {
+        const tower = document.createElement('div')
+        tower.className = `tower ${index === GOAL_TOWER ? 'is-goal' : ''}`
+        tower.style.left = `${(100 / TOWER_COUNT) * index}%`
+        tower.dataset.label = index === GOAL_TOWER ? `${label} · META` : label
+        tower.dataset.index = index
+        board.append(tower)
+      })
+
+      for (let size = diskCount; size >= 1; size--) {
+        const disk = document.createElement('div')
+        disk.className = 'disk'
+        disk.textContent = size
+        disk.style.setProperty('--hue', 260 + (size - 1) * (220 / MAX_DISKS))
+        board.append(disk)
+        diskElements.set(size, disk)
+      }
+    }
+
+    function layoutDisks() {
+      const metrics = getMetrics()
+      towers.forEach((tower, towerIndex) => {
+        tower.forEach((size, level) => {
+          const disk = diskElements.get(size)
+          disk.style.width = `${diskWidth(size, metrics)}px`
+          disk.style.height = `${metrics.diskHeight - 3}px`
+          const position = diskPosition(size, towerIndex, level, metrics)
+          // El disco seleccionado se levanta un poco para indicar que está "en la mano"
+          if (towerIndex === selectedTower && level === tower.length - 1) position.y -= 18
+          disk.style.transform = translate(position)
+        })
+      })
+      board.querySelectorAll('.tower').forEach((tower, index) => {
+        tower.classList.toggle('is-selected', index === selectedTower)
+      })
+    }
+
+    function renderStats() {
+      $('#moves').textContent = moves
+      $('#minimum').textContent = minimumMoves()
+      document.querySelectorAll('#disk-count button').forEach((button) => {
+        button.setAttribute('aria-pressed', Number(button.dataset.count) === diskCount)
+      })
+      $('#solve').disabled = solving || isSolved()
+      $('#pause').disabled = !solving
+      $('#pause').textContent = paused ? '▶ Continuar' : '⏸ Pausar'
+    }
+
+    function setMessage(text, type = '') {
+      const message = $('#message')
+      message.className = 'message'
+      void message.offsetWidth // reinicia la animación de "sacudida"
+      if (type) message.classList.add(type)
+      message.textContent = text
+    }
+
+    // --- Movimientos ---
+
+    function moveDuration() {
+      const speed = Number($('#speed').value)
+      return 1100 / speed // de 1100ms (lento) a 110ms (rápido)
+    }
+
+    // Animación en tres fases con la Web Animations API: subir, desplazar y bajar
+    async function animateMove(from, to, startPosition = null) {
+      const size = topDisk(from)
+      const disk = diskElements.get(size)
+      const metrics = getMetrics()
+      const origin = startPosition ?? diskPosition(size, from, towers[from].length - 1, metrics)
+      const target = diskPosition(size, to, towers[to].length, metrics)
+      const liftY = Math.min(12, target.y - 30)
+      // Partimos de donde está pintado ahora (puede estar levantado por estar seleccionado)
+      const currentTransform = startPosition ? translate(origin) : disk.style.transform
+
+      disk.style.transform = translate(target)
+      const keyframes = startPosition
+        ? [{ transform: currentTransform }, { transform: translate(target) }]
+        : [
+            { transform: currentTransform },
+            { transform: translate({ x: origin.x, y: liftY }), offset: 0.3 },
+            { transform: translate({ x: target.x, y: liftY }), offset: 0.7 },
+            { transform: translate(target) }
+          ]
+
+      isAnimating = true
+      try {
+        await disk.animate(keyframes, {
+          duration: startPosition ? 160 : moveDuration(),
+          easing: 'ease-in-out'
+        }).finished
+      } catch {
+        // Si reiniciamos a mitad de animación, cancel() rechaza la promesa 'finished'
+      } finally {
+        isAnimating = false
+      }
+    }
+
+    function applyMove(from, to) {
+      towers[to].push(towers[from].pop())
+      moves++
+      renderStats()
+    }
+
+    async function tryMove(from, to, startPosition = null) {
+      selectedTower = null
+      const error = validateMove(from, to)
+      if (error) {
+        setMessage(error, 'error')
+        layoutDisks()
+        return
+      }
+
+      await animateMove(from, to, startPosition)
+      applyMove(from, to)
+      layoutDisks()
+      checkWin()
+    }
+
+    function checkWin() {
+      if (!isSolved()) {
+        setMessage(`Movimiento ${moves}. Mínimo posible: ${minimumMoves()}`)
+        return
+      }
+      const perfect = moves === minimumMoves()
+      setMessage(perfect
+        ? `🏆 ¡Perfecto! Resuelto en el mínimo de ${moves} movimientos`
+        : `🎉 ¡Resuelto en ${moves} movimientos! (el mínimo es ${minimumMoves()})`, 'win')
+      renderStats()
+    }
+
+    // --- Solucionador animado ---
+
+    async function solve() {
+      if (solving || isSolved()) return
+      const token = ++solveToken
+      solving = true
+      paused = false
+      selectedTower = null
+      layoutDisks()
+      renderStats()
+
+      const steps = isInitialState() ? hanoi(diskCount, 0, GOAL_TOWER, 1) : solveFrom(diskCount, GOAL_TOWER)
+      setMessage('La recursión está resolviendo el puzle…')
+
+      // for...of llama a next() en cada vuelta: el generador calcula el siguiente
+      // movimiento solo cuando terminamos de animar el anterior
+      for (const [from, to] of steps) {
+        if (paused) await new Promise((resolve) => { resumeSolver = resolve })
+        if (token !== solveToken) return // se ha reiniciado: abandonamos (break implícito)
+        await animateMove(from, to)
+        if (token !== solveToken) return
+        applyMove(from, to)
+        layoutDisks()
+        setMessage(`Disco ${topDisk(to)}: ${TOWER_LABELS[from]} → ${TOWER_LABELS[to]}`)
+      }
+
+      solving = false
+      checkWin()
+    }
+
+    function togglePause() {
+      if (!solving) return
+      paused = !paused
+      if (!paused) {
+        resumeSolver?.()
+        resumeSolver = null
+      }
+      renderStats()
+    }
+
+    function reset(count = diskCount) {
+      solveToken++ // invalida cualquier resolución en marcha
+      solving = false
+      paused = false
+      resumeSolver?.()
+      resumeSolver = null
+      board.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
+      isAnimating = false
+
+      diskCount = count
+      moves = 0
+      selectedTower = null
+      towers = [Array.from({ length: diskCount }, (_, i) => diskCount - i), [], []]
+
+      createBoard()
+      layoutDisks()
+      renderStats()
+      setMessage('Haz clic en una torre y luego en otra, o arrastra el disco de arriba')
+    }
+
+    // --- Interacción: clic y arrastre con Pointer Events ---
+    // Usamos pointer events en vez de la API HTML5 Drag & Drop porque funcionan
+    // igual con ratón, lápiz y dedo, y nos dejan mover el disco libremente.
+
+    function towerAt(clientX) {
+      const rect = board.getBoundingClientRect()
+      const index = Math.floor(((clientX - rect.left) / rect.width) * TOWER_COUNT)
+      return Math.max(0, Math.min(TOWER_COUNT - 1, index))
+    }
+
+    function selectTower(index) {
+      if (selectedTower === null) {
+        if (topDisk(index) === undefined) return setMessage('Esa torre está vacía', 'error')
+        selectedTower = index
+        setMessage(`Disco ${topDisk(index)} seleccionado: elige la torre de destino`)
+        layoutDisks()
+      } else if (selectedTower === index) {
+        selectedTower = null
+        layoutDisks()
+      } else {
+        tryMove(selectedTower, index)
+      }
+    }
+
+    board.addEventListener('pointerdown', (event) => {
+      if (solving || isAnimating) return
+      const tower = towerAt(event.clientX)
+      const size = topDisk(tower)
+      drag = { tower, startX: event.clientX, startY: event.clientY, active: false, size }
+      board.setPointerCapture(event.pointerId)
+    })
+
+    board.addEventListener('pointermove', (event) => {
+      if (!drag || drag.size === undefined) return
+      const dx = event.clientX - drag.startX
+      const dy = event.clientY - drag.startY
+
+      // Hasta que no se mueve unos píxeles lo tratamos como un clic
+      if (!drag.active) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+        drag.active = true
+        selectedTower = null
+        layoutDisks()
+        const disk = diskElements.get(drag.size)
+        disk.classList.add('is-dragging')
+        drag.origin = diskPosition(drag.size, drag.tower, towers[drag.tower].length - 1)
+      }
+
+      drag.position = { x: drag.origin.x + dx, y: drag.origin.y + dy }
+      diskElements.get(drag.size).style.transform = translate(drag.position)
+      board.querySelectorAll('.tower').forEach((element, index) => {
+        element.classList.toggle('is-selected', index === towerAt(event.clientX))
+      })
+    })
+
+    board.addEventListener('pointerup', async (event) => {
+      if (!drag) return
+      const current = drag
+      drag = null
+
+      if (!current.active) return selectTower(towerAt(event.clientX))
+
+      diskElements.get(current.size).classList.remove('is-dragging')
+      const target = towerAt(event.clientX)
+      if (target === current.tower) return layoutDisks()
+      await tryMove(current.tower, target, current.position)
+    })
+
+    board.addEventListener('pointercancel', () => {
+      if (drag?.active) diskElements.get(drag.size).classList.remove('is-dragging')
+      drag = null
+      layoutDisks()
+    })
+
+    // --- Controles ---
+
+    $('#disk-count').innerHTML = Array.from({ length: MAX_DISKS - MIN_DISKS + 1 }, (_, i) => {
+      const count = MIN_DISKS + i
+      return `<button data-count="${count}" aria-label="${count} discos">${count}</button>`
+    }).join('')
+
+    $('#disk-count').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (button) reset(Number(button.dataset.count))
+    })
+
+    $('#reset').addEventListener('click', () => reset())
+    $('#solve').addEventListener('click', solve)
+    $('#pause').addEventListener('click', togglePause)
+
+    document.addEventListener('keydown', (event) => {
+      if (event.repeat || solving || isAnimating) return
+      const index = Number(event.key) - 1
+      if (index >= 0 && index < TOWER_COUNT) selectTower(index)
+    })
+
+    window.addEventListener('resize', layoutDisks)
+
+    reset(5)
+  </script>
+</body>
+
+</html>

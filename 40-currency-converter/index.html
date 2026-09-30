@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>40 - Conversor de divisas</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #f3f6fb;
+      --card: #fff;
+      --text: #0f1b2d;
+      --muted: #66758c;
+      --border: #e1e7f0;
+      --accent: #0f9d76;
+      --accent-soft: #e2f6ef;
+      --danger: #d64545;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100dvh;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background:
+        radial-gradient(circle at 15% 0, #dcf5ec 0, transparent 40%),
+        radial-gradient(circle at 100% 60%, #e3ecff 0, transparent 40%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      width: min(1100px, 100%);
+      padding: 28px 24px 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 30px);
+      letter-spacing: -.5px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: 20px;
+      width: min(1100px, 100%);
+      padding: 12px 24px 28px;
+    }
+
+    .card {
+      padding: 22px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 1px 2px rgb(15 27 45 / .04), 0 12px 32px rgb(15 27 45 / .06);
+    }
+
+    label,
+    .label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .amount {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font: inherit;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      outline: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .amount:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      font: inherit;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+    }
+
+    .swap {
+      width: 46px;
+      height: 46px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      transition: transform .3s, background .2s;
+    }
+
+    .swap:hover {
+      background: var(--accent-soft);
+      transform: rotate(180deg);
+    }
+
+    .result {
+      margin-top: 22px;
+      padding: 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #0f9d76, #0b7c88);
+      color: #fff;
+    }
+
+    .result small {
+      opacity: .85;
+      font-size: 14px;
+    }
+
+    .result strong {
+      display: block;
+      margin: 4px 0;
+      font-size: clamp(28px, 4vw, 38px);
+      letter-spacing: -1px;
+      overflow-wrap: anywhere;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rate {
+      font-size: 14px;
+      opacity: .9;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .badge.network {
+      background: #e7eeff;
+      color: #3b5bdb;
+    }
+
+    .error {
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fdecec;
+      color: var(--danger);
+      font-size: 14px;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chart-header h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .change {
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .change.up {
+      color: var(--accent);
+    }
+
+    .change.down {
+      color: var(--danger);
+    }
+
+    .chart {
+      position: relative;
+      margin-top: 12px;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .tooltip {
+      position: absolute;
+      top: 0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: var(--text);
+      color: #fff;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      translate: -50% -110%;
+    }
+
+    .chart-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .equivalents {
+      grid-column: 1 / -1;
+    }
+
+    .chips {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .chip {
+      display: grid;
+      gap: 2px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+
+    .chip:hover {
+      border-color: var(--accent);
+    }
+
+    .chip strong {
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chip span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .skeleton {
+      opacity: .45;
+    }
+
+    @media (width < 820px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 12px 16px 24px;
+      }
+
+      header {
+        padding: 20px 16px 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>💱 Conversor de divisas</h1>
+    <p>Tipos de cambio del Banco Central Europeo vía la API de Frankfurter</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <label for="amount">Cantidad</label>
+      <input class="amount" id="amount" inputmode="decimal" autocomplete="off" value="100">
+
+      <div class="pair">
+        <div>
+          <label for="from">De</label>
+          <select id="from"></select>
+        </div>
+        <button class="swap" id="swap" aria-label="Intercambiar monedas" title="Intercambiar">⇄</button>
+        <div>
+          <label for="to">A</label>
+          <select id="to"></select>
+        </div>
+      </div>
+
+      <div class="result">
+        <small id="result-from">100,00 €</small>
+        <strong id="result">…</strong>
+        <div class="rate" id="rate">Cargando tipos de cambio…</div>
+      </div>
+
+      <div class="meta">
+        <span id="updated"></span>
+        <span class="badge" id="source" hidden></span>
+      </div>
+      <p class="error" id="error" hidden></p>
+    </section>
+
+    <section class="card">
+      <div class="chart-header">
+        <h2 id="chart-title">Últimos 30 días</h2>
+        <span class="change" id="change"></span>
+      </div>
+      <div class="chart" id="chart">
+        <svg id="svg" viewBox="0 0 600 290" role="img" aria-label="Histórico del tipo de cambio"></svg>
+        <div class="tooltip" id="tooltip" hidden></div>
+      </div>
+      <div class="chart-footer">
+        <span id="chart-start"></span>
+        <span id="chart-range"></span>
+        <span id="chart-end"></span>
+      </div>
+    </section>
+
+    <section class="card equivalents">
+      <span class="label" id="equivalents-title">Equivalencias</span>
+      <div class="chips" id="chips"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    const API_URL = 'https://api.frankfurter.dev/v1'
+    const LOCALE = 'es-ES'
+    const RATES_TTL = 60 * 60 * 1000 // 1 hora: el BCE publica los tipos una vez al día
+    const CURRENCIES_TTL = 24 * 60 * 60 * 1000
+    const HISTORY_DAYS = 30
+    const POPULAR = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'MXN', 'BRL', 'CNY', 'CAD', 'AUD']
+
+    const $amount = document.querySelector('#amount')
+    const $from = document.querySelector('#from')
+    const $to = document.querySelector('#to')
+    const $swap = document.querySelector('#swap')
+    const $result = document.querySelector('#result')
+    const $resultFrom = document.querySelector('#result-from')
+    const $rate = document.querySelector('#rate')
+    const $updated = document.querySelector('#updated')
+    const $source = document.querySelector('#source')
+    const $error = document.querySelector('#error')
+    const $svg = document.querySelector('#svg')
+    const $tooltip = document.querySelector('#tooltip')
+    const $chips = document.querySelector('#chips')
+
+    // ---------- Intl: formateo según el idioma ----------
+    // Intl.DisplayNames traduce códigos ISO (USD, JPY...) a nombres legibles
+    const currencyNames = new Intl.DisplayNames([LOCALE], { type: 'currency' })
+    const dateFormatter = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'long' })
+    const shortDateFormatter = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' })
+    const rateFormatter = new Intl.NumberFormat(LOCALE, { maximumSignificantDigits: 6 })
+
+    // Crear un NumberFormat tiene un coste: guardamos uno por moneda
+    const moneyFormatters = new Map()
+    function formatMoney(value, currency) {
+      if (!moneyFormatters.has(currency)) {
+        // style: 'currency' pone el símbolo, los separadores y los decimales
+        // correctos para cada moneda (el yen, por ejemplo, no usa decimales)
+        moneyFormatters.set(currency, new Intl.NumberFormat(LOCALE, { style: 'currency', currency }))
+      }
+      return moneyFormatters.get(currency).format(value)
+    }
+
+    function getCurrencyName(code, fallback = code) {
+      try {
+        return currencyNames.of(code) ?? fallback
+      } catch {
+        return fallback
+      }
+    }
+
+    function getFlag(code) {
+      // Los emojis de bandera son dos "letras regionales" (EU, US, GB...)
+      const country = code.slice(0, 2).toUpperCase()
+      return String.fromCodePoint(...[...country].map(char => 0x1F1E6 + char.charCodeAt(0) - 65))
+    }
+
+    // ---------- FETCH CON CACHÉ ----------
+    // Doble caché: un Map en memoria (instantáneo y evita peticiones duplicadas
+    // si se piden dos veces a la vez) y sessionStorage (sobrevive a recargar la
+    // pestaña). Guardamos una marca de tiempo para saber si ha caducado.
+    const memoryCache = new Map()
+
+    async function cachedFetch(url, { ttl, signal } = {}) {
+      const key = `fx:${url}`
+      const now = Date.now()
+
+      const inMemory = memoryCache.get(key)
+      if (inMemory && now - inMemory.timestamp < ttl) {
+        return { data: await inMemory.promise, fromCache: true, timestamp: inMemory.timestamp }
+      }
+
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(key))
+        if (stored && now - stored.timestamp < ttl) {
+          memoryCache.set(key, { promise: Promise.resolve(stored.data), timestamp: stored.timestamp })
+          return { data: stored.data, fromCache: true, timestamp: stored.timestamp }
+        }
+      } catch {}
+
+      const promise = fetch(url, { signal }).then(async (response) => {
+        if (!response.ok) throw new Error(`Error ${response.status} al pedir ${url}`)
+        return response.json()
+      })
+      memoryCache.set(key, { promise, timestamp: now })
+
+      try {
+        const data = await promise
+        try {
+          sessionStorage.setItem(key, JSON.stringify({ timestamp: now, data }))
+        } catch {}
+        return { data, fromCache: false, timestamp: now }
+      } catch (error) {
+        // Si falla, no dejamos la promesa rechazada en caché
+        memoryCache.delete(key)
+        throw error
+      }
+    }
+
+    // ---------- ESTADO ----------
+    let rates = null // tipos de cambio para la moneda de origen actual
+    let ratesDate = null
+    let historyController = null
+
+    function parseAmount(text) {
+      // Aceptamos "1234.5", "1234,5" y "1.234,5"
+      const clean = text.trim().replace(/\s/g, '')
+      const normalized = clean.includes(',') ? clean.replace(/\./g, '').replace(',', '.') : clean
+      const value = Number(normalized)
+      return Number.isFinite(value) && value >= 0 ? value : null
+    }
+
+    function getRate(to) {
+      if (to === $from.value) return 1
+      return rates?.[to] ?? null
+    }
+
+    function showError(message) {
+      $error.textContent = message
+      $error.hidden = !message
+    }
+
+    // ---------- RENDER ----------
+    function renderConversion() {
+      const amount = parseAmount($amount.value)
+      const from = $from.value
+      const to = $to.value
+      const rate = getRate(to)
+
+      if (amount === null) {
+        $resultFrom.textContent = 'Cantidad no válida'
+        $result.textContent = '—'
+        return
+      }
+      if (rate === null) return
+
+      $resultFrom.textContent = `${formatMoney(amount, from)} =`
+      $result.textContent = formatMoney(amount * rate, to)
+      $rate.textContent = `1 ${from} = ${rateFormatter.format(rate)} ${to} · 1 ${to} = ${rateFormatter.format(1 / rate)} ${from}`
+      renderEquivalents(amount)
+    }
+
+    function renderEquivalents(amount) {
+      const from = $from.value
+      document.querySelector('#equivalents-title').textContent = `${formatMoney(amount, from)} en otras monedas`
+      const codes = POPULAR.filter(code => code !== from && code !== $to.value && getRate(code) !== null).slice(0, 8)
+      $chips.replaceChildren(...codes.map((code) => {
+        const $chip = document.createElement('button')
+        $chip.className = 'chip'
+        $chip.title = `Convertir a ${code}`
+        const $value = document.createElement('strong')
+        $value.textContent = formatMoney(amount * getRate(code), code)
+        const $name = document.createElement('span')
+        const name = getCurrencyName(code)
+        $name.textContent = `${getFlag(code)} ${name[0].toUpperCase()}${name.slice(1)}`
+        $chip.append($value, $name)
+        $chip.addEventListener('click', () => {
+          $to.value = code
+          update()
+        })
+        return $chip
+      }))
+    }
+
+    function renderMeta(fromCache, timestamp) {
+      const date = new Date(`${ratesDate}T12:00:00`)
+      $updated.textContent = `Tipos del ${dateFormatter.format(date)}`
+      $source.hidden = false
+      const minutes = Math.round((Date.now() - timestamp) / 60000)
+      $source.textContent = fromCache ? `⚡ Desde caché (hace ${minutes} min)` : '🌐 Recién descargado'
+      $source.classList.toggle('network', !fromCache)
+    }
+
+    // ---------- GRÁFICO SVG ----------
+    const SVG_NS = 'http://www.w3.org/2000/svg'
+    const CHART = { width: 600, height: 290, padding: 14 }
+
+    function createSvg(tag, attributes) {
+      const element = document.createElementNS(SVG_NS, tag)
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value)
+      return element
+    }
+
+    function renderChart(points, from, to) {
+      $svg.replaceChildren()
+      $tooltip.hidden = true
+      document.querySelector('#chart-title').textContent = `${from} → ${to} · últimos ${HISTORY_DAYS} días`
+
+      if (points.length < 2) {
+        const $text = createSvg('text', { x: 300, y: 145, 'text-anchor': 'middle', fill: '#66758c', 'font-size': 16 })
+        $text.textContent = from === to ? 'Elige dos monedas distintas' : 'Sin datos suficientes'
+        $svg.append($text)
+        for (const id of ['#change', '#chart-start', '#chart-end', '#chart-range']) {
+          document.querySelector(id).textContent = ''
+        }
+        return
+      }
+
+      const values = points.map(point => point.value)
+      const min = Math.min(...values)
+      const max = Math.max(...values)
+      const range = max - min || 1
+      const { width, height, padding } = CHART
+
+      // Convertimos cada valor en coordenadas del SVG (el eje Y va hacia abajo)
+      const coords = points.map((point, i) => ({
+        ...point,
+        x: (i / (points.length - 1)) * width,
+        y: padding + (1 - (point.value - min) / range) * (height - padding * 2)
+      }))
+
+      const line = coords.map(({ x, y }, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+      const area = `${line} L${width},${height} L0,${height} Z`
+      const first = values[0]
+      const last = values.at(-1)
+      const isUp = last >= first
+      const color = isUp ? '#0f9d76' : '#d64545'
+
+      const $defs = createSvg('defs', {})
+      const $gradient = createSvg('linearGradient', { id: 'area-gradient', x1: 0, y1: 0, x2: 0, y2: 1 })
+      $gradient.append(
+        createSvg('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': 0.25 }),
+        createSvg('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 })
+      )
+      $defs.append($gradient)
+
+      // Líneas guía horizontales
+      for (let i = 0; i <= 3; i++) {
+        const y = padding + (i / 3) * (height - padding * 2)
+        $svg.append(createSvg('line', { x1: 0, x2: width, y1: y, y2: y, stroke: '#e1e7f0', 'stroke-dasharray': '4 6' }))
+      }
+
+      const $cursor = createSvg('line', { y1: 0, y2: height, stroke: '#94a3b8', 'stroke-width': 1, visibility: 'hidden' })
+      const $dot = createSvg('circle', { r: 5, fill: color, stroke: '#fff', 'stroke-width': 2 })
+      const lastPoint = coords.at(-1)
+      $dot.setAttribute('cx', lastPoint.x)
+      $dot.setAttribute('cy', lastPoint.y)
+
+      $svg.append(
+        $defs,
+        createSvg('path', { d: area, fill: 'url(#area-gradient)' }),
+        createSvg('path', { d: line, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }),
+        $cursor,
+        $dot
+      )
+
+      const change = ((last - first) / first) * 100
+      const $change = document.querySelector('#change')
+      $change.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(change).toLocaleString(LOCALE, { maximumFractionDigits: 2 })} %`
+      $change.className = `change ${isUp ? 'up' : 'down'}`
+
+      document.querySelector('#chart-start').textContent = shortDateFormatter.format(points[0].date)
+      document.querySelector('#chart-end').textContent = shortDateFormatter.format(points.at(-1).date)
+      document.querySelector('#chart-range').textContent = `mín. ${rateFormatter.format(min)} · máx. ${rateFormatter.format(max)}`
+
+      // Tooltip: buscamos el punto más cercano al puntero
+      $svg.onpointermove = (event) => {
+        const rect = $svg.getBoundingClientRect()
+        const x = ((event.clientX - rect.left) / rect.width) * width
+        const index = Math.round((x / width) * (coords.length - 1))
+        const point = coords[Math.max(0, Math.min(coords.length - 1, index))]
+        $cursor.setAttribute('x1', point.x)
+        $cursor.setAttribute('x2', point.x)
+        $cursor.setAttribute('visibility', 'visible')
+        $dot.setAttribute('cx', point.x)
+        $dot.setAttribute('cy', point.y)
+        $tooltip.hidden = false
+        $tooltip.style.left = `${(point.x / width) * rect.width}px`
+        $tooltip.style.top = `${(point.y / height) * rect.height}px`
+        $tooltip.textContent = `${shortDateFormatter.format(point.date)} · ${rateFormatter.format(point.value)} ${to}`
+      }
+      $svg.onpointerleave = () => {
+        $cursor.setAttribute('visibility', 'hidden')
+        $dot.setAttribute('cx', lastPoint.x)
+        $dot.setAttribute('cy', lastPoint.y)
+        $tooltip.hidden = true
+      }
+    }
+
+    // ---------- CARGA DE DATOS ----------
+    function toISODate(date) {
+      return date.toISOString().slice(0, 10)
+    }
+
+    async function loadRates() {
+      const from = $from.value
+      const { data, fromCache, timestamp } = await cachedFetch(`${API_URL}/latest?from=${from}`, { ttl: RATES_TTL })
+      // Si mientras esperábamos el usuario cambió de moneda, ignoramos la respuesta
+      if (from !== $from.value) return
+      rates = data.rates
+      ratesDate = data.date
+      renderMeta(fromCache, timestamp)
+      renderConversion()
+    }
+
+    async function loadHistory() {
+      const from = $from.value
+      const to = $to.value
+      if (from === to) {
+        renderChart([], from, to)
+        return
+      }
+
+      // Cancelamos la petición anterior: si el usuario cambia rápido de moneda,
+      // una respuesta antigua podría llegar tarde y pintar el gráfico equivocado
+      historyController?.abort()
+      historyController = new AbortController()
+
+      const start = new Date()
+      start.setDate(start.getDate() - HISTORY_DAYS)
+      const url = `${API_URL}/${toISODate(start)}..?from=${from}&to=${to}`
+      $svg.classList.add('skeleton')
+
+      try {
+        const { data } = await cachedFetch(url, { ttl: RATES_TTL, signal: historyController.signal })
+        if (from !== $from.value || to !== $to.value) return
+        const points = Object.entries(data.rates)
+          .map(([date, value]) => ({ date: new Date(`${date}T12:00:00`), value: value[to] }))
+          .filter(point => typeof point.value === 'number')
+        renderChart(points, from, to)
+      } catch (error) {
+        if (error.name !== 'AbortError') throw error
+      } finally {
+        $svg.classList.remove('skeleton')
+      }
+    }
+
+    async function update() {
+      showError('')
+      try {
+        await Promise.all([loadRates(), loadHistory()])
+      } catch (error) {
+        console.error(error)
+        showError('No se han podido cargar los tipos de cambio. Revisa tu conexión e inténtalo de nuevo.')
+      }
+    }
+
+    async function loadCurrencies() {
+      let codes
+      try {
+        const { data } = await cachedFetch(`${API_URL}/currencies`, { ttl: CURRENCIES_TTL })
+        codes = Object.keys(data)
+      } catch {
+        // Si falla la lista, usamos las más conocidas para no dejar la app vacía
+        codes = POPULAR
+      }
+      const options = codes
+        .map(code => ({ code, name: getCurrencyName(code) }))
+        .sort((a, b) => a.code.localeCompare(b.code))
+
+      for (const $select of [$from, $to]) {
+        $select.replaceChildren(...options.map(({ code, name }) => new Option(`${getFlag(code)} ${code} · ${name}`, code)))
+      }
+      $from.value = 'EUR'
+      $to.value = 'USD'
+    }
+
+    // ---------- EVENTOS ----------
+    // Convertir al teclear NO hace peticiones: usamos los tipos ya descargados
+    $amount.addEventListener('input', renderConversion)
+    $from.addEventListener('change', update)
+    $to.addEventListener('change', () => {
+      renderConversion()
+      loadHistory().catch(() => showError('No se ha podido cargar el histórico.'))
+    })
+    $swap.addEventListener('click', () => {
+      const from = $from.value
+      $from.value = $to.value
+      $to.value = from
+      update()
+    })
+
+    await loadCurrencies()
+    await update()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>98 - Motor 3D con raycasting</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #05060a;
+      color: #f1f1f4;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      max-width: 290px;
+      padding: 14px 16px;
+      border: 1px solid rgb(255 255 255 / 10%);
+      border-radius: 14px;
+      background: rgb(8 10 20 / 72%);
+      backdrop-filter: blur(6px);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      pointer-events: none;
+    }
+
+    .hud h1 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .hud h1 span {
+      color: #f7df1e;
+    }
+
+    .hud ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      color: #b8bccb;
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 20px;
+      padding: 0 5px;
+      border: 1px solid rgb(255 255 255 / 20%);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: rgb(255 255 255 / 6%);
+      color: #fff;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      text-align: center;
+    }
+
+    .hud .stats {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      color: #8e93a6;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+    }
+
+    .hud .on {
+      color: #4ade80;
+    }
+
+    .hud .off {
+      color: #f87171;
+    }
+
+    .prompt {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      margin: 0;
+      padding: 8px 16px;
+      border-radius: 99px;
+      background: rgb(8 10 20 / 75%);
+      font-size: 0.85rem;
+      transform: translateX(-50%);
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 0.3s;
+    }
+
+    .prompt.is-hidden {
+      opacity: 0;
+    }
+
+    @media (width < 640px) {
+      .hud {
+        max-width: calc(100vw - 28px);
+        font-size: 0.72rem;
+      }
+
+      .hud ul {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="screen" aria-label="Vista 3D del laberinto"></canvas>
+
+  <aside class="hud">
+    <h1>Raycasting <span>3D</span></h1>
+    <ul>
+      <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o flechas para moverte</li>
+      <li><kbd>Shift</kbd> correr · ratón o <kbd>←</kbd><kbd>→</kbd> para girar</li>
+      <li><kbd>M</kbd> minimapa · <kbd>F</kbd> ojo de pez sin corregir</li>
+    </ul>
+    <div class="stats">
+      <span id="fps">-- fps</span>
+      <span id="rays">-- rayos</span>
+      <span>ojo de pez: <b id="fisheye" class="off">NO</b></span>
+    </div>
+  </aside>
+
+  <p class="prompt" id="prompt">🖱️ Haz click para capturar el ratón</p>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    // El mundo es una matriz: 0 = pasillo, cualquier otro número = pared con esa textura
+    const MAP = `
+      111111111111111111111111
+      100000002000000003000001
+      100000002000000003000001
+      100440002000000000055001
+      100440000000000003055001
+      100000002000000003000001
+      122022222000000333033001
+      100000000000000000000005
+      100000000000000000000005
+      100030303000000222200001
+      100000000000000020000001
+      100030003000000020004001
+      100000000000000020000001
+      100030303000000020000001
+      100000000000000000000001
+      111100001111000000000001
+      100100001001000005000001
+      100100001001000000000001
+      100000000001000005000001
+      100100001001000000000001
+      100111111101004444400001
+      100000000000000000000001
+      100000000000000000000001
+      111111111111111111111111
+    `.trim().split('\n').map(row => [...row.trim()].map(Number))
+
+    const TEXTURE_SIZE = 64
+    const TARGET_PIXELS = 170000 // resolución interna aproximada (ancho × alto)
+    const FOG_DENSITY = 0.006 // cuanto mayor, más espesa la niebla
+    const MOVE_SPEED = 3 // casillas por segundo
+    const ROTATION_SPEED = 2.4 // radianes por segundo
+    const MOUSE_SENSITIVITY = 0.0025
+    const PLAYER_RADIUS = 0.22
+    const MINIMAP_COLORS = ['', '#b0493b', '#5a6f96', '#9a6b3f', '#5f7d3c', '#f7df1e']
+
+    const canvas = $('#screen')
+    const ctx = canvas.getContext('2d')
+    // Pintamos la escena píxel a píxel en un canvas pequeño y luego lo ampliamos (look retro)
+    const view = document.createElement('canvas')
+    const viewCtx = view.getContext('2d')
+
+    // dir = hacia dónde mira el jugador; plane = plano de cámara, perpendicular a dir.
+    // |plane| / |dir| = 0.66 -> campo de visión de unos 66 grados
+    const player = { x: 5.5, y: 7.5, dirX: 1, dirY: 0, planeX: 0, planeY: 0.66 }
+
+    const keys = new Set()
+    let width, height, image, pixels, background, rayHits
+    let showMinimap = true
+    let useFisheye = false
+    let lastTime = performance.now()
+    let fps = 60
+    let pointerLocked = false
+    let touchStart = null
+
+    // ---------- Texturas generadas por código (sin imágenes) ----------
+
+    function createTexture(draw) {
+      const texture = document.createElement('canvas')
+      texture.width = texture.height = TEXTURE_SIZE
+      const context = texture.getContext('2d')
+      draw(context)
+      // Vemos los bytes RGBA como enteros de 32 bits: un píxel = un número (0xAABBGGRR en little-endian)
+      return new Uint32Array(context.getImageData(0, 0, TEXTURE_SIZE, TEXTURE_SIZE).data.buffer)
+    }
+
+    function addNoise(context, amount, alpha) {
+      for (let i = 0; i < amount; i++) {
+        context.fillStyle = Math.random() < 0.5 ? `rgb(0 0 0 / ${alpha})` : `rgb(255 255 255 / ${alpha})`
+        context.fillRect(Math.random() * TEXTURE_SIZE | 0, Math.random() * TEXTURE_SIZE | 0, 2, 2)
+      }
+    }
+
+    const TEXTURES = [
+      null,
+      createTexture(context => { // 1: ladrillo
+        context.fillStyle = '#9c3b2c'
+        context.fillRect(0, 0, 64, 64)
+        addNoise(context, 400, 0.12)
+        context.fillStyle = '#d8c7b2'
+        for (let row = 0; row < 4; row++) {
+          context.fillRect(0, row * 16, 64, 2)
+          const offset = row % 2 === 0 ? 0 : 16
+          for (let x = offset; x < 64; x += 32) context.fillRect(x, row * 16, 2, 16)
+        }
+      }),
+      createTexture(context => { // 2: piedra azul
+        context.fillStyle = '#56688f'
+        context.fillRect(0, 0, 64, 64)
+        addNoise(context, 600, 0.15)
+        context.strokeStyle = '#2d3850'
+        context.lineWidth = 2
+        context.strokeRect(1, 1, 30, 30)
+        context.strokeRect(33, 1, 30, 30)
+        context.strokeRect(1, 33, 62, 30)
+      }),
+      createTexture(context => { // 3: madera
+        const shades = ['#8a5a31', '#9b6a3c', '#7d5029', '#946338']
+        shades.forEach((shade, index) => {
+          context.fillStyle = shade
+          context.fillRect(index * 16, 0, 16, 64)
+        })
+        context.fillStyle = 'rgb(0 0 0 / 35%)'
+        for (let x = 0; x < 64; x += 16) context.fillRect(x, 0, 1, 64)
+        for (let i = 0; i < 40; i++) {
+          context.fillStyle = 'rgb(60 30 10 / 25%)'
+          context.fillRect(Math.random() * 64 | 0, Math.random() * 64 | 0, 1, 6 + Math.random() * 10)
+        }
+      }),
+      createTexture(context => { // 4: piedra con musgo
+        context.fillStyle = '#6b6f66'
+        context.fillRect(0, 0, 64, 64)
+        addNoise(context, 500, 0.18)
+        for (let i = 0; i < 14; i++) {
+          context.fillStyle = `rgb(${70 + Math.random() * 40} ${120 + Math.random() * 50} 50 / 70%)`
+          context.beginPath()
+          context.arc(Math.random() * 64, Math.random() * 64, 3 + Math.random() * 6, 0, Math.PI * 2)
+          context.fill()
+        }
+      }),
+      createTexture(context => { // 5: el logo de JavaScript
+        context.fillStyle = '#f7df1e'
+        context.fillRect(0, 0, 64, 64)
+        context.fillStyle = '#1a1a1a'
+        context.font = 'bold 30px system-ui, sans-serif'
+        context.textAlign = 'right'
+        context.textBaseline = 'alphabetic'
+        context.fillText('JS', 60, 58)
+        context.strokeStyle = 'rgb(0 0 0 / 25%)'
+        context.strokeRect(0.5, 0.5, 63, 63)
+      })
+    ]
+
+    // ---------- Tamaños y fondo ----------
+
+    function resize() {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.round(innerWidth * ratio)
+      canvas.height = Math.round(innerHeight * ratio)
+
+      // Mantenemos un número de píxeles parecido sea cual sea la forma de la pantalla
+      const aspect = innerWidth / innerHeight
+      height = Math.round(Math.sqrt(TARGET_PIXELS / aspect))
+      width = Math.round(height * aspect)
+      view.width = width
+      view.height = height
+      image = viewCtx.createImageData(width, height)
+      pixels = new Uint32Array(image.data.buffer)
+      rayHits = new Float32Array(width * 2)
+      background = createBackground()
+      $('#rays').textContent = `${width} rayos`
+    }
+
+    function rgb(r, g, b) {
+      return (255 << 24) | (b << 16) | (g << 8) | r
+    }
+
+    function createBackground() {
+      // Cielo y suelo se calculan una vez: cada fotograma solo copiamos este array
+      const result = new Uint32Array(width * height)
+      const horizon = height / 2
+      for (let y = 0; y < height; y++) {
+        let color
+        if (y < horizon) {
+          const t = y / horizon
+          color = rgb(12 + t * 50 | 0, 14 + t * 30 | 0, 40 + t * 60 | 0)
+        } else {
+          // Cuanto más cerca del horizonte, más lejos está ese trozo de suelo -> más oscuro
+          const light = getFog(horizon / (y - horizon + 1))
+          color = rgb(78 * light | 0, 70 * light | 0, 62 * light | 0)
+        }
+        result.fill(color, y * width, (y + 1) * width)
+      }
+      return result
+    }
+
+    function getFog(distance) {
+      // Niebla: la luz cae con el cuadrado de la distancia, pero nunca llega a negro total
+      return 1 / (1 + distance * distance * FOG_DENSITY)
+    }
+
+    // ---------- Raycasting con el algoritmo DDA ----------
+
+    function castRays() {
+      pixels.set(background)
+      const halfHeight = height / 2
+
+      for (let x = 0; x < width; x++) {
+        // 1. Dirección del rayo: cameraX va de -1 (borde izquierdo) a 1 (borde derecho)
+        const cameraX = (2 * x) / width - 1
+        const rayDirX = player.dirX + player.planeX * cameraX
+        const rayDirY = player.dirY + player.planeY * cameraX
+
+        // 2. Casilla del mapa en la que estamos
+        let mapX = Math.floor(player.x)
+        let mapY = Math.floor(player.y)
+
+        // 3. deltaDist = cuánto avanza el rayo para cruzar UNA casilla entera en X o en Y
+        const deltaDistX = rayDirX === 0 ? 1e30 : Math.abs(1 / rayDirX)
+        const deltaDistY = rayDirY === 0 ? 1e30 : Math.abs(1 / rayDirY)
+
+        // 4. sideDist = distancia hasta la PRIMERA línea vertical / horizontal de la rejilla
+        let stepX, stepY, sideDistX, sideDistY
+        if (rayDirX < 0) {
+          stepX = -1
+          sideDistX = (player.x - mapX) * deltaDistX
+        } else {
+          stepX = 1
+          sideDistX = (mapX + 1 - player.x) * deltaDistX
+        }
+        if (rayDirY < 0) {
+          stepY = -1
+          sideDistY = (player.y - mapY) * deltaDistY
+        } else {
+          stepY = 1
+          sideDistY = (mapY + 1 - player.y) * deltaDistY
+        }
+
+        // 5. DDA: saltamos siempre a la línea de la rejilla más cercana (en X o en Y)
+        //    hasta chocar con una pared. Nunca "atravesamos" una esquina ni hacemos pasos de más
+        let side = 0 // 0 = pared cara este/oeste (línea vertical), 1 = cara norte/sur
+        let wall = 0
+        while (wall === 0) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX
+            mapX += stepX
+            side = 0
+          } else {
+            sideDistY += deltaDistY
+            mapY += stepY
+            side = 1
+          }
+          wall = MAP[mapY]?.[mapX] ?? 1
+        }
+
+        // 6. Distancia PERPENDICULAR al plano de cámara (no la distancia real al jugador).
+        //    Si usáramos la distancia euclídea, los rayos de los lados (más largos) harían las
+        //    paredes más bajas en los bordes: el famoso efecto "ojo de pez". Pulsa F para verlo
+        const perpendicular = side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY
+        const distance = Math.max(0.0001, useFisheye
+          ? perpendicular * Math.hypot(rayDirX, rayDirY)
+          : perpendicular)
+
+        rayHits[x * 2] = player.x + perpendicular * rayDirX
+        rayHits[x * 2 + 1] = player.y + perpendicular * rayDirY
+
+        // 7. Altura de la columna: inversamente proporcional a la distancia
+        const lineHeight = height / distance
+        const drawStart = Math.max(0, Math.floor(halfHeight - lineHeight / 2))
+        const drawEnd = Math.min(height, Math.ceil(halfHeight + lineHeight / 2))
+
+        // 8. Qué columna de la textura toca: el punto exacto donde el rayo golpea la pared
+        let wallX = side === 0 ? player.y + perpendicular * rayDirY : player.x + perpendicular * rayDirX
+        wallX -= Math.floor(wallX)
+        let textureX = Math.floor(wallX * TEXTURE_SIZE)
+        // Volteamos la textura en las caras que vemos "del revés" para que no salga en espejo
+        if ((side === 0 && rayDirX < 0) || (side === 1 && rayDirY > 0)) textureX = TEXTURE_SIZE - textureX - 1
+
+        // 9. Sombreado: más oscuro con la distancia (niebla) y en las caras N/S (luz lateral)
+        const shade = getFog(distance) * (side === 1 ? 0.7 : 1)
+
+        const texture = TEXTURES[wall] ?? TEXTURES[1]
+        const step = TEXTURE_SIZE / lineHeight
+        let textureY = (drawStart - halfHeight + lineHeight / 2) * step
+
+        for (let y = drawStart; y < drawEnd; y++) {
+          const color = texture[(textureY & (TEXTURE_SIZE - 1)) * TEXTURE_SIZE + textureX]
+          textureY += step
+          const r = (color & 255) * shade
+          const g = ((color >> 8) & 255) * shade
+          const b = ((color >> 16) & 255) * shade
+          pixels[y * width + x] = (255 << 24) | (b << 16) | (g << 8) | r
+        }
+      }
+
+      viewCtx.putImageData(image, 0, 0)
+    }
+
+    // ---------- Minimapa 2D con los rayos ----------
+
+    function drawMinimap() {
+      const rows = MAP.length
+      const cols = MAP[0].length
+      const cell = Math.max(4, Math.min(8, Math.floor(Math.min(innerWidth, innerHeight) / 3.2 / rows)))
+      const originX = innerWidth - cols * cell - 14
+      const originY = 14
+
+      ctx.fillStyle = 'rgb(5 6 12 / 70%)'
+      ctx.fillRect(originX - 6, originY - 6, cols * cell + 12, rows * cell + 12)
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (MAP[y][x] === 0) continue
+          ctx.fillStyle = MINIMAP_COLORS[MAP[y][x]]
+          ctx.fillRect(originX + x * cell, originY + y * cell, cell, cell)
+        }
+      }
+
+      // Dibujamos uno de cada pocos rayos para que se vea el "abanico" de visión
+      const playerX = originX + player.x * cell
+      const playerY = originY + player.y * cell
+      ctx.strokeStyle = 'rgb(255 230 120 / 22%)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let x = 0; x < width; x += 4) {
+        ctx.moveTo(playerX, playerY)
+        ctx.lineTo(originX + rayHits[x * 2] * cell, originY + rayHits[x * 2 + 1] * cell)
+      }
+      ctx.stroke()
+
+      ctx.fillStyle = '#ff4d6d'
+      ctx.beginPath()
+      ctx.arc(playerX, playerY, Math.max(2.5, cell * 0.4), 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    function drawCrosshair() {
+      const x = innerWidth / 2
+      const y = innerHeight / 2
+      ctx.strokeStyle = 'rgb(255 255 255 / 70%)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(x - 8, y)
+      ctx.lineTo(x + 8, y)
+      ctx.moveTo(x, y - 8)
+      ctx.lineTo(x, y + 8)
+      ctx.stroke()
+    }
+
+    // ---------- Movimiento y colisiones ----------
+
+    function isWall(x, y) {
+      return (MAP[Math.floor(y)]?.[Math.floor(x)] ?? 1) !== 0
+    }
+
+    function collides(x, y) {
+      // Comprobamos las 4 esquinas del "cuerpo" del jugador, no solo su centro
+      return isWall(x - PLAYER_RADIUS, y - PLAYER_RADIUS) || isWall(x + PLAYER_RADIUS, y - PLAYER_RADIUS) ||
+        isWall(x - PLAYER_RADIUS, y + PLAYER_RADIUS) || isWall(x + PLAYER_RADIUS, y + PLAYER_RADIUS)
+    }
+
+    function move(dx, dy) {
+      // Movemos cada eje por separado: si choca en X aún puede deslizarse en Y (y al revés)
+      if (!collides(player.x + dx, player.y)) player.x += dx
+      if (!collides(player.x, player.y + dy)) player.y += dy
+    }
+
+    function rotate(angle) {
+      // Matriz de rotación aplicada a la dirección y al plano de cámara
+      const cos = Math.cos(angle)
+      const sin = Math.sin(angle)
+      const { dirX, dirY, planeX, planeY } = player
+      player.dirX = dirX * cos - dirY * sin
+      player.dirY = dirX * sin + dirY * cos
+      player.planeX = planeX * cos - planeY * sin
+      player.planeY = planeX * sin + planeY * cos
+    }
+
+    function updatePlayer(deltaTime) {
+      const speed = MOVE_SPEED * deltaTime * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 1.8 : 1)
+      let forward = 0
+      let strafe = 0
+      if (keys.has('KeyW') || keys.has('ArrowUp')) forward++
+      if (keys.has('KeyS') || keys.has('ArrowDown')) forward--
+      if (keys.has('KeyD')) strafe++
+      if (keys.has('KeyA')) strafe--
+      if (keys.has('ArrowRight') || keys.has('KeyE')) rotate(ROTATION_SPEED * deltaTime)
+      if (keys.has('ArrowLeft') || keys.has('KeyQ')) rotate(-ROTATION_SPEED * deltaTime)
+
+      if (forward === 0 && strafe === 0) return
+      // Normalizamos para no ir más rápido en diagonal
+      const length = Math.hypot(forward, strafe)
+      // El vector "derecha" es la dirección girada 90 grados: (-dirY, dirX)
+      const dx = (player.dirX * forward - player.dirY * strafe) / length * speed
+      const dy = (player.dirY * forward + player.dirX * strafe) / length * speed
+      move(dx, dy)
+    }
+
+    // ---------- Bucle principal ----------
+
+    function frame(time) {
+      // Delta time: la velocidad no depende de los fps. Lo limitamos para evitar saltos
+      const deltaTime = Math.min(0.1, (time - lastTime) / 1000)
+      lastTime = time
+      fps = fps * 0.95 + (1 / Math.max(deltaTime, 0.001)) * 0.05
+
+      updatePlayer(deltaTime)
+      castRays()
+
+      const ratio = canvas.width / innerWidth
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(view, 0, 0, canvas.width, canvas.height)
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+      if (showMinimap) drawMinimap()
+      drawCrosshair()
+
+      requestAnimationFrame(frame)
+    }
+
+    setInterval(() => {
+      $('#fps').textContent = `${Math.round(fps)} fps`
+    }, 500)
+
+    // ---------- Eventos ----------
+
+    function updateToggles() {
+      const fisheye = $('#fisheye')
+      fisheye.textContent = useFisheye ? 'SÍ' : 'NO'
+      fisheye.className = useFisheye ? 'on' : 'off'
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.code === 'KeyM' && !event.repeat) showMinimap = !showMinimap
+      if (event.code === 'KeyF' && !event.repeat) {
+        useFisheye = !useFisheye
+        updateToggles()
+      }
+      if (event.code.startsWith('Arrow')) event.preventDefault()
+      keys.add(event.code)
+    })
+
+    document.addEventListener('keyup', event => keys.delete(event.code))
+    // Si la ventana pierde el foco no recibimos el keyup: soltamos todas las teclas
+    window.addEventListener('blur', () => keys.clear())
+
+    // Pointer Lock: oculta el cursor y nos da el movimiento relativo del ratón (movementX)
+    canvas.addEventListener('click', async () => {
+      if (pointerLocked || !canvas.requestPointerLock) return
+      try {
+        await canvas.requestPointerLock()
+      } catch {
+        $('#prompt').textContent = 'No se puede capturar el ratón aquí: gira con ← →'
+      }
+    })
+
+    document.addEventListener('pointerlockchange', () => {
+      pointerLocked = document.pointerLockElement === canvas
+      $('#prompt').classList.toggle('is-hidden', pointerLocked)
+      $('#prompt').textContent = '🖱️ Haz click para capturar el ratón'
+    })
+
+    document.addEventListener('pointerlockerror', () => {
+      $('#prompt').textContent = 'No se puede capturar el ratón aquí: gira con ← →'
+    })
+
+    document.addEventListener('mousemove', event => {
+      if (pointerLocked) rotate(event.movementX * MOUSE_SENSITIVITY)
+    })
+
+    // En pantallas táctiles: arrastrar en horizontal gira y en vertical avanza o retrocede
+    canvas.addEventListener('pointerdown', event => {
+      if (event.pointerType !== 'touch') return
+      touchStart = { x: event.clientX, y: event.clientY }
+      canvas.setPointerCapture(event.pointerId)
+    })
+
+    canvas.addEventListener('pointermove', event => {
+      if (event.pointerType !== 'touch' || !touchStart) return
+      rotate((event.clientX - touchStart.x) * 0.006)
+      const forward = -(event.clientY - touchStart.y) * 0.01
+      move(player.dirX * forward, player.dirY * forward)
+      touchStart = { x: event.clientX, y: event.clientY }
+    })
+
+    canvas.addEventListener('pointerup', () => { touchStart = null })
+    canvas.addEventListener('pointercancel', () => { touchStart = null })
+
+    window.addEventListener('resize', resize)
+
+    // Empezamos mirando por el pasillo hacia la pared con el logo de JavaScript
+    rotate(-0.12)
+    resize()
+    requestAnimationFrame(frame)
+  </script>
+</body>
+
+</html>

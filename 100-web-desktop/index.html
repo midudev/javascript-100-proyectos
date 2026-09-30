@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>100 - Escritorio web</title>
+  <style>
+    :root {
+      --taskbar-height: 52px;
+      --panel: rgb(22 25 38 / 82%);
+      --panel-solid: #171a27;
+      --line: rgb(255 255 255 / 10%);
+      --text: #eef0f7;
+      --muted: #9aa1b8;
+      --accent: #7c9cff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      overflow: hidden;
+      background: #0a0c16;
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      user-select: none;
+    }
+
+    button,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    /* ---------- Escritorio ---------- */
+    .desktop {
+      position: fixed;
+      inset: 0 0 var(--taskbar-height) 0;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 20% 10%, rgb(124 58 237 / 45%) 0, transparent 45%),
+        radial-gradient(ellipse at 85% 30%, rgb(14 165 233 / 35%) 0, transparent 45%),
+        radial-gradient(ellipse at 60% 100%, rgb(236 72 153 / 30%) 0, transparent 50%),
+        linear-gradient(160deg, #0f1226, #070812);
+    }
+
+    .desktop::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgb(255 255 255 / 7%) 1px, transparent 1px);
+      background-size: 26px 26px;
+    }
+
+    .watermark {
+      position: absolute;
+      right: 5%;
+      bottom: 6%;
+      margin: 0;
+      color: rgb(255 255 255 / 6%);
+      font-size: clamp(5rem, 16vw, 13rem);
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      line-height: 0.8;
+      text-align: right;
+      pointer-events: none;
+    }
+
+    .watermark small {
+      display: block;
+      font-size: 0.18em;
+      letter-spacing: 0;
+    }
+
+    /* Iconos: en columnas desde arriba a la izquierda, dejando libre la esquina inferior izquierda */
+    .icons {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: repeat(auto-fill, 104px);
+      gap: 4px;
+      height: calc(100% - 100px);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .icon {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 86px;
+      height: 100px;
+      padding: 8px 4px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      cursor: default;
+    }
+
+    .icon:hover {
+      background: rgb(255 255 255 / 7%);
+    }
+
+    .icon.is-selected,
+    .icon:focus-visible {
+      border-color: rgb(124 156 255 / 50%);
+      background: rgb(124 156 255 / 20%);
+      outline: none;
+    }
+
+    .icon span:last-child {
+      display: -webkit-box;
+      overflow: hidden;
+      font-size: 0.75rem;
+      line-height: 1.2;
+      text-align: center;
+      text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .tile {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, hsl(var(--hue) 85% 62%), hsl(calc(var(--hue) + 40) 80% 45%));
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 35%), 0 6px 14px -6px rgb(0 0 0 / 70%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      text-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+    }
+
+    .tile.small {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      font-size: 0.72rem;
+    }
+
+    .tile.tiny {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      font-size: 0.55rem;
+    }
+
+    /* ---------- Ventanas ---------- */
+    .window {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel-solid);
+      box-shadow: 0 30px 70px -20px rgb(0 0 0 / 75%);
+      overflow: hidden;
+      transition: opacity 0.18s, transform 0.18s, visibility 0s;
+    }
+
+    .window.is-active {
+      border-color: rgb(124 156 255 / 45%);
+    }
+
+    .window.is-minimized {
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(60px) scale(0.85);
+      pointer-events: none;
+      transition: opacity 0.18s, transform 0.18s, visibility 0s 0.18s;
+    }
+
+    .window.is-maximized {
+      border-radius: 0;
+    }
+
+    /* Solo animamos posición y tamaño al maximizar/restaurar (no durante el arrastre) */
+    .window.is-animating {
+      transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s, border-radius 0.2s;
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 38px;
+      flex-shrink: 0;
+      padding: 0 4px 0 10px;
+      background: rgb(255 255 255 / 4%);
+      touch-action: none;
+    }
+
+    .window:not(.is-active) .titlebar {
+      color: var(--muted);
+    }
+
+    .window-title {
+      flex: 1;
+      overflow: hidden;
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .window-controls {
+      display: flex;
+    }
+
+    .window-controls button,
+    .window-controls a {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 30px;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .window-controls button:hover,
+    .window-controls a:hover {
+      background: rgb(255 255 255 / 10%);
+    }
+
+    .window-controls .close:hover {
+      background: #e11d48;
+      color: #fff;
+    }
+
+    .window-body {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      background: #fff;
+    }
+
+    .window-body iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    /* Los clicks dentro de un iframe NO llegan a este documento. Con este "escudo" encima
+       de las ventanas inactivas nos enteramos del click y les damos el foco */
+    .shield {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+
+    .window:not(.is-active) .shield {
+      display: block;
+    }
+
+    /* Durante un arrastre o redimensionado desactivamos los iframes: si el puntero pasa por
+       encima de uno, sus eventos se los quedaría el documento del iframe y perderíamos el arrastre */
+    .desktop.is-interacting iframe {
+      pointer-events: none;
+    }
+
+    .desktop.is-interacting {
+      cursor: var(--cursor, default);
+    }
+
+    .resize-handle {
+      position: absolute;
+      z-index: 2;
+      touch-action: none;
+    }
+
+    .resize-handle[data-dir='n'] { top: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+    .resize-handle[data-dir='s'] { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+    .resize-handle[data-dir='e'] { top: 10px; bottom: 10px; right: 0; width: 6px; cursor: ew-resize; }
+    .resize-handle[data-dir='w'] { top: 10px; bottom: 10px; left: 0; width: 6px; cursor: ew-resize; }
+    .resize-handle[data-dir='ne'] { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+    .resize-handle[data-dir='nw'] { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+    .resize-handle[data-dir='se'] { bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+    .resize-handle[data-dir='sw'] { bottom: 0; left: 0; width: 14px; height: 14px; cursor: nesw-resize; }
+
+    .window.is-maximized .resize-handle {
+      display: none;
+    }
+
+    /* App interna de bienvenida */
+    .welcome {
+      height: 100%;
+      padding: 22px 24px;
+      overflow: auto;
+      background: linear-gradient(160deg, #1d2140, #151827);
+      color: var(--text);
+      user-select: text;
+    }
+
+    .welcome h2 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .welcome p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .welcome ul {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 0;
+      list-style: none;
+      font-size: 0.88rem;
+    }
+
+    .welcome li {
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgb(255 255 255 / 5%);
+    }
+
+    .welcome button {
+      padding: 8px 14px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #0b0f1d;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ---------- Barra de tareas ---------- */
+    .taskbar {
+      position: fixed;
+      inset: auto 0 0 0;
+      z-index: 9000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: var(--taskbar-height);
+      padding: 0 10px;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(18px) saturate(1.4);
+    }
+
+    .taskbar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      max-width: calc(100% - 220px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .task-button,
+    .start-button {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      height: 40px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .task-button:hover,
+    .start-button:hover,
+    .start-button[aria-expanded='true'] {
+      background: rgb(255 255 255 / 9%);
+    }
+
+    .task-button span:last-child {
+      max-width: 120px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .task-button::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 3px;
+      width: 6px;
+      height: 3px;
+      border-radius: 99px;
+      background: var(--muted);
+      transform: translateX(-50%);
+      transition: width 0.2s, background 0.2s;
+    }
+
+    .task-button.is-active {
+      background: rgb(255 255 255 / 9%);
+    }
+
+    .task-button.is-active::after {
+      width: 18px;
+      background: var(--accent);
+    }
+
+    .start-logo {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: #f7df1e;
+      color: #111;
+      font-size: 0.7rem;
+      font-weight: 900;
+    }
+
+    .tray {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .clock {
+      padding: 0 10px;
+      font-size: 0.75rem;
+      line-height: 1.3;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .show-desktop {
+      width: 10px;
+      height: 100%;
+      border: 0;
+      border-left: 1px solid var(--line);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .show-desktop:hover {
+      background: rgb(255 255 255 / 12%);
+    }
+
+    /* ---------- Menú inicio ---------- */
+    .start-menu {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--taskbar-height) + 10px);
+      z-index: 9500;
+      display: flex;
+      flex-direction: column;
+      width: min(640px, calc(100vw - 20px));
+      height: min(620px, calc(100dvh - var(--taskbar-height) - 20px));
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgb(24 27 42 / 92%);
+      backdrop-filter: blur(24px) saturate(1.4);
+      box-shadow: 0 30px 80px -20px rgb(0 0 0 / 80%);
+      transform: translateX(-50%);
+      animation: menu-in 0.18s ease-out;
+    }
+
+    @keyframes menu-in {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 16px);
+      }
+    }
+
+    .search {
+      width: 100%;
+      height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      background: rgb(0 0 0 / 30%);
+      outline: none;
+    }
+
+    .search:focus {
+      border-color: var(--accent);
+    }
+
+    .start-heading {
+      display: flex;
+      justify-content: space-between;
+      margin: 16px 4px 8px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .app-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-content: start;
+      gap: 2px;
+      flex: 1;
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      list-style: none;
+    }
+
+    .app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 7px 8px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .app-item:hover,
+    .app-item.is-highlighted {
+      background: rgb(255 255 255 / 9%);
+    }
+
+    .app-item strong {
+      display: block;
+      overflow: hidden;
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .app-item small {
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+
+    .no-results {
+      grid-column: 1 / -1;
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .start-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (width < 640px) {
+      .icons {
+        height: calc(100% - 20px);
+      }
+
+      .app-list {
+        grid-template-columns: 1fr;
+      }
+
+      .clock .date {
+        display: none;
+      }
+
+      .taskbar-center {
+        max-width: calc(100% - 90px);
+        margin-right: 60px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="desktop" id="desktop">
+    <p class="watermark">100<small>proyectos de JavaScript</small></p>
+    <ul class="icons" id="icons" aria-label="Iconos del escritorio"></ul>
+    <div id="windows"></div>
+  </main>
+
+  <section class="start-menu" id="start-menu" hidden aria-label="Menú inicio">
+    <input class="search" id="search" type="search" placeholder="🔎 Busca entre los 99 proyectos…" autocomplete="off" aria-label="Buscar proyectos">
+    <p class="start-heading"><span>Todos los proyectos</span><span id="result-count"></span></p>
+    <ul class="app-list" id="app-list"></ul>
+    <footer class="start-footer"><span class="start-logo">JS</span> midudev · 100 proyectos de JavaScript sin frameworks</footer>
+  </section>
+
+  <footer class="taskbar">
+    <div class="taskbar-center" id="taskbar-center">
+      <button class="start-button" id="start-button" aria-expanded="false" aria-controls="start-menu" title="Inicio">
+        <span class="start-logo">JS</span>
+      </button>
+    </div>
+    <div class="tray">
+      <div class="clock" id="clock"><div class="time"></div><div class="date"></div></div>
+      <button class="show-desktop" id="show-desktop" title="Mostrar escritorio" aria-label="Mostrar escritorio"></button>
+    </div>
+  </footer>
+
+  <script type="module">
+    const $ = selector => document.querySelector(selector)
+
+    // Todas las "apps" del sistema: los 99 proyectos anteriores [slug, título]
+    const PROJECTS = [
+      ['01-tinder-swipe', 'Tinder Swipe'],
+      ['02-arkanoid-game', 'Arkanoid Game'],
+      ['03-midu-typing-game', 'Reto de Mecanografía'],
+      ['04-chatgpt-local', 'ChatGPT local'],
+      ['05-api-geo-ip', 'Buscar info de IP'],
+      ['06-tetris-canvas', 'Tetris en Canvas'],
+      ['07-tier-maker', 'Tier Maker'],
+      ['08-excel-js', 'Hojas de cálculo'],
+      ['09-paint-win-95', 'Paint con Canvas'],
+      ['10-stack-game', 'Stack Game'],
+      ['11-js-perf-benchmark', 'JS Perf Benchmark'],
+      ['12-moto-scroll', 'Animación por Scroll'],
+      ['13-google-translate', 'Google Translate'],
+      ['14-snake-game', 'Snake'],
+      ['15-memory-game', 'Juego de memoria'],
+      ['16-pomodoro-timer', 'Temporizador Pomodoro'],
+      ['17-password-generator', 'Generador de contraseñas'],
+      ['18-game-of-life', 'Juego de la vida'],
+      ['19-weather-app', 'App del tiempo'],
+      ['20-drum-kit', 'Batería virtual'],
+      ['21-tic-tac-toe-ai', 'Tres en raya imbatible'],
+      ['22-markdown-editor', 'Editor de Markdown'],
+      ['23-sorting-visualizer', 'Visualizador de ordenación'],
+      ['24-color-palette', 'Generador de paletas'],
+      ['25-whack-a-mole', 'Machaca el topo'],
+      ['26-infinite-scroll', 'Scroll infinito'],
+      ['27-2048-game', '2048'],
+      ['28-pixel-art', 'Editor de Pixel Art'],
+      ['29-pokedex', 'Pokédex'],
+      ['30-emoji-picker', 'Selector de emojis'],
+      ['31-minesweeper', 'Buscaminas'],
+      ['32-text-diff', 'Comparador de textos'],
+      ['33-audio-visualizer', 'Visualizador de audio'],
+      ['34-flappy-bird', 'Flappy Bird'],
+      ['35-kanban-board', 'Tablero Kanban'],
+      ['36-photo-booth', 'Fotomatón'],
+      ['37-wordle', 'Wordle'],
+      ['38-web-components', 'Web Components'],
+      ['39-maze-generator', 'Laberintos'],
+      ['40-currency-converter', 'Conversor de divisas'],
+      ['41-simon-says', 'Simón dice'],
+      ['42-interactive-particles', 'Partículas interactivas'],
+      ['43-js-quiz', 'Quiz de JavaScript'],
+      ['44-github-profile', 'Perfil de GitHub'],
+      ['45-pong', 'Pong'],
+      ['46-signature-pad', 'Firma digital'],
+      ['47-pathfinding', 'Buscador de caminos A*'],
+      ['48-command-palette', 'Paleta de comandos'],
+      ['49-sudoku', 'Sudoku'],
+      ['50-piano-synth', 'Piano sintetizador'],
+      ['51-image-compressor', 'Compresor de imágenes'],
+      ['52-hangman', 'Ahorcado'],
+      ['53-spa-router', 'Router SPA'],
+      ['54-matrix-rain', 'Lluvia de Matrix'],
+      ['55-expense-tracker', 'Control de gastos'],
+      ['56-text-effects', 'Efectos de texto'],
+      ['57-connect-four', 'Conecta 4'],
+      ['58-countries-explorer', 'Explorador de países'],
+      ['59-mandelbrot', 'Fractal de Mandelbrot'],
+      ['60-svg-editor', 'Editor con deshacer'],
+      ['61-space-invaders', 'Space Invaders'],
+      ['62-morse-code', 'Código Morse'],
+      ['63-proxy-reactivity', 'Reactividad con Proxy'],
+      ['64-world-clock', 'Relojes del mundo'],
+      ['65-sliding-puzzle', 'Puzzle deslizante'],
+      ['66-metronome', 'Metrónomo'],
+      ['67-fireworks', 'Fuegos artificiales'],
+      ['68-offline-notes', 'Notas offline (PWA)'],
+      ['69-regex-tester', 'Probador de RegExp'],
+      ['70-dino-runner', 'Dino Runner'],
+      ['71-virtual-list', 'Lista virtual'],
+      ['72-carousel', 'Carrusel'],
+      ['73-guitar-tuner', 'Afinador de guitarra'],
+      ['74-asteroids', 'Asteroids'],
+      ['75-form-validation', 'Validación de formularios'],
+      ['76-tabs-chat', 'Chat entre pestañas'],
+      ['77-hacker-news', 'Lector de Hacker News'],
+      ['78-tower-of-hanoi', 'Torres de Hanói'],
+      ['79-gradient-generator', 'Generador de degradados'],
+      ['80-screen-recorder', 'Grabador de pantalla'],
+      ['81-binary-search-tree', 'Árbol binario de búsqueda'],
+      ['82-meme-generator', 'Generador de memes'],
+      ['83-solar-system', 'Sistema solar'],
+      ['84-secret-messages', 'Mensajes cifrados'],
+      ['85-bouncing-balls', 'Física de pelotas'],
+      ['86-wikipedia-search', 'Buscador de Wikipedia'],
+      ['87-view-transitions', 'Galería con View Transitions'],
+      ['88-mouse-effects', 'Efectos con el ratón'],
+      ['89-video-player', 'Reproductor de vídeo'],
+      ['90-gamepad-tester', 'Tester de mandos'],
+      ['91-calendar', 'Calendario'],
+      ['92-battleship', 'Hundir la flota'],
+      ['93-calculator', 'Calculadora sin eval'],
+      ['94-text-analyzer', 'Analizador de texto'],
+      ['95-infinite-whiteboard', 'Pizarra infinita'],
+      ['96-toast-notifications', 'Notificaciones toast'],
+      ['97-json-viewer', 'Visor de JSON'],
+      ['98-raycaster', 'Motor 3D con raycasting'],
+      ['99-idle-clicker', 'Juego incremental']
+    ].map(([slug, title]) => ({ slug, title, number: slug.split('-')[0] }))
+
+    const DESKTOP_APPS = ['02-arkanoid-game', '06-tetris-canvas', '10-stack-game', '27-2048-game', '59-mandelbrot', '92-battleship', '98-raycaster', '99-idle-clicker']
+    const WELCOME_APP = { slug: 'welcome', title: 'Bienvenida', number: '100' }
+    const MIN_WIDTH = 320
+    const MIN_HEIGHT = 200
+    const CASCADE_STEP = 32
+    const MOBILE_WIDTH = 640
+
+    const desktop = $('#desktop')
+    const windowsLayer = $('#windows')
+    const startMenu = $('#start-menu')
+    const startButton = $('#start-button')
+    const searchInput = $('#search')
+
+    const openWindows = [] // { id, app, element, taskButton, x, y, width, height, minimized, maximized, restore }
+    let topZIndex = 10
+    let nextWindowId = 1
+    let activeWindow = null
+    let filteredApps = PROJECTS
+    let highlightedIndex = 0
+
+    // ---------- Utilidades ----------
+
+    function getHue(number) {
+      // Ángulo áureo: reparte los colores de los iconos sin que dos seguidos se parezcan
+      return Math.round((Number(number) * 137.508) % 360)
+    }
+
+    function tileHTML(app, size = '') {
+      return `<span class="tile ${size}" style="--hue: ${getHue(app.number)}">${app.number}</span>`
+    }
+
+    function getDesktopSize() {
+      return { width: desktop.clientWidth, height: desktop.clientHeight }
+    }
+
+    function normalize(text) {
+      // Quitamos tildes para que "raton" encuentre "ratón"
+      return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+    }
+
+    // ---------- Gestión de ventanas ----------
+
+    function applyRect(win) {
+      const { element } = win
+      element.style.left = `${win.x}px`
+      element.style.top = `${win.y}px`
+      element.style.width = `${win.width}px`
+      element.style.height = `${win.height}px`
+    }
+
+    function focusWindow(win) {
+      if (!win) return
+      // El z-index más alto va a la ventana con el foco: siempre sumamos, así nunca hay empates
+      win.element.style.zIndex = ++topZIndex
+      activeWindow = win
+      openWindows.forEach(item => {
+        const isActive = item === win
+        item.element.classList.toggle('is-active', isActive)
+        item.taskButton.classList.toggle('is-active', isActive)
+      })
+    }
+
+    function focusTopWindow() {
+      // Tras cerrar o minimizar, el foco pasa a la ventana visible que esté más arriba
+      const candidates = openWindows.filter(win => !win.minimized)
+      const top = candidates.sort((a, b) => b.element.style.zIndex - a.element.style.zIndex)[0]
+      if (top) focusWindow(top)
+      else {
+        activeWindow = null
+        openWindows.forEach(win => {
+          win.element.classList.remove('is-active')
+          win.taskButton.classList.remove('is-active')
+        })
+      }
+    }
+
+    function createWindowContent(app) {
+      if (app === WELCOME_APP) {
+        return `
+          <div class="welcome">
+            <h2>🎉 ¡Proyecto 100!</h2>
+            <p>Un escritorio hecho con HTML, CSS y JavaScript desde el que puedes abrir los 99 proyectos anteriores como si fueran aplicaciones.</p>
+            <ul>
+              <li>🖱️ Arrastra las ventanas por la barra de título y redimensiónalas desde los bordes</li>
+              <li>🗖 Doble click en la barra de título para maximizar</li>
+              <li>🔎 Abre el menú <b>JS</b> de la barra de tareas y busca cualquier proyecto</li>
+              <li>🧩 Cada ventana es un <code>&lt;iframe&gt;</code> con el proyecto dentro</li>
+            </ul>
+            <button data-open-start>Explorar los proyectos</button>
+          </div>
+        `
+      }
+      const src = `../${app.slug}/index.html`
+      return `
+        <iframe src="${src}" title="${app.title}" allow="autoplay; camera; microphone; display-capture; geolocation; clipboard-write; fullscreen"></iframe>
+        <div class="shield"></div>
+      `
+    }
+
+    function openApp(app) {
+      const { width: desktopWidth, height: desktopHeight } = getDesktopSize()
+      const count = openWindows.length
+      const width = Math.min(920, desktopWidth - 60)
+      const height = Math.min(580, desktopHeight - 50)
+      const win = {
+        id: nextWindowId++,
+        app,
+        x: Math.max(0, Math.min(140 + (count % 8) * CASCADE_STEP, desktopWidth - width)),
+        y: Math.max(0, Math.min(24 + (count % 8) * CASCADE_STEP, desktopHeight - height)),
+        width: Math.max(MIN_WIDTH, width),
+        height: Math.max(MIN_HEIGHT, height),
+        minimized: false,
+        maximized: false,
+        restore: null
+      }
+
+      const element = document.createElement('section')
+      element.className = 'window'
+      element.setAttribute('role', 'dialog')
+      element.setAttribute('aria-label', app.title)
+      const external = app === WELCOME_APP ? '' : `<a href="../${app.slug}/index.html" target="_blank" rel="noopener" title="Abrir en una pestaña nueva" aria-label="Abrir en una pestaña nueva">↗</a>`
+      element.innerHTML = `
+        <header class="titlebar">
+          ${tileHTML(app, 'tiny')}
+          <span class="window-title">${app.number} · ${app.title}</span>
+          <div class="window-controls">
+            ${external}
+            <button data-action="minimize" aria-label="Minimizar">–</button>
+            <button data-action="maximize" aria-label="Maximizar">▢</button>
+            <button data-action="close" class="close" aria-label="Cerrar">✕</button>
+          </div>
+        </header>
+        <div class="window-body">${createWindowContent(app)}</div>
+        ${['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map(dir => `<div class="resize-handle" data-dir="${dir}"></div>`).join('')}
+      `
+      win.element = element
+
+      const taskButton = document.createElement('button')
+      taskButton.className = 'task-button'
+      taskButton.title = app.title
+      taskButton.innerHTML = `${tileHTML(app, 'small')}<span>${app.title}</span>`
+      taskButton.addEventListener('click', () => toggleFromTaskbar(win))
+      win.taskButton = taskButton
+      $('#taskbar-center').append(taskButton)
+
+      setupWindowEvents(win)
+      openWindows.push(win)
+      windowsLayer.append(element)
+      applyRect(win)
+
+      // En pantallas pequeñas las ventanas se abren siempre maximizadas
+      if (desktopWidth < MOBILE_WIDTH) toggleMaximize(win, { animate: false })
+
+      element.animate(
+        [{ opacity: 0, transform: 'scale(0.94) translateY(12px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 180, easing: 'ease-out' }
+      )
+      focusWindow(win)
+      return win
+    }
+
+    async function closeWindow(win) {
+      const index = openWindows.indexOf(win)
+      if (index === -1) return
+      openWindows.splice(index, 1)
+      win.taskButton.remove()
+
+      await win.element.animate(
+        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.94)' }],
+        { duration: 150, easing: 'ease-in', fill: 'forwards' }
+      ).finished
+      win.element.remove()
+      if (activeWindow === win) focusTopWindow()
+    }
+
+    function minimizeWindow(win) {
+      win.minimized = true
+      win.element.classList.add('is-minimized')
+      if (activeWindow === win) focusTopWindow()
+      win.taskButton.classList.remove('is-active')
+    }
+
+    function restoreWindow(win) {
+      win.minimized = false
+      win.element.classList.remove('is-minimized')
+      focusWindow(win)
+    }
+
+    function toggleFromTaskbar(win) {
+      if (win.minimized) restoreWindow(win)
+      else if (activeWindow === win) minimizeWindow(win)
+      else focusWindow(win)
+    }
+
+    function withAnimation(win, change) {
+      win.element.classList.add('is-animating')
+      change()
+      setTimeout(() => win.element.classList.remove('is-animating'), 220)
+    }
+
+    function toggleMaximize(win, { animate = true } = {}) {
+      const change = () => {
+        if (win.maximized) {
+          Object.assign(win, win.restore)
+          win.maximized = false
+        } else {
+          // Guardamos el tamaño y la posición para poder restaurarla después
+          win.restore = { x: win.x, y: win.y, width: win.width, height: win.height }
+          const { width, height } = getDesktopSize()
+          Object.assign(win, { x: 0, y: 0, width, height })
+          win.maximized = true
+        }
+        win.element.classList.toggle('is-maximized', win.maximized)
+        applyRect(win)
+      }
+      if (animate) withAnimation(win, change)
+      else change()
+    }
+
+    // ---------- Arrastrar y redimensionar con Pointer Events ----------
+
+    function startInteraction(event, cursor) {
+      // Capturamos el puntero: todos los pointermove irán a este elemento aunque salgamos de él
+      event.currentTarget.setPointerCapture(event.pointerId)
+      desktop.classList.add('is-interacting')
+      desktop.style.setProperty('--cursor', cursor)
+    }
+
+    function endInteraction() {
+      desktop.classList.remove('is-interacting')
+    }
+
+    function setupDrag(win) {
+      const titlebar = win.element.querySelector('.titlebar')
+      let drag = null
+
+      titlebar.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || event.target.closest('button, a')) return
+        focusWindow(win)
+
+        // Si está maximizada, al arrastrar la restauramos manteniendo el cursor en la misma
+        // proporción de la barra de título (como hacen Windows y macOS)
+        if (win.maximized) {
+          const ratio = (event.clientX - win.x) / win.width
+          toggleMaximize(win, { animate: false })
+          win.x = event.clientX - win.width * ratio
+          win.y = 0
+          applyRect(win)
+        }
+
+        drag = { offsetX: event.clientX - win.x, offsetY: event.clientY - win.y }
+        startInteraction(event, 'grabbing')
+      })
+
+      titlebar.addEventListener('pointermove', event => {
+        if (!drag) return
+        const { width, height } = getDesktopSize()
+        // Limitamos para que la barra de título nunca quede fuera de alcance
+        win.x = Math.min(Math.max(event.clientX - drag.offsetX, 80 - win.width), width - 80)
+        win.y = Math.min(Math.max(event.clientY - drag.offsetY, 0), height - 38)
+        applyRect(win)
+      })
+
+      const stop = () => {
+        if (!drag) return
+        drag = null
+        endInteraction()
+      }
+      titlebar.addEventListener('pointerup', stop)
+      titlebar.addEventListener('pointercancel', stop)
+
+      titlebar.addEventListener('dblclick', event => {
+        if (!event.target.closest('button, a')) toggleMaximize(win)
+      })
+    }
+
+    function setupResize(win) {
+      win.element.querySelectorAll('.resize-handle').forEach(handle => {
+        let start = null
+        const dir = handle.dataset.dir
+
+        handle.addEventListener('pointerdown', event => {
+          if (event.button !== 0) return
+          focusWindow(win)
+          start = { pointerX: event.clientX, pointerY: event.clientY, x: win.x, y: win.y, width: win.width, height: win.height }
+          startInteraction(event, getComputedStyle(handle).cursor)
+        })
+
+        handle.addEventListener('pointermove', event => {
+          if (!start) return
+          const dx = event.clientX - start.pointerX
+          const dy = event.clientY - start.pointerY
+
+          // Cada letra de la dirección indica qué borde se mueve: n (arriba), s, e (derecha), w
+          if (dir.includes('e')) win.width = Math.max(MIN_WIDTH, start.width + dx)
+          if (dir.includes('s')) win.height = Math.max(MIN_HEIGHT, start.height + dy)
+          if (dir.includes('w')) {
+            // Al estirar por la izquierda, crece el ancho y la ventana se mueve a la vez
+            win.width = Math.max(MIN_WIDTH, start.width - dx)
+            win.x = start.x + start.width - win.width
+          }
+          if (dir.includes('n')) {
+            win.height = Math.max(MIN_HEIGHT, start.height - dy)
+            win.y = Math.max(0, start.y + start.height - win.height)
+            win.height = start.y + start.height - win.y
+          }
+          applyRect(win)
+        })
+
+        const stop = () => {
+          if (!start) return
+          start = null
+          endInteraction()
+        }
+        handle.addEventListener('pointerup', stop)
+        handle.addEventListener('pointercancel', stop)
+      })
+    }
+
+    function setupWindowEvents(win) {
+      setupDrag(win)
+      setupResize(win)
+
+      // Fase de captura: enfocamos la ventana antes de que el click llegue a cualquier botón
+      win.element.addEventListener('pointerdown', () => {
+        if (activeWindow !== win) focusWindow(win)
+      }, { capture: true })
+
+      win.element.querySelector('.window-controls').addEventListener('click', event => {
+        const action = event.target.closest('button')?.dataset.action
+        if (action === 'close') closeWindow(win)
+        if (action === 'minimize') minimizeWindow(win)
+        if (action === 'maximize') toggleMaximize(win)
+      })
+
+      win.element.querySelector('[data-open-start]')?.addEventListener('click', () => toggleStartMenu(true))
+    }
+
+    // ---------- Escritorio ----------
+
+    function renderDesktopIcons() {
+      const apps = [WELCOME_APP, ...DESKTOP_APPS.map(slug => PROJECTS.find(app => app.slug === slug))]
+      $('#icons').innerHTML = apps.map(app => `
+        <li><button class="icon" data-slug="${app.slug}">
+          ${tileHTML(app)}
+          <span>${app.title}</span>
+        </button></li>
+      `).join('')
+    }
+
+    function findApp(slug) {
+      return slug === WELCOME_APP.slug ? WELCOME_APP : PROJECTS.find(app => app.slug === slug)
+    }
+
+    function openOrFocus(app) {
+      // La bienvenida solo se abre una vez; los proyectos pueden abrirse varias veces
+      const existing = app === WELCOME_APP && openWindows.find(win => win.app === app)
+      if (existing) restoreWindow(existing)
+      else openApp(app)
+    }
+
+    $('#icons').addEventListener('click', event => {
+      const icon = event.target.closest('.icon')
+      document.querySelectorAll('.icon.is-selected').forEach(item => item.classList.remove('is-selected'))
+      if (!icon) return
+      icon.classList.add('is-selected')
+    })
+
+    $('#icons').addEventListener('dblclick', event => {
+      const icon = event.target.closest('.icon')
+      if (icon) openOrFocus(findApp(icon.dataset.slug))
+    })
+
+    // En pantallas táctiles no hay doble click: abrimos con un solo toque
+    $('#icons').addEventListener('pointerup', event => {
+      const icon = event.target.closest('.icon')
+      if (icon && event.pointerType === 'touch') openOrFocus(findApp(icon.dataset.slug))
+    })
+
+    $('#icons').addEventListener('keydown', event => {
+      const icon = event.target.closest('.icon')
+      if (icon && event.key === 'Enter') {
+        event.preventDefault()
+        openOrFocus(findApp(icon.dataset.slug))
+      }
+    })
+
+    desktop.addEventListener('pointerdown', event => {
+      if (event.target === desktop || event.target === windowsLayer) {
+        document.querySelectorAll('.icon.is-selected').forEach(item => item.classList.remove('is-selected'))
+      }
+    })
+
+    $('#show-desktop').addEventListener('click', () => {
+      const visible = openWindows.filter(win => !win.minimized)
+      // Si hay ventanas a la vista las minimizamos todas; si no, las restauramos
+      if (visible.length > 0) visible.forEach(minimizeWindow)
+      else openWindows.forEach(restoreWindow)
+    })
+
+    // ---------- Menú inicio con buscador ----------
+
+    function renderAppList() {
+      const query = normalize(searchInput.value.trim())
+      filteredApps = PROJECTS.filter(app => normalize(`${app.number} ${app.title} ${app.slug}`).includes(query))
+      highlightedIndex = 0
+      $('#result-count').textContent = `${filteredApps.length} de ${PROJECTS.length}`
+
+      $('#app-list').innerHTML = filteredApps.length === 0
+        ? '<li class="no-results">No hay ningún proyecto con ese nombre 🤔</li>'
+        : filteredApps.map((app, index) => `
+          <li><button class="app-item ${index === highlightedIndex ? 'is-highlighted' : ''}" data-slug="${app.slug}">
+            ${tileHTML(app, 'small')}
+            <span><strong>${app.title}</strong><small>${app.slug}</small></span>
+          </button></li>
+        `).join('')
+    }
+
+    function updateHighlight(newIndex) {
+      const items = document.querySelectorAll('.app-item')
+      if (items.length === 0) return
+      highlightedIndex = (newIndex + items.length) % items.length
+      items.forEach((item, index) => item.classList.toggle('is-highlighted', index === highlightedIndex))
+      items[highlightedIndex].scrollIntoView({ block: 'nearest' })
+    }
+
+    function toggleStartMenu(force) {
+      const open = force ?? startMenu.hidden
+      startMenu.hidden = !open
+      startButton.setAttribute('aria-expanded', open)
+      if (open) {
+        searchInput.value = ''
+        renderAppList()
+        searchInput.focus()
+      }
+    }
+
+    startButton.addEventListener('click', () => toggleStartMenu())
+    searchInput.addEventListener('input', renderAppList)
+
+    searchInput.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        // En la rejilla de 2 columnas, arriba/abajo saltan de 2 en 2
+        const columns = getComputedStyle($('#app-list')).gridTemplateColumns.split(' ').length
+        updateHighlight(highlightedIndex + (event.key === 'ArrowDown' ? columns : -columns))
+      } else if (event.key === 'Enter' && filteredApps[highlightedIndex]) {
+        openApp(filteredApps[highlightedIndex])
+        toggleStartMenu(false)
+      }
+    })
+
+    $('#app-list').addEventListener('click', event => {
+      const item = event.target.closest('.app-item')
+      if (!item) return
+      openApp(findApp(item.dataset.slug))
+      toggleStartMenu(false)
+    })
+
+    document.addEventListener('pointerdown', event => {
+      if (startMenu.hidden || startMenu.contains(event.target) || startButton.contains(event.target)) return
+      toggleStartMenu(false)
+    })
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !startMenu.hidden) toggleStartMenu(false)
+    })
+
+    // ---------- Reloj de la barra de tareas ----------
+
+    const timeFormatter = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' })
+    const dateFormatter = new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+    function updateClock() {
+      const now = new Date()
+      $('#clock .time').textContent = timeFormatter.format(now)
+      $('#clock .date').textContent = dateFormatter.format(now)
+    }
+
+    // Al cambiar el tamaño del navegador, las ventanas maximizadas siguen ocupando todo
+    window.addEventListener('resize', () => {
+      const { width, height } = getDesktopSize()
+      openWindows.forEach(win => {
+        if (win.maximized) Object.assign(win, { width, height })
+        else {
+          win.x = Math.min(win.x, Math.max(0, width - 80))
+          win.y = Math.min(win.y, Math.max(0, height - 38))
+        }
+        applyRect(win)
+      })
+    })
+
+    renderDesktopIcons()
+    updateClock()
+    setInterval(updateClock, 1000)
+
+    // Arrancamos con un par de ventanas abiertas para que el escritorio no esté vacío
+    const { width: startWidth } = getDesktopSize()
+    if (startWidth >= MOBILE_WIDTH) {
+      const game = openApp(findApp('98-raycaster'))
+      Object.assign(game, { x: 210, y: 28, width: Math.max(MIN_WIDTH, Math.min(660, startWidth - 560)), height: 430 })
+      applyRect(game)
+    }
+    const welcome = openApp(WELCOME_APP)
+    if (startWidth >= MOBILE_WIDTH) {
+      Object.assign(welcome, { x: Math.max(210, startWidth - 460), y: 110, width: 420, height: 490 })
+      applyRect(welcome)
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>29 - Pokédex</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #f4f5f9;
+      --text: #1d2130;
+      --muted: #6b7185;
+      --red: #e3350d;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 14px clamp(16px, 4vw, 40px) 10px;
+      background: #f4f5f9e6;
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #e3e5ee;
+    }
+
+    .top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 20px;
+    }
+
+    h1 {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }
+
+    h1 small {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0;
+    }
+
+    /* Pokéball hecha solo con CSS */
+    .pokeball {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--text);
+      background:
+        radial-gradient(circle, #fff 0 3px, var(--text) 3.5px 5.5px, transparent 6px),
+        linear-gradient(var(--red) 0 45%, var(--text) 45% 55%, #fff 55%);
+    }
+
+    .search {
+      flex: 1;
+      min-width: 200px;
+      max-width: 360px;
+      margin-left: auto;
+      padding: 10px 14px;
+      font: inherit;
+      font-size: 15px;
+      border: 1px solid #dcdfe8;
+      border-radius: 12px;
+      background: #fff;
+      outline: none;
+    }
+
+    .search:focus {
+      border-color: #9aa3bb;
+      box-shadow: 0 0 0 3px #9aa3bb33;
+    }
+
+    .types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    /* En móvil, una sola fila con scroll horizontal */
+    @media (max-width: 760px) {
+      .types {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+    }
+
+    .types button {
+      flex-shrink: 0;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 2px solid var(--type, #cfd3de);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .types button[aria-pressed="true"] {
+      background: var(--type, var(--text));
+      border-color: var(--type, var(--text));
+      color: #fff;
+    }
+
+    .progress {
+      height: 3px;
+      margin-top: 10px;
+      border-radius: 3px;
+      background: #e3e5ee;
+      overflow: hidden;
+      transition: opacity .4s;
+    }
+
+    .progress div {
+      height: 100%;
+      width: 0;
+      background: var(--red);
+      transition: width .3s;
+    }
+
+    main {
+      padding: 20px clamp(16px, 4vw, 40px) 40px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 16px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .card {
+      position: relative;
+      padding: 14px;
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 1px 2px #1d21300d, 0 8px 24px -12px #1d213026;
+      cursor: pointer;
+      transition: translate .2s, box-shadow .2s;
+      animation: appear .35s ease-out both;
+    }
+
+    .card:hover {
+      translate: 0 -4px;
+      box-shadow: 0 1px 2px #1d21300d, 0 16px 30px -12px #1d213040;
+    }
+
+    .card:focus-visible {
+      outline: 3px solid var(--type);
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        scale: .95;
+      }
+    }
+
+    .card .number {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .card figure {
+      margin: 6px 0 10px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--type) 30%, transparent) 0 60%, transparent 61%);
+    }
+
+    .card img {
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 8px #0002);
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      text-transform: capitalize;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .badge {
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--type);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-shadow: 0 1px 1px #0003;
+    }
+
+    .empty,
+    .error {
+      margin: 60px 0;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .error button {
+      font: inherit;
+      margin-left: 6px;
+      padding: 6px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--text);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    /* ---------- Diálogo de detalle ---------- */
+
+    dialog {
+      width: min(440px, calc(100vw - 32px));
+      max-height: calc(100dvh - 32px);
+      padding: 0;
+      border: 0;
+      border-radius: 28px;
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 30px 80px #0005;
+    }
+
+    dialog::backdrop {
+      background: #1d213088;
+      backdrop-filter: blur(4px);
+    }
+
+    dialog[open] {
+      animation: pop .25s ease-out;
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        scale: .92;
+      }
+    }
+
+    .detail-hero {
+      position: relative;
+      padding: 18px 20px 0;
+      background: linear-gradient(160deg, var(--type), color-mix(in srgb, var(--type) 60%, #fff));
+      color: #fff;
+      text-align: center;
+    }
+
+    .detail-hero img {
+      width: 200px;
+      height: 200px;
+      margin-bottom: -40px;
+      filter: drop-shadow(0 10px 12px #0003);
+    }
+
+    .detail-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detail-nav button {
+      width: 36px;
+      height: 36px;
+      border: 0;
+      border-radius: 50%;
+      background: #ffffff38;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .detail-nav span {
+      font-weight: 800;
+      opacity: .85;
+    }
+
+    .detail-body {
+      padding: 48px 24px 24px;
+    }
+
+    .detail-body h2 {
+      margin: 0;
+      font-size: 28px;
+      text-transform: capitalize;
+      text-align: center;
+    }
+
+    .genus {
+      margin: 2px 0 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .detail-body .badges {
+      justify-content: center;
+    }
+
+    .description {
+      min-height: 3em;
+      margin: 14px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      text-align: center;
+      color: #444a5c;
+    }
+
+    .measures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .measures div {
+      padding: 8px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    .measures small {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: auto 32px 1fr;
+      align-items: center;
+      gap: 6px 10px;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .stats dt {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .stats dd {
+      margin: 0;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 8px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .bar i {
+      display: block;
+      height: 100%;
+      width: var(--value);
+      border-radius: 8px;
+      background: var(--type);
+      animation: grow .6s ease-out;
+    }
+
+    @keyframes grow {
+      from {
+        width: 0;
+      }
+    }
+
+    /* En móvil, dos tarjetas por fila */
+    @media (max-width: 760px) {
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="top">
+      <h1><i class="pokeball"></i>Pokédex <small>1ª generación</small></h1>
+      <input class="search" id="search" type="search" placeholder="Buscar por nombre o número…"
+        aria-label="Buscar Pokémon" autocomplete="off">
+    </div>
+    <nav class="types" id="types" aria-label="Filtrar por tipo"></nav>
+    <div class="progress" id="progress"><div></div></div>
+  </header>
+
+  <main>
+    <ul class="grid" id="grid"></ul>
+    <p class="empty" id="empty" hidden>No hay ningún Pokémon que coincida 🤔</p>
+    <p class="error" id="error" hidden>No se han podido cargar todos los Pokémon.<button id="retry">Reintentar</button></p>
+  </main>
+
+  <!-- Plantilla de la tarjeta: no se pinta, la clonamos por cada Pokémon -->
+  <template id="card-template">
+    <li class="card" tabindex="0">
+      <span class="number"></span>
+      <figure><img loading="lazy" decoding="async" width="160" height="160" alt=""></figure>
+      <h2></h2>
+      <div class="badges"></div>
+    </li>
+  </template>
+
+  <dialog id="detail">
+    <div class="detail-hero">
+      <div class="detail-nav">
+        <button data-step="-1" aria-label="Anterior">←</button>
+        <span id="detail-number"></span>
+        <button data-step="1" aria-label="Siguiente">→</button>
+      </div>
+      <img id="detail-image" alt="">
+    </div>
+    <div class="detail-body">
+      <h2 id="detail-name"></h2>
+      <p class="genus" id="detail-genus"></p>
+      <div class="badges" id="detail-types"></div>
+      <p class="description" id="detail-description"></p>
+      <div class="measures">
+        <div><small>Altura</small><strong id="detail-height"></strong></div>
+        <div><small>Peso</small><strong id="detail-weight"></strong></div>
+      </div>
+      <dl class="stats" id="detail-stats"></dl>
+    </div>
+  </dialog>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    const API = 'https://pokeapi.co/api/v2'
+    const TOTAL = 151
+    const BATCH_SIZE = 25
+    const MAX_STAT = 255
+    const TYPES = {
+      normal: { name: 'Normal', color: '#a8a77a' },
+      fire: { name: 'Fuego', color: '#ee8130' },
+      water: { name: 'Agua', color: '#6390f0' },
+      grass: { name: 'Planta', color: '#7ac74c' },
+      electric: { name: 'Eléctrico', color: '#e6bc2f' },
+      ice: { name: 'Hielo', color: '#74cec9' },
+      fighting: { name: 'Lucha', color: '#c22e28' },
+      poison: { name: 'Veneno', color: '#a33ea1' },
+      ground: { name: 'Tierra', color: '#d6b150' },
+      flying: { name: 'Volador', color: '#a98ff3' },
+      psychic: { name: 'Psíquico', color: '#f95587' },
+      bug: { name: 'Bicho', color: '#a6b91a' },
+      rock: { name: 'Roca', color: '#b6a136' },
+      ghost: { name: 'Fantasma', color: '#735797' },
+      dragon: { name: 'Dragón', color: '#6f35fc' },
+      steel: { name: 'Acero', color: '#9a9ab8' },
+      fairy: { name: 'Hada', color: '#d685ad' }
+    }
+    const STAT_NAMES = {
+      hp: 'PS',
+      attack: 'Ataque',
+      defense: 'Defensa',
+      'special-attack': 'At. Esp.',
+      'special-defense': 'Def. Esp.',
+      speed: 'Velocidad'
+    }
+
+    // Algunos nombres de la API no son "bonitos" para mostrar
+    const NAME_FIXES = { 'nidoran-f': 'nidoran ♀', 'nidoran-m': 'nidoran ♂', 'mr-mime': 'mr. mime' }
+
+    const $grid = $('#grid')
+    const $search = $('#search')
+    const $types = $('#types')
+    const $progress = $('#progress')
+    const $dialog = $('#detail')
+    const $template = $('#card-template')
+
+    const pokemons = new Map() // id -> datos simplificados
+    const cards = new Map() // id -> <li> de la tarjeta
+    let activeType = ''
+    let currentId = null
+    let loading = false
+
+    /* ---------- Datos ---------- */
+
+    // Caché en memoria: guardamos la PROMESA de cada URL. Si pedimos dos
+    // veces lo mismo (aunque la primera petición no haya terminado) solo
+    // se hace una petición de red.
+    const cache = new Map()
+
+    function fetchJSON(url) {
+      if (!cache.has(url)) {
+        const promise = fetch(url).then(response => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          return response.json()
+        })
+        // Si falla la quitamos de la caché para poder reintentar
+        promise.catch(() => cache.delete(url))
+        cache.set(url, promise)
+      }
+      return cache.get(url)
+    }
+
+    // La API devuelve MUCHOS datos: nos quedamos solo con lo que usamos
+    async function getPokemon(id) {
+      const data = await fetchJSON(`${API}/pokemon/${id}`)
+      return {
+        id: data.id,
+        name: NAME_FIXES[data.name] ?? data.name,
+        types: data.types.map(({ type }) => type.name),
+        image: data.sprites.other['official-artwork'].front_default,
+        height: data.height / 10, // decímetros -> metros
+        weight: data.weight / 10, // hectogramos -> kilos
+        stats: data.stats.map(({ stat, base_stat: value }) => ({ name: stat.name, value }))
+      }
+    }
+
+    async function getSpecies(id) {
+      const data = await fetchJSON(`${API}/pokemon-species/${id}`)
+      const genus = data.genera.find(item => item.language.name === 'es')?.genus ?? ''
+      const text = data.flavor_text_entries.find(item => item.language.name === 'es')?.flavor_text ?? ''
+      // Los textos vienen con saltos de línea y caracteres de control
+      return { genus, description: text.replace(/[\n\f\r]+/g, ' ') }
+    }
+
+    // ¿En serie o en paralelo?
+    //  - En serie (await dentro de un for) cada petición espera a la anterior:
+    //    151 peticiones x 200ms = ¡30 segundos!
+    //  - En paralelo con Promise.all se lanzan todas a la vez y esperamos
+    //    solo a la más lenta. Pero 151 a la vez saturan la red y la API,
+    //    así que las lanzamos en lotes de BATCH_SIZE y pintamos cada lote
+    //    en cuanto llega.
+    async function loadAll() {
+      if (loading) return
+      loading = true
+      $('#error').hidden = true
+
+      try {
+        for (let start = 1; start <= TOTAL; start += BATCH_SIZE) {
+          const ids = []
+          for (let id = start; id < start + BATCH_SIZE && id <= TOTAL; id++) {
+            if (!pokemons.has(id)) ids.push(id)
+          }
+          if (ids.length === 0) continue
+
+          // Promise.all espera a que TODAS terminen (y falla si falla una)
+          const batch = await Promise.all(ids.map(getPokemon))
+          batch.forEach(pokemon => pokemons.set(pokemon.id, pokemon))
+          renderCards(batch)
+          updateProgress()
+        }
+      } catch {
+        $('#error').hidden = false
+      } finally {
+        loading = false
+        applyFilters()
+      }
+    }
+
+    /* ---------- Render ---------- */
+
+    function createBadges(types) {
+      return types.map(type => {
+        const badge = document.createElement('span')
+        badge.className = 'badge'
+        badge.style.setProperty('--type', TYPES[type]?.color ?? '#999')
+        badge.textContent = TYPES[type]?.name ?? type
+        return badge
+      })
+    }
+
+    const formatNumber = (id) => `#${String(id).padStart(3, '0')}`
+
+    function createCard(pokemon) {
+      // cloneNode(true) copia la plantilla con todos sus hijos
+      const card = $template.content.firstElementChild.cloneNode(true)
+      card.dataset.id = pokemon.id
+      card.style.setProperty('--type', TYPES[pokemon.types[0]]?.color)
+      card.querySelector('.number').textContent = formatNumber(pokemon.id)
+      card.querySelector('h2').textContent = pokemon.name
+      const img = card.querySelector('img')
+      img.src = pokemon.image
+      img.alt = pokemon.name
+      card.querySelector('.badges').append(...createBadges(pokemon.types))
+      return card
+    }
+
+    function renderCards(batch) {
+      const fragment = document.createDocumentFragment()
+      for (const pokemon of batch) {
+        const card = createCard(pokemon)
+        cards.set(pokemon.id, card)
+        fragment.append(card)
+      }
+      // Un único append al DOM por lote (con un DocumentFragment)
+      $grid.append(fragment)
+      applyFilters()
+    }
+
+    function updateProgress() {
+      const percent = (pokemons.size / TOTAL) * 100
+      $progress.firstElementChild.style.width = `${percent}%`
+      if (pokemons.size === TOTAL) $progress.style.opacity = 0
+    }
+
+    function createTypeButtons() {
+      const all = document.createElement('button')
+      all.textContent = 'Todos'
+      all.dataset.type = ''
+      all.setAttribute('aria-pressed', 'true')
+
+      const buttons = Object.entries(TYPES).map(([type, { name, color }]) => {
+        const button = document.createElement('button')
+        button.textContent = name
+        button.dataset.type = type
+        button.style.setProperty('--type', color)
+        button.setAttribute('aria-pressed', 'false')
+        return button
+      })
+      $types.append(all, ...buttons)
+    }
+
+    /* ---------- Filtros ---------- */
+
+    function matches(pokemon, query) {
+      if (activeType && !pokemon.types.includes(activeType)) return false
+      if (!query) return true
+      const number = query.replace('#', '')
+      if (/^\d+$/.test(number)) {
+        return pokemon.id === Number(number) || String(pokemon.id).padStart(3, '0').startsWith(number)
+      }
+      return pokemon.name.includes(query)
+    }
+
+    // No volvemos a crear las tarjetas: solo las mostramos u ocultamos
+    function applyFilters() {
+      const query = $search.value.trim().toLowerCase()
+      let visible = 0
+      for (const [id, card] of cards) {
+        const show = matches(pokemons.get(id), query)
+        card.hidden = !show
+        if (show) visible++
+      }
+      $('#empty').hidden = visible > 0 || loading
+    }
+
+    $search.addEventListener('input', applyFilters)
+
+    $types.addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      activeType = button.dataset.type
+      $types.querySelectorAll('button').forEach(item => {
+        item.setAttribute('aria-pressed', item === button)
+      })
+      applyFilters()
+    })
+
+    /* ---------- Detalle ---------- */
+
+    async function openDetail(id) {
+      const pokemon = pokemons.get(id)
+      if (!pokemon) return
+      currentId = id
+      const color = TYPES[pokemon.types[0]]?.color
+
+      $dialog.style.setProperty('--type', color)
+      $('#detail-number').textContent = formatNumber(id)
+      $('#detail-image').src = pokemon.image
+      $('#detail-image').alt = pokemon.name
+      $('#detail-name').textContent = pokemon.name
+      $('#detail-types').replaceChildren(...createBadges(pokemon.types))
+      $('#detail-height').textContent = `${pokemon.height.toLocaleString('es')} m`
+      $('#detail-weight').textContent = `${pokemon.weight.toLocaleString('es')} kg`
+
+      const rows = pokemon.stats.flatMap(({ name, value }) => {
+        const label = document.createElement('dt')
+        label.textContent = STAT_NAMES[name] ?? name
+        const amount = document.createElement('dd')
+        amount.textContent = value
+        const bar = document.createElement('div')
+        bar.className = 'bar'
+        bar.innerHTML = `<i style="--value: ${(value / MAX_STAT) * 100}%"></i>`
+        return [label, amount, bar]
+      })
+      $('#detail-stats').replaceChildren(...rows)
+
+      if (!$dialog.open) $dialog.showModal()
+
+      // La descripción viene de otro endpoint: la pedimos al abrir
+      // (y gracias a la caché, la segunda vez es instantánea)
+      $('#detail-genus').textContent = ' '
+      $('#detail-description').textContent = 'Cargando descripción…'
+      try {
+        const { genus, description } = await getSpecies(id)
+        if (currentId !== id) return // el usuario ya ha cambiado de Pokémon
+        $('#detail-genus').textContent = genus
+        $('#detail-description').textContent = description
+      } catch {
+        if (currentId === id) $('#detail-description').textContent = 'No se ha podido cargar la descripción.'
+      }
+    }
+
+    function step(delta) {
+      const next = ((currentId - 1 + delta + TOTAL) % TOTAL) + 1
+      if (pokemons.has(next)) openDetail(next)
+    }
+
+    $grid.addEventListener('click', (event) => {
+      const card = event.target.closest('.card')
+      if (card) openDetail(Number(card.dataset.id))
+    })
+
+    $grid.addEventListener('keydown', (event) => {
+      const card = event.target.closest('.card')
+      if (card && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault()
+        openDetail(Number(card.dataset.id))
+      }
+    })
+
+    $dialog.addEventListener('click', (event) => {
+      // Si el clic es sobre el propio <dialog> (no su contenido) es el fondo
+      if (event.target === $dialog) $dialog.close()
+      const button = event.target.closest('[data-step]')
+      if (button) step(Number(button.dataset.step))
+    })
+
+    $dialog.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') step(-1)
+      if (event.key === 'ArrowRight') step(1)
+    })
+
+    $('#retry').addEventListener('click', loadAll)
+
+    createTypeButtons()
+    loadAll()
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>41 - Simón dice</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0d0d14;
+      --text: #f3f3f7;
+      --muted: #8d8da3;
+      --board: min(78vmin, 560px);
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100dvh;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 45%, #1e1e33 0, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .hud {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .best {
+      color: var(--muted);
+    }
+
+    .best strong {
+      color: var(--text);
+      font-size: 18px;
+    }
+
+    .strict {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid #2c2c44;
+      border-radius: 99px;
+      background: #15151f;
+      cursor: pointer;
+    }
+
+    .strict input {
+      accent-color: #ff4d4d;
+    }
+
+    .title {
+      position: fixed;
+      top: 18px;
+      left: 24px;
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 1px;
+    }
+
+    .help {
+      position: fixed;
+      top: 52px;
+      left: 24px;
+      margin: 0;
+      max-width: 300px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    kbd {
+      display: inline-block;
+      min-width: 20px;
+      padding: 0 5px;
+      border: 1px solid #3a3a55;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 11px;
+      text-align: center;
+      color: var(--text);
+    }
+
+    .board {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: calc(var(--board) * .035);
+      width: var(--board);
+      height: var(--board);
+      padding: calc(var(--board) * .035);
+      border-radius: 50%;
+      background: #050508;
+      box-shadow: 0 0 0 6px #1b1b29, 0 40px 100px rgb(0 0 0 / .6);
+    }
+
+    .board.shake {
+      animation: shake .4s;
+    }
+
+    .pad {
+      position: relative;
+      border: 0;
+      background: var(--color);
+      filter: brightness(.55) saturate(.9);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: filter .08s, box-shadow .08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .pad span {
+      position: absolute;
+      font-size: calc(var(--board) * .035);
+      font-weight: 800;
+      color: rgb(255 255 255 / .75);
+    }
+
+    .pad.lit {
+      filter: brightness(1.25) saturate(1.2);
+      box-shadow: 0 0 calc(var(--board) * .12) var(--color);
+      z-index: 1;
+    }
+
+    .green {
+      --color: #19c26b;
+      border-top-left-radius: 100%;
+    }
+
+    .red {
+      --color: #ff3b47;
+      border-top-right-radius: 100%;
+    }
+
+    .yellow {
+      --color: #ffd12e;
+      border-bottom-left-radius: 100%;
+    }
+
+    .blue {
+      --color: #2f8bff;
+      border-bottom-right-radius: 100%;
+    }
+
+    .green span {
+      left: 32%;
+      top: 32%;
+    }
+
+    .red span {
+      right: 32%;
+      top: 32%;
+    }
+
+    .yellow span {
+      left: 32%;
+      bottom: 32%;
+    }
+
+    .blue span {
+      right: 32%;
+      bottom: 32%;
+    }
+
+    /* Modo "demo": los botones se iluminan en círculo mientras no se juega */
+    .board.idle .pad {
+      animation: attract 2.4s infinite;
+    }
+
+    .board.idle .red {
+      animation-delay: .6s;
+    }
+
+    .board.idle .blue {
+      animation-delay: 1.2s;
+    }
+
+    .board.idle .yellow {
+      animation-delay: 1.8s;
+    }
+
+    .center {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      translate: -50% -50%;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 6px;
+      width: 42%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 30%, #2a2a3d, #111118);
+      box-shadow: 0 0 0 calc(var(--board) * .03) #050508;
+      z-index: 2;
+      text-align: center;
+    }
+
+    .center h2 {
+      margin: 0;
+      font-size: calc(var(--board) * .05);
+      letter-spacing: 3px;
+    }
+
+    .level {
+      font-size: calc(var(--board) * .085);
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status {
+      min-height: 1.2em;
+      margin: 0;
+      padding: 0 10%;
+      color: var(--muted);
+      font-size: calc(var(--board) * .026);
+    }
+
+    .start {
+      margin-top: 4px;
+      padding: .6em 1.4em;
+      border: 0;
+      border-radius: 99px;
+      background: #fff;
+      color: #111;
+      font: inherit;
+      font-size: calc(var(--board) * .028);
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .start:hover {
+      background: #ffd12e;
+    }
+
+    @keyframes attract {
+
+      0%,
+      20%,
+      100% {
+        filter: brightness(.55) saturate(.9);
+      }
+
+      8% {
+        filter: brightness(1.15) saturate(1.1);
+      }
+    }
+
+    @keyframes shake {
+
+      25%,
+      75% {
+        translate: -8px 0;
+      }
+
+      50% {
+        translate: 8px 0;
+      }
+    }
+
+    @media (width < 700px) {
+      :root {
+        --board: min(92vw, 70dvh);
+      }
+
+      .help {
+        display: none;
+      }
+
+      .hud {
+        top: auto;
+        bottom: 20px;
+        right: 50%;
+        translate: 50% 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1 class="title">🎵 Simón dice</h1>
+  <p class="help">
+    Repite la secuencia de colores. Cada ronda añade un paso más y va más rápido.
+    Juega con el ratón, el dedo o las teclas <kbd>Q</kbd> <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd>.
+  </p>
+
+  <div class="hud">
+    <span class="best">Récord <strong id="best">0</strong></span>
+    <label class="strict"><input type="checkbox" id="strict"> Modo estricto</label>
+  </div>
+
+  <main class="board idle" id="board">
+    <button class="pad green" data-color="green" aria-label="Verde"><span>Q</span></button>
+    <button class="pad red" data-color="red" aria-label="Rojo"><span>W</span></button>
+    <button class="pad yellow" data-color="yellow" aria-label="Amarillo"><span>A</span></button>
+    <button class="pad blue" data-color="blue" aria-label="Azul"><span>S</span></button>
+
+    <div class="center">
+      <h2>SIMÓN</h2>
+      <div class="level" id="level">--</div>
+      <p class="status" id="status">¿Tienes buena memoria?</p>
+      <button class="start" id="start">Empezar</button>
+    </div>
+  </main>
+
+  <script type="module">
+    const COLORS = ['green', 'red', 'yellow', 'blue']
+
+    // Frecuencias del Simon original de 1978 (en hercios)
+    const FREQUENCIES = {
+      green: 391.995, // Sol 4
+      red: 329.628, // Mi 4
+      yellow: 261.626, // Do 4
+      blue: 195.998 // Sol 3
+    }
+    const ERROR_FREQUENCY = 90
+
+    const KEYS = { q: 'green', w: 'red', a: 'yellow', s: 'blue' }
+    const BEST_KEY = 'simon-says-best'
+    const PLAYER_FLASH = 220
+
+    const $board = document.querySelector('#board')
+    const $level = document.querySelector('#level')
+    const $status = document.querySelector('#status')
+    const $start = document.querySelector('#start')
+    const $best = document.querySelector('#best')
+    const $strict = document.querySelector('#strict')
+
+    let sequence = []
+    let inputIndex = 0
+    let acceptingInput = false
+    let runId = 0 // identifica la partida actual para poder "cancelar" esperas
+    let best = readBest()
+    let audioContext = null
+
+    // ---------- UTILIDADES ASÍNCRONAS ----------
+    // sleep devuelve una promesa que se resuelve tras "ms" milisegundos.
+    // Con await podemos escribir código con pausas de arriba a abajo, como
+    // si fuera síncrono, en lugar de anidar setTimeout dentro de setTimeout
+    // (el temido "callback hell") y calcular a mano los retrasos acumulados
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+    // ---------- SONIDO CON WEB AUDIO ----------
+    function getAudioContext() {
+      // Los navegadores solo permiten crear/activar audio tras un gesto del
+      // usuario (clic, tecla...). Por eso lo creamos la primera vez que se juega
+      audioContext ??= new AudioContext()
+      if (audioContext.state === 'suspended') audioContext.resume()
+      return audioContext
+    }
+
+    function playTone(frequency, duration, type = 'triangle') {
+      const context = getAudioContext()
+      const now = context.currentTime
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+
+      oscillator.type = type
+      oscillator.frequency.value = frequency
+
+      // Envolvente: subimos y bajamos el volumen suavemente. Si cortáramos
+      // el sonido de golpe se oiría un "clic" desagradable
+      gain.gain.setValueAtTime(0, now)
+      gain.gain.linearRampToValueAtTime(0.3, now + 0.02)
+      gain.gain.setValueAtTime(0.3, now + duration / 1000 - 0.05)
+      gain.gain.linearRampToValueAtTime(0, now + duration / 1000)
+
+      // oscilador -> volumen -> altavoces
+      oscillator.connect(gain).connect(context.destination)
+      oscillator.start(now)
+      oscillator.stop(now + duration / 1000 + 0.05)
+    }
+
+    // ---------- LUCES ----------
+    function getPad(color) {
+      return $board.querySelector(`[data-color="${color}"]`)
+    }
+
+    async function flash(color, duration) {
+      const $pad = getPad(color)
+      $pad.classList.add('lit')
+      playTone(FREQUENCIES[color], duration)
+      await sleep(duration)
+      $pad.classList.remove('lit')
+    }
+
+    // Velocidad creciente, como el original: más rápido tras las rondas 5, 9 y 13
+    function getTempo(level) {
+      if (level >= 13) return { on: 200, off: 60 }
+      if (level >= 9) return { on: 280, off: 80 }
+      if (level >= 5) return { on: 360, off: 110 }
+      return { on: 460, off: 140 }
+    }
+
+    // ---------- LÓGICA DEL JUEGO ----------
+    async function playSequence() {
+      const currentRun = runId
+      acceptingInput = false // bloqueamos la entrada mientras suena la secuencia
+      setStatus('Mira y escucha…')
+      await sleep(700)
+
+      const { on, off } = getTempo(sequence.length)
+      for (const color of sequence) {
+        // Si mientras esperábamos se reinició la partida, abandonamos este bucle
+        if (currentRun !== runId) return
+        await flash(color, on)
+        await sleep(off)
+      }
+
+      if (currentRun !== runId) return
+      inputIndex = 0
+      acceptingInput = true
+      setStatus('¡Tu turno!')
+    }
+
+    function nextRound() {
+      sequence.push(COLORS[Math.floor(Math.random() * COLORS.length)])
+      $level.textContent = sequence.length
+      playSequence()
+    }
+
+    function startGame() {
+      getAudioContext()
+      runId++
+      sequence = []
+      $board.classList.remove('idle')
+      $start.textContent = 'Reiniciar'
+      nextRound()
+    }
+
+    async function handleInput(color) {
+      if (!acceptingInput) return
+      const currentRun = runId
+      flash(color, PLAYER_FLASH)
+
+      if (color !== sequence[inputIndex]) {
+        await fail(currentRun)
+        return
+      }
+
+      inputIndex++
+      if (inputIndex < sequence.length) return
+
+      // Secuencia completa
+      acceptingInput = false
+      const score = sequence.length
+      if (score > best) {
+        best = score
+        saveBest(best)
+        setStatus(`¡Nuevo récord! 🏆`)
+      } else {
+        setStatus('¡Bien! 🎉')
+      }
+      await sleep(800)
+      if (currentRun === runId) nextRound()
+    }
+
+    async function fail(currentRun) {
+      acceptingInput = false
+      playTone(ERROR_FREQUENCY, 600, 'sawtooth')
+      $board.classList.remove('shake')
+      void $board.offsetWidth // reinicia la animación de sacudida
+      $board.classList.add('shake')
+
+      if ($strict.checked) {
+        // Modo estricto: un fallo y se acaba la partida
+        setStatus(`¡Fallaste! Llegaste a ${sequence.length - 1} 😵`)
+        runId++
+        $board.classList.add('idle')
+        $start.textContent = 'Otra vez'
+        return
+      }
+
+      // Modo normal: repetimos la misma secuencia
+      setStatus('¡Ups! Te la repito')
+      await sleep(1200)
+      if (currentRun === runId) playSequence()
+    }
+
+    function setStatus(text) {
+      $status.textContent = text
+    }
+
+    function readBest() {
+      try {
+        return Number(localStorage.getItem(BEST_KEY)) || 0
+      } catch {
+        return 0
+      }
+    }
+
+    function saveBest(value) {
+      $best.textContent = value
+      try {
+        localStorage.setItem(BEST_KEY, value)
+      } catch {}
+    }
+
+    // ---------- EVENTOS ----------
+    $board.addEventListener('pointerdown', (event) => {
+      const $pad = event.target.closest('.pad')
+      if (!$pad) return
+      event.preventDefault()
+      handleInput($pad.dataset.color)
+    })
+
+    window.addEventListener('keydown', (event) => {
+      if (event.repeat || event.ctrlKey || event.metaKey) return
+      const color = KEYS[event.key.toLowerCase()]
+      if (color) handleInput(color)
+      else if (event.key === 'Enter' && $board.classList.contains('idle') && document.activeElement !== $start) startGame()
+    })
+
+    $start.addEventListener('click', () => {
+      // Quitamos el foco para que Enter o Espacio no reinicien la partida sin querer
+      $start.blur()
+      startGame()
+    })
+
+    $best.textContent = best
+  </script>
+</body>
+
+</html>

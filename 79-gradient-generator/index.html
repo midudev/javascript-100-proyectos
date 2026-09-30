@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>79 - Generador de degradados</title>
+  <style>
+    :root {
+      --bg: #f4f4f7;
+      --surface: #ffffff;
+      --border: #e4e4ec;
+      --text: #1c1c28;
+      --muted: #6e6e82;
+      --accent: #4f46e5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 20px;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* --- Vista previa ---
+       El degradado se construye en CSS a partir de custom properties.
+       Desde JS solo cambiamos sus valores con style.setProperty(). */
+    .preview {
+      --angle: 120deg;
+      --position: 50% 50%;
+      --shape: circle;
+      --stops: #4f46e5 0%, #ec4899 50%, #f59e0b 100%;
+      position: relative;
+      border-radius: 28px;
+      box-shadow: 0 30px 60px -30px #1c1c2866, inset 0 0 0 1px #0000000d;
+      background-color: #ddd;
+    }
+
+    .preview[data-type="linear"] {
+      background-image: linear-gradient(var(--angle) var(--interpolation,), var(--stops));
+    }
+
+    .preview[data-type="radial"] {
+      background-image: radial-gradient(var(--shape) at var(--position) var(--interpolation,), var(--stops));
+    }
+
+    .preview[data-type="conic"] {
+      background-image: conic-gradient(from var(--angle) at var(--position) var(--interpolation,), var(--stops));
+    }
+
+    .preview-tools {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .chip {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #ffffffcc;
+      backdrop-filter: blur(8px);
+      font-size: .8rem;
+      font-weight: 600;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+
+    .glass {
+      border: 0;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #ffffffd9;
+      backdrop-filter: blur(8px);
+      font: inherit;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .glass:hover {
+      background: #fff;
+    }
+
+    /* --- Panel de controles --- */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+
+    .segmented button {
+      border: 0;
+      padding: 8px;
+      border-radius: 9px;
+      background: none;
+      font: inherit;
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px #0000001f;
+    }
+
+    /* Dial circular para el ángulo */
+    .dial {
+      --angle: 120deg;
+      position: relative;
+      flex: none;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .dial:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .dial::after {
+      content: '';
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 8px;
+      height: 8px;
+      translate: -50% -50%;
+      border-radius: 50%;
+      background: var(--text);
+    }
+
+    .dial-hand {
+      position: absolute;
+      left: calc(50% - 2px);
+      bottom: 50%;
+      width: 4px;
+      height: 34px;
+      border-radius: 4px;
+      background: var(--accent);
+      transform-origin: 50% 100%;
+      rotate: var(--angle);
+    }
+
+    .dial-hand::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: -5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px var(--surface);
+    }
+
+    .number {
+      width: 72px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font: inherit;
+    }
+
+    select {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font: inherit;
+    }
+
+    .positions {
+      display: grid;
+      grid-template-columns: repeat(3, 26px);
+      gap: 4px;
+    }
+
+    .positions button {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+    }
+
+    .positions button[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Barra de paradas */
+    .stops-bar {
+      position: relative;
+      height: 30px;
+      margin: 6px 8px 16px;
+      border-radius: 8px;
+      box-shadow: inset 0 0 0 1px #0000001a;
+      cursor: copy;
+      touch-action: none;
+    }
+
+    .marker {
+      position: absolute;
+      top: 100%;
+      width: 18px;
+      height: 18px;
+      translate: -50% -4px;
+      border-radius: 50% 50% 50% 0;
+      rotate: -45deg;
+      background: var(--color);
+      border: 3px solid white;
+      box-shadow: 0 1px 4px #0005;
+      cursor: grab;
+    }
+
+    .marker.is-selected {
+      box-shadow: 0 0 0 2px var(--accent), 0 1px 4px #0005;
+    }
+
+    .stops {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .stop {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) 70px 34px;
+      gap: 8px;
+      align-items: center;
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+    }
+
+    .stop.is-selected {
+      border-color: var(--border);
+      background: var(--bg);
+    }
+
+    .stop input[type="color"] {
+      width: 38px;
+      height: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 9px;
+      background: none;
+      cursor: pointer;
+    }
+
+    .stop input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .stop input[type="color"]::-webkit-color-swatch {
+      border: 1px solid #0000001a;
+      border-radius: 9px;
+    }
+
+    .stop code {
+      font-size: .85rem;
+    }
+
+    .stop .number {
+      width: 100%;
+    }
+
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    .icon-button:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .add-stop {
+      margin-top: 8px;
+      width: 100%;
+      padding: 9px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: none;
+      font: inherit;
+      font-size: .88rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .presets button {
+      aspect-ratio: 1.6;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px #0000001a;
+      transition: transform .15s;
+    }
+
+    .presets button:hover {
+      transform: scale(1.06);
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      border-radius: 14px;
+      background: #1c1c28;
+      color: #e8e8f0;
+      font-size: .78rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .code-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .button {
+      padding: 10px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font: inherit;
+      font-weight: 600;
+      font-size: .88rem;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      border-color: transparent;
+      background: var(--text);
+      color: white;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        height: auto;
+        min-height: 100dvh;
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .preview {
+        height: 46dvh;
+      }
+
+      .panel {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="preview" id="preview" data-type="linear" aria-label="Vista previa del degradado">
+    <span class="chip" id="chip">linear · 120°</span>
+    <div class="preview-tools">
+      <button class="glass" id="random">🎲 Aleatorio</button>
+    </div>
+  </main>
+
+  <aside class="panel">
+    <h1>🎨 Generador de degradados</h1>
+
+    <section>
+      <h2>CSS</h2>
+      <pre id="code"></pre>
+      <div class="code-actions">
+        <button class="button primary" id="copy">Copiar CSS</button>
+        <button class="button" id="share">🔗 Copiar enlace</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tipo</h2>
+      <div class="segmented" id="types">
+        <button data-type="linear">Lineal</button>
+        <button data-type="radial">Radial</button>
+        <button data-type="conic">Cónico</button>
+      </div>
+    </section>
+
+    <section class="row">
+      <div id="angle-group" class="row">
+        <div class="dial" id="dial" role="slider" tabindex="0" aria-label="Ángulo" aria-valuemin="0"
+          aria-valuemax="359" aria-valuenow="120">
+          <div class="dial-hand"></div>
+        </div>
+        <div>
+          <h2>Ángulo</h2>
+          <input class="number" id="angle" type="number" min="0" max="359" value="120" aria-label="Ángulo en grados">
+        </div>
+      </div>
+
+      <div id="shape-group" hidden>
+        <h2>Forma</h2>
+        <div class="segmented" id="shapes">
+          <button data-shape="circle">Círculo</button>
+          <button data-shape="ellipse">Elipse</button>
+        </div>
+      </div>
+
+      <div id="position-group" hidden>
+        <h2>Centro</h2>
+        <div class="positions" id="positions"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Interpolación</h2>
+      <select id="interpolation">
+        <option value="">sRGB (por defecto)</option>
+        <option value="oklab">OKLab</option>
+        <option value="oklch">OKLCH (colores más vivos)</option>
+        <option value="oklch longer hue">OKLCH · arcoíris (longer hue)</option>
+        <option value="hsl">HSL</option>
+      </select>
+    </section>
+
+    <section>
+      <h2>Paradas de color</h2>
+      <div class="stops-bar" id="stops-bar" title="Haz clic para añadir una parada, arrastra para moverla"></div>
+      <ul class="stops" id="stops"></ul>
+      <button class="add-stop" id="add-stop">＋ Añadir parada</button>
+    </section>
+
+    <section>
+      <h2>Presets</h2>
+      <div class="presets" id="presets"></div>
+    </section>
+
+  </aside>
+
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector)
+
+    // CONSTANTES
+    const TYPES = ['linear', 'radial', 'conic']
+    const SHAPES = ['circle', 'ellipse']
+    const INTERPOLATIONS = ['', 'oklab', 'oklch', 'oklch longer hue', 'hsl']
+    const POSITIONS = [0, 50, 100].flatMap((y) => [0, 50, 100].map((x) => `${x}% ${y}%`))
+    const HEX_REGEX = /^#?[0-9a-f]{6}$/i
+    const MAX_STOPS = 8
+
+    const PRESETS = [
+      { type: 'linear', angle: 120, interpolation: 'oklch', stops: [['#4f46e5', 0], ['#ec4899', 50], ['#f59e0b', 100]] },
+      { type: 'linear', angle: 135, interpolation: '', stops: [['#0ea5e9', 0], ['#22d3ee', 45], ['#a7f3d0', 100]] },
+      { type: 'radial', shape: 'circle', position: '50% 0%', interpolation: 'oklab', stops: [['#fde68a', 0], ['#f97316', 45], ['#7c2d12', 100]] },
+      { type: 'conic', angle: 0, position: '50% 50%', interpolation: 'oklch longer hue', stops: [['#ef4444', 0], ['#ef4444', 100]] },
+      { type: 'linear', angle: 180, interpolation: 'oklab', stops: [['#0f172a', 0], ['#312e81', 55], ['#db2777', 100]] },
+      { type: 'radial', shape: 'ellipse', position: '0% 100%', interpolation: 'oklch', stops: [['#a3e635', 0], ['#10b981', 40], ['#0f766e', 100]] },
+      { type: 'linear', angle: 45, interpolation: '', stops: [['#fbc2eb', 0], ['#a6c1ee', 100]] },
+      { type: 'conic', angle: 220, position: '30% 70%', interpolation: 'oklab', stops: [['#111827', 0], ['#6366f1', 25], ['#f472b6', 50], ['#111827', 100]] }
+    ]
+
+    // ESTADO
+    let state = presetToState(PRESETS[0])
+    let selectedStopId = state.stops[0].id
+    let nextId = 100
+    let lastWrittenHash = ''
+    let hashTimeout = null
+
+    const preview = $('#preview')
+    const dial = $('#dial')
+
+    // --- Estado ---
+
+    function presetToState({ type, angle = 90, shape = 'circle', position = '50% 50%', interpolation = '', stops }) {
+      return {
+        type,
+        angle,
+        shape,
+        position,
+        interpolation,
+        stops: stops.map(([color, stopPosition], index) => ({ id: index + 1, color, position: stopPosition }))
+      }
+    }
+
+    // CSS exige que las paradas vayan en orden; si no, "recorta" las posiciones
+    const sortedStops = (source = state) => [...source.stops].sort((a, b) => a.position - b.position)
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+    function buildStops(source = state) {
+      return sortedStops(source).map(({ color, position }) => `${color} ${position}%`).join(', ')
+    }
+
+    function buildGradient(source = state) {
+      const { type, angle, shape, position } = source
+      const stops = buildStops(source)
+      const interpolation = source.interpolation ? ` in ${source.interpolation}` : ''
+      if (type === 'linear') return `linear-gradient(${angle}deg${interpolation}, ${stops})`
+      if (type === 'radial') return `radial-gradient(${shape} at ${position}${interpolation}, ${stops})`
+      return `conic-gradient(from ${angle}deg at ${position}${interpolation}, ${stops})`
+    }
+
+    // --- Colores ---
+
+    function hexToRgb(hex) {
+      const value = parseInt(hex.slice(1), 16)
+      return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+    }
+
+    function rgbToHex(rgb) {
+      return `#${rgb.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`
+    }
+
+    function hslToHex(hue, saturation, lightness) {
+      const s = saturation / 100
+      const l = lightness / 100
+      const k = (n) => (n + hue / 30) % 12
+      const a = s * Math.min(l, 1 - l)
+      const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))
+      return rgbToHex([f(0) * 255, f(8) * 255, f(4) * 255])
+    }
+
+    // Color aproximado en una posición del degradado (mezcla RGB entre las dos paradas vecinas)
+    function colorAt(position) {
+      const stops = sortedStops()
+      const after = stops.find((stop) => stop.position >= position) ?? stops.at(-1)
+      const before = [...stops].reverse().find((stop) => stop.position <= position) ?? stops[0]
+      if (before === after) return before.color
+      const t = (position - before.position) / (after.position - before.position)
+      const from = hexToRgb(before.color)
+      const to = hexToRgb(after.color)
+      return rgbToHex(from.map((channel, index) => channel + (to[index] - channel) * t))
+    }
+
+    // --- Render ---
+
+    // Aquí está la clave del proyecto: no reescribimos todo el background,
+    // solo actualizamos las custom properties y el CSS hace el resto
+    function renderPreview() {
+      preview.dataset.type = state.type
+      preview.style.setProperty('--angle', `${state.angle}deg`)
+      preview.style.setProperty('--position', state.position)
+      preview.style.setProperty('--shape', state.shape)
+      preview.style.setProperty('--stops', buildStops())
+      if (state.interpolation) preview.style.setProperty('--interpolation', `in ${state.interpolation}`)
+      else preview.style.removeProperty('--interpolation') // se usa el valor vacío de var(--interpolation,)
+
+      const detail = state.type === 'radial' ? state.shape : `${state.angle}°`
+      $('#chip').textContent = `${state.type} · ${detail}${state.interpolation ? ` · ${state.interpolation}` : ''}`
+    }
+
+    function renderControls() {
+      document.querySelectorAll('#types button').forEach((button) => {
+        button.setAttribute('aria-pressed', button.dataset.type === state.type)
+      })
+      document.querySelectorAll('#shapes button').forEach((button) => {
+        button.setAttribute('aria-pressed', button.dataset.shape === state.shape)
+      })
+      document.querySelectorAll('#positions button').forEach((button) => {
+        button.setAttribute('aria-pressed', button.dataset.position === state.position)
+      })
+
+      $('#angle-group').hidden = state.type === 'radial'
+      $('#shape-group').hidden = state.type !== 'radial'
+      $('#position-group').hidden = state.type === 'linear'
+
+      dial.style.setProperty('--angle', `${state.angle}deg`)
+      dial.setAttribute('aria-valuenow', state.angle)
+      if (document.activeElement !== $('#angle')) $('#angle').value = state.angle
+      $('#interpolation').value = state.interpolation
+    }
+
+    function renderStops() {
+      const bar = $('#stops-bar')
+      const interpolation = state.interpolation ? ` in ${state.interpolation}` : ''
+      bar.style.background = `linear-gradient(90deg${interpolation}, ${buildStops()})`
+
+      bar.replaceChildren(...state.stops.map((stop) => {
+        const marker = document.createElement('span')
+        marker.className = `marker ${stop.id === selectedStopId ? 'is-selected' : ''}`
+        marker.style.left = `${stop.position}%`
+        marker.style.setProperty('--color', stop.color)
+        marker.dataset.id = stop.id
+        return marker
+      }))
+
+      $('#stops').innerHTML = sortedStops().map((stop) => `
+        <li class="stop ${stop.id === selectedStopId ? 'is-selected' : ''}" data-id="${stop.id}">
+          <input type="color" value="${stop.color}" data-field="color" aria-label="Color de la parada">
+          <code>${stop.color}</code>
+          <input class="number" type="number" min="0" max="100" value="${stop.position}" data-field="position" aria-label="Posición en %">
+          <button class="icon-button" data-action="remove" aria-label="Eliminar parada" ${state.stops.length <= 2 ? 'disabled' : ''}>✕</button>
+        </li>
+      `).join('')
+
+      $('#add-stop').disabled = state.stops.length >= MAX_STOPS
+    }
+
+    function renderCode() {
+      const gradient = buildGradient()
+      const fallback = sortedStops()[0].color
+      $('#code').textContent = `background: ${fallback}; /* respaldo */\nbackground: ${gradient};`
+    }
+
+    // Renderizado completo; con light: true no regeneramos la lista de paradas
+    // (así no perdemos el foco del input mientras el usuario escribe)
+    function render({ light = false } = {}) {
+      renderPreview()
+      renderControls()
+      if (light) {
+        const interpolation = state.interpolation ? ` in ${state.interpolation}` : ''
+        $('#stops-bar').style.background = `linear-gradient(90deg${interpolation}, ${buildStops()})`
+        state.stops.forEach((stop) => {
+          const marker = $(`.marker[data-id="${stop.id}"]`)
+          marker.style.left = `${stop.position}%`
+          marker.style.setProperty('--color', stop.color)
+        })
+      } else {
+        renderStops()
+      }
+      renderCode()
+      scheduleHashUpdate()
+    }
+
+    // --- Estado en la URL (location.hash) ---
+
+    // Guardamos el estado en el hash para poder compartir el degradado con un enlace.
+    // Usamos replaceState (no crea entradas en el historial) y con debounce:
+    // mientras arrastras el dial se generan decenas de cambios por segundo
+    // y algunos navegadores limitan las llamadas a la History API.
+    function writeHash() {
+      clearTimeout(hashTimeout)
+      const params = new URLSearchParams({
+        t: state.type,
+        a: state.angle,
+        i: state.interpolation,
+        sh: state.shape,
+        p: state.position.replaceAll('%', '').replace(' ', '_'),
+        s: sortedStops().map(({ color, position }) => `${color.slice(1)}.${position}`).join('_')
+      })
+      lastWrittenHash = `#${params}`
+      history.replaceState(null, '', lastWrittenHash)
+    }
+
+    function scheduleHashUpdate() {
+      clearTimeout(hashTimeout)
+      hashTimeout = setTimeout(writeHash, 250)
+    }
+
+    // Leemos el hash validando cada valor: nunca hay que fiarse de lo que llega por la URL
+    function readHash() {
+      const params = new URLSearchParams(location.hash.slice(1))
+      const stops = (params.get('s') ?? '').split('_')
+        .map((chunk) => chunk.split('.'))
+        .filter(([hex, position]) => HEX_REGEX.test(hex) && position !== undefined && !Number.isNaN(Number(position)))
+        .map(([hex, position], index) => ({ id: index + 1, color: `#${hex.toLowerCase()}`, position: clamp(Math.round(Number(position)), 0, 100) }))
+        .slice(0, MAX_STOPS)
+      if (stops.length < 2) return null
+
+      const [x, y] = (params.get('p') ?? '50_50').split('_').map(Number)
+      const position = `${clamp(x || 0, 0, 100)}% ${clamp(y || 0, 0, 100)}%`
+
+      return {
+        type: TYPES.includes(params.get('t')) ? params.get('t') : 'linear',
+        angle: clamp(Math.round(Number(params.get('a')) || 0), 0, 359),
+        interpolation: INTERPOLATIONS.includes(params.get('i')) ? params.get('i') : '',
+        shape: SHAPES.includes(params.get('sh')) ? params.get('sh') : 'circle',
+        position,
+        stops
+      }
+    }
+
+    function loadState(newState) {
+      state = newState
+      nextId = Math.max(...state.stops.map((stop) => stop.id)) + 1
+      selectedStopId = state.stops[0].id
+      render()
+    }
+
+    window.addEventListener('hashchange', () => {
+      if (location.hash === lastWrittenHash) return
+      const fromHash = readHash()
+      if (fromHash) loadState(fromHash)
+    })
+
+    // --- Dial del ángulo ---
+
+    // Math.atan2(dy, dx) da el ángulo del puntero respecto al centro, medido desde
+    // el eje X (derecha) en radianes. En CSS, 0deg apunta ARRIBA y gira en sentido
+    // horario, así que pasamos a grados y sumamos 90. Como la Y de la pantalla
+    // crece hacia abajo, el sentido horario sale solo.
+    function angleFromPointer(event) {
+      const rect = dial.getBoundingClientRect()
+      const dx = event.clientX - (rect.left + rect.width / 2)
+      const dy = event.clientY - (rect.top + rect.height / 2)
+      let degrees = (Math.atan2(dy, dx) * 180) / Math.PI + 90
+      degrees = (degrees + 360) % 360
+      if (event.shiftKey) degrees = Math.round(degrees / 15) * 15 // Mayús: saltos de 15°
+      return Math.round(degrees) % 360
+    }
+
+    function setAngle(angle) {
+      state.angle = ((Math.round(angle) % 360) + 360) % 360
+      render({ light: true })
+    }
+
+    dial.addEventListener('pointerdown', (event) => {
+      dial.setPointerCapture(event.pointerId)
+      setAngle(angleFromPointer(event))
+    })
+
+    dial.addEventListener('pointermove', (event) => {
+      if (dial.hasPointerCapture(event.pointerId)) setAngle(angleFromPointer(event))
+    })
+
+    dial.addEventListener('keydown', (event) => {
+      const step = event.shiftKey ? 15 : 1
+      if (event.key === 'ArrowRight' || event.key === 'ArrowUp') setAngle(state.angle + step)
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') setAngle(state.angle - step)
+      else return
+      event.preventDefault()
+    })
+
+    $('#angle').addEventListener('input', (event) => {
+      const value = Number(event.target.value)
+      if (!Number.isNaN(value)) setAngle(clamp(value, 0, 359))
+    })
+
+    // --- Paradas ---
+
+    function addStop(position) {
+      if (state.stops.length >= MAX_STOPS) return
+      const stop = { id: nextId++, color: colorAt(position), position: Math.round(position) }
+      state.stops.push(stop)
+      selectedStopId = stop.id
+      render()
+    }
+
+    // Añadir una parada en el hueco más grande entre dos paradas
+    $('#add-stop').addEventListener('click', () => {
+      const stops = sortedStops()
+      let bestGap = -1
+      let bestPosition = 50
+      for (let i = 0; i < stops.length - 1; i++) {
+        const gap = stops[i + 1].position - stops[i].position
+        if (gap > bestGap) {
+          bestGap = gap
+          bestPosition = stops[i].position + gap / 2
+        }
+      }
+      addStop(bestPosition)
+    })
+
+    $('#stops').addEventListener('input', (event) => {
+      const item = event.target.closest('.stop')
+      const stop = state.stops.find(({ id }) => id === Number(item.dataset.id))
+      const { field } = event.target.dataset
+      selectedStopId = stop.id
+
+      if (field === 'color') {
+        stop.color = event.target.value
+        item.querySelector('code').textContent = stop.color
+      } else if (field === 'position') {
+        const value = Number(event.target.value)
+        if (event.target.value === '' || Number.isNaN(value)) return
+        stop.position = clamp(Math.round(value), 0, 100)
+      }
+      render({ light: true })
+    })
+
+    // Al terminar de editar reordenamos la lista
+    $('#stops').addEventListener('change', () => renderStops())
+
+    $('#stops').addEventListener('click', (event) => {
+      const item = event.target.closest('.stop')
+      if (!item) return
+      const id = Number(item.dataset.id)
+      if (event.target.closest('[data-action="remove"]')) {
+        if (state.stops.length <= 2) return
+        state.stops = state.stops.filter((stop) => stop.id !== id)
+        selectedStopId = state.stops[0].id
+        render()
+      } else if (selectedStopId !== id) {
+        selectedStopId = id
+        document.querySelectorAll('.stop, .marker').forEach((element) => {
+          element.classList.toggle('is-selected', Number(element.dataset.id) === id)
+        })
+      }
+    })
+
+    // Barra: clic en un hueco añade una parada; arrastrar un marcador lo mueve
+    const bar = $('#stops-bar')
+    let draggingStop = null
+
+    function positionFromPointer(event) {
+      const rect = bar.getBoundingClientRect()
+      return clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100)
+    }
+
+    bar.addEventListener('pointerdown', (event) => {
+      const marker = event.target.closest('.marker')
+      if (!marker) return addStop(positionFromPointer(event))
+      draggingStop = state.stops.find(({ id }) => id === Number(marker.dataset.id))
+      selectedStopId = draggingStop.id
+      bar.setPointerCapture(event.pointerId)
+      renderStops()
+    })
+
+    bar.addEventListener('pointermove', (event) => {
+      if (!draggingStop) return
+      draggingStop.position = Math.round(positionFromPointer(event))
+      render({ light: true })
+      const input = $(`.stop[data-id="${draggingStop.id}"] [data-field="position"]`)
+      if (input) input.value = draggingStop.position
+    })
+
+    bar.addEventListener('pointerup', () => {
+      if (!draggingStop) return
+      draggingStop = null
+      renderStops()
+    })
+
+    // --- Resto de controles ---
+
+    $('#types').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      state.type = button.dataset.type
+      render()
+    })
+
+    $('#shapes').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      state.shape = button.dataset.shape
+      render()
+    })
+
+    $('#positions').innerHTML = POSITIONS.map((position) => `
+      <button data-position="${position}" aria-label="Centro en ${position}"></button>
+    `).join('')
+
+    $('#positions').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (!button) return
+      state.position = button.dataset.position
+      render()
+    })
+
+    $('#interpolation').addEventListener('change', (event) => {
+      state.interpolation = event.target.value
+      render()
+    })
+
+    $('#presets').innerHTML = PRESETS.map((preset, index) => `
+      <button data-index="${index}" style="background: ${buildGradient(presetToState(preset))}"
+        aria-label="Preset ${index + 1} (${preset.type})"></button>
+    `).join('')
+
+    $('#presets').addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (button) loadState(presetToState(PRESETS[Number(button.dataset.index)]))
+    })
+
+    // Degradado aleatorio con colores armónicos: partimos de un tono y avanzamos
+    function randomGradient() {
+      const count = 2 + Math.floor(Math.random() * 3)
+      const baseHue = Math.random() * 360
+      const hueStep = 30 + Math.random() * 90
+      const stops = Array.from({ length: count }, (_, index) => [
+        hslToHex((baseHue + index * hueStep) % 360, 70 + Math.random() * 25, 50 + Math.random() * 15),
+        Math.round((index / (count - 1)) * 100)
+      ])
+      loadState(presetToState({
+        type: state.type,
+        angle: Math.floor(Math.random() * 360),
+        shape: state.shape,
+        position: state.position,
+        interpolation: state.interpolation,
+        stops
+      }))
+    }
+
+    $('#random').addEventListener('click', randomGradient)
+
+    // Clipboard API: asíncrona y basada en promesas. Puede fallar (permisos,
+    // iframes sin allow="clipboard-write"...), así que siempre con try/catch
+    async function copyText(text, button, label) {
+      try {
+        await navigator.clipboard.writeText(text)
+        button.textContent = '✓ ¡Copiado!'
+      } catch {
+        button.textContent = 'No se pudo copiar'
+        const selection = window.getSelection()
+        selection.selectAllChildren($('#code'))
+      }
+      setTimeout(() => { button.textContent = label }, 1500)
+    }
+
+    $('#copy').addEventListener('click', (event) => copyText($('#code').textContent, event.currentTarget, 'Copiar CSS'))
+    $('#share').addEventListener('click', (event) => {
+      writeHash() // nos aseguramos de que la URL tiene el estado más reciente
+      copyText(location.href, event.currentTarget, '🔗 Copiar enlace')
+    })
+
+    // Si el navegador no entiende "in oklch" desactivamos esas opciones
+    const supportsInterpolation = CSS.supports('background-image', 'linear-gradient(in oklch, red, blue)')
+    if (!supportsInterpolation) {
+      document.querySelectorAll('#interpolation option').forEach((option) => {
+        option.disabled = option.value !== ''
+      })
+      state.interpolation = ''
+    }
+
+    const fromHash = readHash()
+    if (fromHash) {
+      if (!supportsInterpolation) fromHash.interpolation = ''
+      loadState(fromHash)
+    } else {
+      render()
+    }
+  </script>
+</body>
+
+</html>

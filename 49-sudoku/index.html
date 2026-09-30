@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>49 - Sudoku</title>
+  <style>
+    :root {
+      --bg: #f5f3ee;
+      --surface: #ffffff;
+      --text: #1e2230;
+      --muted: #6b7080;
+      --line: #d8d4ca;
+      --line-strong: #2b3040;
+      --given: #1e2230;
+      --user: #2f5bd3;
+      --peer: #eef1f8;
+      --same: #d9e2fb;
+      --selected: #b9cbfa;
+      --conflict: #e0364b;
+      --conflict-bg: #fde4e7;
+      --try: #f59e0b;
+      --ok: #16a34a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 80% 0%, #e8eefc, transparent 45%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: auto 280px;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .board-wrapper {
+      display: grid;
+      gap: 12px;
+    }
+
+    .board-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -.5px;
+    }
+
+    .timer {
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
+
+    .board {
+      --size: min(88vw, calc(100dvh - 120px), 560px);
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      width: var(--size);
+      height: var(--size);
+      border: 3px solid var(--line-strong);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: 0 24px 50px -30px rgb(30 40 80 / 45%);
+      user-select: none;
+      outline: none;
+    }
+
+    .cell {
+      position: relative;
+      display: grid;
+      place-content: center;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      font-size: calc(var(--size) / 16);
+      font-weight: 500;
+      color: var(--user);
+      cursor: pointer;
+      transition: background .12s;
+    }
+
+    /* Líneas gruesas que separan las cajas de 3x3 */
+    .cell:nth-child(9n) {
+      border-right: 0;
+    }
+
+    .cell:nth-child(9n + 3),
+    .cell:nth-child(9n + 6) {
+      border-right: 2px solid var(--line-strong);
+    }
+
+    .cell:nth-child(n + 19):nth-child(-n + 27),
+    .cell:nth-child(n + 46):nth-child(-n + 54) {
+      border-bottom: 2px solid var(--line-strong);
+    }
+
+    .cell:nth-child(n + 73) {
+      border-bottom: 0;
+    }
+
+    .cell.given {
+      color: var(--given);
+      font-weight: 700;
+    }
+
+    .cell.peer {
+      background: var(--peer);
+    }
+
+    .cell.same {
+      background: var(--same);
+    }
+
+    .cell.selected {
+      background: var(--selected);
+    }
+
+    .cell.conflict {
+      color: var(--conflict);
+      background: var(--conflict-bg);
+    }
+
+    .cell.hinted {
+      color: var(--ok);
+    }
+
+    .cell.trying {
+      color: var(--try);
+      background: #fff6e0;
+    }
+
+    .cell.backtrack {
+      background: #ffe1e1;
+    }
+
+    .cell.solved {
+      animation: solved .6s ease both;
+      animation-delay: calc(var(--i) * 6ms);
+    }
+
+    @keyframes solved {
+      50% {
+        transform: scale(.85);
+        background: #dcfce7;
+      }
+    }
+
+    .notes {
+      position: absolute;
+      inset: 2px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      font-size: calc(var(--size) / 42);
+      font-weight: 500;
+      color: var(--muted);
+      text-align: center;
+      align-items: center;
+    }
+
+    aside {
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 10px 30px -20px rgb(30 40 80 / 30%);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+
+    select,
+    button {
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    select {
+      flex: 1;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f3f4f8;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      border-color: var(--text);
+      background: var(--text);
+      color: white;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: #000;
+    }
+
+    button[aria-pressed="true"] {
+      border-color: var(--user);
+      background: #e6edff;
+      color: var(--user);
+    }
+
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .numpad button {
+      position: relative;
+      height: 54px;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .numpad button.done {
+      color: var(--muted);
+      opacity: .5;
+    }
+
+    .numpad small {
+      position: absolute;
+      right: 7px;
+      bottom: 4px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .message {
+      min-height: 40px;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .message.success {
+      color: var(--ok);
+      font-weight: 600;
+    }
+
+    .keys {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    kbd {
+      padding: 0 5px;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: white;
+      font-family: inherit;
+    }
+
+    @media (width < 860px) {
+      .app {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .board {
+        --size: min(92vw, 560px);
+      }
+
+      aside {
+        width: min(92vw, 560px);
+      }
+    }
+  </style>
+
+  <script type="module">
+    const SIZE = 9
+    const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    // Cuántas casillas vaciamos según la dificultad
+    const DIFFICULTIES = { facil: 38, medio: 48, dificil: 56 }
+    const MAX_STEPS_PER_FRAME = 2000
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const boardElement = $('#board')
+    const timerElement = $('#timer')
+    const messageElement = $('#message')
+    const difficultySelect = $('#difficulty')
+    const notesButton = $('#notes')
+    const hintButton = $('#hint')
+    const solveButton = $('#solve')
+    const eraseButton = $('#erase')
+    const numpad = $('#numpad')
+
+    // ---------- Utilidades de la rejilla ----------
+
+    const rowOf = (index) => Math.floor(index / SIZE)
+    const colOf = (index) => index % SIZE
+    const boxOf = (index) => Math.floor(rowOf(index) / 3) * 3 + Math.floor(colOf(index) / 3)
+
+    // "Vecinos" de cada casilla: las 20 casillas de su fila, columna y caja.
+    // Los precalculamos una vez porque los usaremos miles de veces
+    const PEERS = Array.from({ length: 81 }, (_, index) => {
+      const peers = []
+      for (let other = 0; other < 81; other++) {
+        if (other === index) continue
+        if (rowOf(other) === rowOf(index) || colOf(other) === colOf(index) || boxOf(other) === boxOf(index)) {
+          peers.push(other)
+        }
+      }
+      return peers
+    })
+
+    function shuffle(array) {
+      // Fisher-Yates: baraja de forma uniforme
+      const copy = [...array]
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[copy[i], copy[j]] = [copy[j], copy[i]]
+      }
+      return copy
+    }
+
+    function getCandidates(board, index) {
+      const used = new Set(PEERS[index].map((peer) => board[peer]))
+      return DIGITS.filter((digit) => !used.has(digit))
+    }
+
+    // Elegimos la casilla vacía con MENOS opciones posibles (heurística MRV):
+    // si solo cabe un número, no hay que probar nada y el árbol de búsqueda se poda muchísimo
+    function findBestEmptyCell(board) {
+      let best = null
+      for (let index = 0; index < 81; index++) {
+        if (board[index] !== 0) continue
+        const candidates = getCandidates(board, index)
+        if (!best || candidates.length < best.candidates.length) {
+          best = { index, candidates }
+          if (candidates.length <= 1) break
+        }
+      }
+      return best
+    }
+
+    // ---------- Backtracking ----------
+
+    // Backtracking = probar, y si nos equivocamos, deshacer y probar otra cosa:
+    //  1. Buscamos una casilla vacía
+    //  2. Probamos a poner un número válido y seguimos resolviendo (recursión)
+    //  3. Si más adelante llegamos a una casilla sin opciones, volvemos atrás,
+    //     borramos el número y probamos el siguiente
+    //  4. Si ningún número funciona, devolvemos false para que la llamada
+    //     anterior también retroceda
+    function solve(board, { random = false } = {}) {
+      const cell = findBestEmptyCell(board)
+      if (!cell) return true // no quedan casillas vacías: ¡resuelto!
+
+      const candidates = random ? shuffle(cell.candidates) : cell.candidates
+      for (const value of candidates) {
+        board[cell.index] = value
+        if (solve(board, { random })) return true
+      }
+
+      board[cell.index] = 0 // deshacemos: este camino no lleva a ninguna solución
+      return false
+    }
+
+    // Igual que solve, pero cuenta soluciones (parando en `limit` para no perder tiempo)
+    function countSolutions(board, limit = 2) {
+      const cell = findBestEmptyCell(board)
+      if (!cell) return 1
+
+      let count = 0
+      for (const value of cell.candidates) {
+        board[cell.index] = value
+        count += countSolutions(board, limit - count)
+        if (count >= limit) break
+      }
+      board[cell.index] = 0
+      return count
+    }
+
+    // ---------- Generador de puzzles ----------
+
+    function generatePuzzle(difficulty) {
+      // 1. Rellenamos un tablero vacío con backtracking ALEATORIO: cada vez sale uno distinto
+      const solution = Array(81).fill(0)
+      solve(solution, { random: true })
+
+      // 2. Quitamos números en orden aleatorio, pero solo si el puzzle sigue
+      //    teniendo UNA única solución (si no, sería injusto para el jugador)
+      const puzzle = [...solution]
+      let removed = 0
+      for (const index of shuffle([...Array(81).keys()])) {
+        if (removed >= DIFFICULTIES[difficulty]) break
+        const backup = puzzle[index]
+        puzzle[index] = 0
+        if (countSolutions([...puzzle]) === 1) removed++
+        else puzzle[index] = backup
+      }
+
+      return { puzzle, solution }
+    }
+
+    // Versión paso a paso para animar. Un generador (function*) se puede pausar
+    // con yield: la animación pide un paso, lo pinta y pide el siguiente.
+    // Recorremos las casillas EN ORDEN (sin MRV) para que se vea bien el retroceso
+    function* solveStepByStep(board) {
+      const index = board.indexOf(0)
+      if (index === -1) return true
+
+      for (const value of getCandidates(board, index)) {
+        board[index] = value
+        yield { index, value, type: 'try' }
+        if (yield* solveStepByStep(board)) return true
+      }
+
+      board[index] = 0
+      yield { index, value: 0, type: 'backtrack' }
+      return false
+    }
+
+    // ---------- Estado del juego ----------
+
+    let puzzle = []
+    let solution = []
+    let board = []
+    let notes = []
+    let selected = 40
+    let isNotesMode = false
+    let isSolving = false
+    let isFinished = false
+    let hintsUsed = 0
+    let startTime = 0
+    let timerInterval = null
+    let solveRun = 0
+
+    const cells = Array.from({ length: 81 }, (_, index) => {
+      const cell = document.createElement('div')
+      cell.className = 'cell'
+      cell.setAttribute('role', 'gridcell')
+      cell.dataset.index = index
+      cell.style.setProperty('--i', index)
+      boardElement.append(cell)
+      return cell
+    })
+
+    function newGame() {
+      isSolving = false
+      solveRun++ // cancela una animación de "Resolver" que esté en marcha
+      cells.forEach((cell) => cell.classList.remove('solved', 'hinted'))
+      const generated = generatePuzzle(difficultySelect.value)
+      puzzle = generated.puzzle
+      solution = generated.solution
+      board = [...puzzle]
+      notes = Array.from({ length: 81 }, () => new Set())
+      isFinished = false
+      hintsUsed = 0
+      setMessage('Selecciona una casilla y escribe un número. <kbd>N</kbd> activa las notas.')
+      startTimer()
+      render()
+    }
+
+    function getConflicts() {
+      const conflicts = new Set()
+      board.forEach((value, index) => {
+        if (value === 0) return
+        if (PEERS[index].some((peer) => board[peer] === value)) conflicts.add(index)
+      })
+      return conflicts
+    }
+
+    // ---------- Pintado ----------
+
+    function render() {
+      const conflicts = getConflicts()
+      const selectedValue = board[selected]
+
+      cells.forEach((cell, index) => {
+        const value = board[index]
+        const isPeer = PEERS[selected].includes(index)
+
+        cell.classList.toggle('given', puzzle[index] !== 0)
+        cell.classList.toggle('selected', index === selected)
+        cell.classList.toggle('peer', isPeer)
+        cell.classList.toggle('same', value !== 0 && value === selectedValue && index !== selected)
+        cell.classList.toggle('conflict', conflicts.has(index))
+        cell.classList.remove('trying', 'backtrack')
+
+        if (value !== 0) {
+          cell.textContent = value
+        } else if (notes[index].size > 0) {
+          cell.innerHTML = `<div class="notes">${DIGITS.map((digit) => `<span>${notes[index].has(digit) ? digit : ''}</span>`).join('')}</div>`
+        } else {
+          cell.textContent = ''
+        }
+      })
+
+      // Cuántas veces queda cada número por colocar
+      numpad.querySelectorAll('button').forEach((button) => {
+        const digit = Number(button.dataset.digit)
+        const placed = board.filter((value, index) => value === digit && !conflicts.has(index)).length
+        const remaining = Math.max(9 - placed, 0)
+        button.querySelector('small').textContent = remaining
+        button.classList.toggle('done', remaining === 0)
+        button.disabled = isSolving || isFinished
+      })
+
+      notesButton.setAttribute('aria-pressed', isNotesMode)
+      notesButton.textContent = isNotesMode ? '✏️ Notas: sí' : '✏️ Notas: no'
+      hintButton.disabled = isSolving || isFinished
+      eraseButton.disabled = isSolving || isFinished
+      notesButton.disabled = isSolving || isFinished
+      solveButton.textContent = isSolving ? '⏩ Terminar' : '🤖 Resolver'
+      solveButton.disabled = isFinished && !isSolving
+    }
+
+    function setMessage(html, isSuccess = false) {
+      messageElement.innerHTML = html
+      messageElement.classList.toggle('success', isSuccess)
+    }
+
+    // ---------- Cronómetro ----------
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000)
+      const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+      const seconds = String(totalSeconds % 60).padStart(2, '0')
+      return `${minutes}:${seconds}`
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval)
+      startTime = Date.now()
+      timerElement.textContent = '00:00'
+      timerInterval = setInterval(() => {
+        timerElement.textContent = formatTime(Date.now() - startTime)
+      }, 250)
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval)
+    }
+
+    // ---------- Acciones del jugador ----------
+
+    function checkFinished() {
+      const isComplete = board.every((value, index) => value === solution[index])
+      if (!isComplete) return
+
+      isFinished = true
+      stopTimer()
+      cells.forEach((cell) => cell.classList.add('solved'))
+      const hintsText = hintsUsed ? ` con ${hintsUsed} pista${hintsUsed > 1 ? 's' : ''}` : ' sin pistas'
+      setMessage(`🎉 ¡Enhorabuena! Sudoku resuelto en ${formatTime(Date.now() - startTime)}${hintsText}.`, true)
+    }
+
+    function placeNumber(digit, { asNote = isNotesMode } = {}) {
+      if (isSolving || isFinished || puzzle[selected] !== 0) return
+
+      if (asNote) {
+        if (board[selected] !== 0) return
+        const cellNotes = notes[selected]
+        cellNotes.has(digit) ? cellNotes.delete(digit) : cellNotes.add(digit)
+      } else {
+        board[selected] = board[selected] === digit ? 0 : digit
+        notes[selected].clear()
+        // Al colocar un número lo quitamos de las notas de sus vecinos
+        if (board[selected] !== 0) PEERS[selected].forEach((peer) => notes[peer].delete(digit))
+        cells[selected].classList.remove('hinted')
+      }
+
+      render()
+      checkFinished()
+    }
+
+    function erase() {
+      if (isSolving || puzzle[selected] !== 0) return
+      board[selected] = 0
+      notes[selected].clear()
+      cells[selected].classList.remove('hinted')
+      render()
+    }
+
+    function giveHint() {
+      if (isSolving || isFinished) return
+      // Si la casilla seleccionada no sirve, buscamos una vacía o incorrecta
+      const isUseful = (index) => puzzle[index] === 0 && board[index] !== solution[index]
+      const target = isUseful(selected)
+        ? selected
+        : shuffle([...Array(81).keys()]).find(isUseful)
+
+      if (target === undefined) return
+      selected = target
+      board[target] = solution[target]
+      notes[target].clear()
+      PEERS[target].forEach((peer) => notes[peer].delete(solution[target]))
+      hintsUsed++
+      render()
+      cells[target].classList.add('hinted')
+      checkFinished()
+    }
+
+    function moveSelection(rowDelta, colDelta) {
+      const row = (rowOf(selected) + rowDelta + SIZE) % SIZE
+      const col = (colOf(selected) + colDelta + SIZE) % SIZE
+      selected = row * SIZE + col
+      render()
+    }
+
+    // ---------- Resolver con animación ----------
+
+    async function animateSolve() {
+      if (isSolving) {
+        // Segundo clic: dejamos de animar y mostramos la solución directamente
+        isSolving = false
+        return
+      }
+
+      isSolving = true
+      const run = ++solveRun
+      stopTimer()
+      // Partimos solo de los números iniciales: lo que haya puesto el jugador podría estar mal
+      board = [...puzzle]
+      notes.forEach((set) => set.clear())
+      render()
+
+      const steps = solveStepByStep(board)
+      let tries = 0
+      let backtracks = 0
+      let speed = 0.5 // pasos por frame (puede ser decimal: se acumula)
+      let budget = 0
+      let frame = 0
+
+      while (isSolving && run === solveRun) {
+        let done = false
+        budget += speed
+        const stepsThisFrame = Math.floor(budget)
+        budget -= stepsThisFrame
+
+        for (let i = 0; i < stepsThisFrame; i++) {
+          const { value: step, done: isDone } = steps.next()
+          if (isDone) {
+            done = true
+            break
+          }
+
+          const cell = cells[step.index]
+          cell.textContent = step.value || ''
+          cell.classList.toggle('trying', step.type === 'try')
+          cell.classList.toggle('backtrack', step.type === 'backtrack')
+          if (step.type === 'try') tries++
+          else backtracks++
+        }
+
+        setMessage(`🤖 Probando números... <strong>${tries}</strong> intentos y <strong>${backtracks}</strong> retrocesos.`)
+        if (done) break
+
+        // Empezamos despacio para ver el algoritmo y vamos acelerando
+        frame++
+        if (frame % 60 === 0) speed = Math.min(speed * 2, MAX_STEPS_PER_FRAME)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+
+      // Si mientras tanto se ha empezado otra partida, no tocamos nada
+      if (run !== solveRun) return
+
+      // Tanto si termina como si se pulsa "Terminar ya", mostramos la solución final
+      isSolving = false
+      board = [...solution]
+      render()
+      isFinished = true
+      cells.forEach((cell) => cell.classList.add('solved'))
+      setMessage(`🤖 Resuelto por backtracking tras ${tries} intentos y ${backtracks} retrocesos.`, true)
+      render()
+    }
+
+    // ---------- Eventos ----------
+
+    boardElement.addEventListener('pointerdown', (event) => {
+      const cell = event.target.closest('.cell')
+      if (!cell || isSolving) return
+      selected = Number(cell.dataset.index)
+      boardElement.focus()
+      render()
+    })
+
+    numpad.addEventListener('click', (event) => {
+      const button = event.target.closest('button')
+      if (button) placeNumber(Number(button.dataset.digit))
+    })
+
+    document.addEventListener('keydown', (event) => {
+      const isInSelect = event.target instanceof Element && event.target.closest('select')
+      if (isInSelect || event.metaKey || event.ctrlKey || event.altKey) return
+
+      const MOVES = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
+      if (MOVES[event.key]) {
+        event.preventDefault()
+        if (!isSolving) moveSelection(...MOVES[event.key])
+        return
+      }
+
+      // Usamos event.code para que Shift + número funcione en cualquier distribución de teclado
+      const digitMatch = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)
+      if (digitMatch) {
+        placeNumber(Number(digitMatch[1]), { asNote: isNotesMode || event.shiftKey })
+        return
+      }
+
+      if (['Backspace', 'Delete', '0'].includes(event.key)) erase()
+      if (event.key.toLowerCase() === 'n' && !isSolving && !isFinished) {
+        isNotesMode = !isNotesMode
+        render()
+      }
+      if (event.key.toLowerCase() === 'h') giveHint()
+    })
+
+    notesButton.addEventListener('click', () => {
+      isNotesMode = !isNotesMode
+      render()
+    })
+
+    eraseButton.addEventListener('click', erase)
+    hintButton.addEventListener('click', giveHint)
+    solveButton.addEventListener('click', animateSolve)
+    $('#new-game').addEventListener('click', newGame)
+    difficultySelect.addEventListener('change', newGame)
+
+    // Partida de ejemplo: unos cuantos números y notas para que no empiece vacía
+    function addDemoMoves() {
+      const empties = shuffle(board.map((value, index) => (value === 0 ? index : -1)).filter((index) => index !== -1))
+      empties.slice(0, 4).forEach((index) => {
+        board[index] = solution[index]
+      })
+      empties.slice(4, 7).forEach((index) => {
+        getCandidates(board, index).slice(0, 3).forEach((digit) => notes[index].add(digit))
+      })
+      render()
+    }
+
+    newGame()
+    addDemoMoves()
+  </script>
+</head>
+
+<body>
+  <main class="app">
+    <div class="board-wrapper">
+      <div class="board-header">
+        <h1>🧩 Sudoku</h1>
+        <span class="timer" id="timer" aria-label="Tiempo">00:00</span>
+      </div>
+      <div id="board" class="board" role="grid" tabindex="0" aria-label="Tablero de Sudoku"></div>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <div class="row">
+          <select id="difficulty" aria-label="Dificultad">
+            <option value="facil">Fácil</option>
+            <option value="medio" selected>Medio</option>
+            <option value="dificil">Difícil</option>
+          </select>
+          <button id="new-game" class="primary">Nuevo</button>
+        </div>
+
+        <div id="numpad" class="numpad">
+          <button data-digit="1">1<small></small></button>
+          <button data-digit="2">2<small></small></button>
+          <button data-digit="3">3<small></small></button>
+          <button data-digit="4">4<small></small></button>
+          <button data-digit="5">5<small></small></button>
+          <button data-digit="6">6<small></small></button>
+          <button data-digit="7">7<small></small></button>
+          <button data-digit="8">8<small></small></button>
+          <button data-digit="9">9<small></small></button>
+        </div>
+
+        <div class="actions">
+          <button id="notes" aria-pressed="false">✏️ Notas: no</button>
+          <button id="erase">⌫ Borrar</button>
+          <button id="hint">💡 Pista</button>
+          <button id="solve">🤖 Resolver</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p id="message" class="message" aria-live="polite"></p>
+        <p class="keys">
+          <kbd>←↑↓→</kbd> moverse · <kbd>1-9</kbd> número · <kbd>⇧</kbd>+<kbd>1-9</kbd> nota ·
+          <kbd>N</kbd> modo notas · <kbd>⌫</kbd> borrar · <kbd>H</kbd> pista
+        </p>
+      </div>
+    </aside>
+  </main>
+</body>
+
+</html>

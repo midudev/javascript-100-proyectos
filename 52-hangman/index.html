@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>52 - Ahorcado</title>
+  <style>
+    :root {
+      --bg: #fbf6ec;
+      --paper: #fffdf7;
+      --ink: #2a2436;
+      --muted: #7a7285;
+      --border: #e8dfcd;
+      --accent: #e8590c;
+      --green: #2b8a3e;
+      --green-bg: #d3f9d8;
+      --red: #c92a2a;
+      --red-bg: #ffe3e3;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 15% 10%, #fff3d6, transparent 40%),
+        var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .game {
+      display: grid;
+      grid-template-columns: minmax(240px, 360px) minmax(320px, 620px);
+      gap: clamp(16px, 4vw, 48px);
+      align-items: center;
+      width: min(100%, 1060px);
+    }
+
+    .drawing {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--paper);
+      box-shadow: 0 20px 40px -28px rgb(80 50 10 / 40%);
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      stroke: var(--ink);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .gallows {
+      stroke: #8d6e4f;
+      stroke-width: 6;
+    }
+
+    /* Truco del "dibujado a mano": con pathLength="1" la longitud de cada trazo
+       vale 1. Un guion de longitud 1 desplazado 1 (dashoffset) queda fuera de la
+       línea, así que no se ve. Al animar el dashoffset a 0, el trazo se "dibuja" */
+    .part {
+      stroke-dasharray: 1 2;
+      stroke-dashoffset: 1;
+      opacity: 0;
+      transition: stroke-dashoffset .6s ease-out, opacity .1s;
+    }
+
+    .part.visible {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+
+    .face {
+      stroke: var(--red);
+      stroke-width: 3;
+    }
+
+    .panel {
+      display: grid;
+      gap: 18px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 34px);
+      letter-spacing: -.5px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .stat {
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    select,
+    button {
+      height: 38px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--paper);
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    .primary {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: white;
+      font-weight: 600;
+    }
+
+    .primary:hover:not(:disabled) {
+      background: #000;
+    }
+
+    .category {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .category strong {
+      color: var(--accent);
+    }
+
+    .hint {
+      min-height: 22px;
+      margin: 0;
+      font-size: 15px;
+      font-style: italic;
+      color: var(--muted);
+    }
+
+    .word {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 64px;
+    }
+
+    .letter {
+      display: grid;
+      place-content: center;
+      width: clamp(30px, 5vw, 46px);
+      height: clamp(42px, 7vw, 60px);
+      border-bottom: 4px solid var(--ink);
+      font-size: clamp(22px, 4vw, 34px);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .letter.space {
+      border-bottom-color: transparent;
+    }
+
+    .letter.revealed {
+      animation: reveal .35s ease-out;
+    }
+
+    .letter.missed {
+      color: var(--red);
+    }
+
+    @keyframes reveal {
+      from {
+        transform: translateY(-10px) scale(.6);
+        opacity: 0;
+      }
+    }
+
+    .message {
+      min-height: 28px;
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .message.win {
+      color: var(--green);
+    }
+
+    .message.lose {
+      color: var(--red);
+    }
+
+    .keyboard {
+      display: grid;
+      gap: 6px;
+    }
+
+    .keyboard .row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .key {
+      flex: 1;
+      max-width: 50px;
+      height: 48px;
+      padding: 0;
+      font-size: 17px;
+      font-weight: 700;
+      box-shadow: 0 2px 0 var(--border);
+      transition: background .2s, color .2s, transform .1s;
+    }
+
+    .key:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: none;
+    }
+
+    .key.correct {
+      border-color: var(--green);
+      background: var(--green-bg);
+      color: var(--green);
+    }
+
+    .key.wrong {
+      border-color: var(--red-bg);
+      background: var(--red-bg);
+      color: var(--red);
+      text-decoration: line-through;
+    }
+
+    .key:disabled {
+      cursor: default;
+      opacity: .85;
+    }
+
+    .lives {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .shake {
+      animation: shake .35s;
+    }
+
+    @keyframes shake {
+      25% {
+        transform: translateX(-6px);
+      }
+
+      75% {
+        transform: translateX(6px);
+      }
+    }
+
+    @media (width < 760px) {
+      .game {
+        grid-template-columns: 1fr;
+      }
+
+      .drawing {
+        width: min(260px, 70vw);
+        margin: 0 auto;
+      }
+
+      .key {
+        height: 42px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const MAX_ERRORS = 6
+    const STATS_KEY = 'ahorcado:stats'
+    const KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjklñ', 'zxcvbnm']
+
+    const WORDS = {
+      Animales: [
+        ['murciélago', 'Mamífero que vuela de noche guiándose por el eco'],
+        ['pingüino', 'Ave que no vuela pero nada de maravilla'],
+        ['camaleón', 'Reptil que cambia de color'],
+        ['búho', 'Ave nocturna que gira mucho la cabeza'],
+        ['tiburón', 'Pez con varias filas de dientes'],
+        ['cigüeña', 'Ave que, según la leyenda, trae a los bebés']
+      ],
+      Frutas: [
+        ['plátano', 'Amarillo, curvo y lleno de potasio'],
+        ['melocotón', 'Fruta de piel aterciopelada'],
+        ['piña', 'Tiene corona y es tropical'],
+        ['sandía', 'Verde por fuera, roja por dentro'],
+        ['frambuesa', 'Pequeña fruta roja del bosque'],
+        ['limón', 'Ácido y amarillo']
+      ],
+      Países: [
+        ['españa', 'Su capital es Madrid'],
+        ['méxico', 'Tierra de los tacos y los mariachis'],
+        ['japón', 'El país del sol naciente'],
+        ['perú', 'Allí está Machu Picchu'],
+        ['costa rica', 'País centroamericano famoso por su "pura vida"'],
+        ['canadá', 'Su bandera tiene una hoja de arce']
+      ],
+      Programación: [
+        ['función', 'Bloque de código reutilizable'],
+        ['algoritmo', 'Secuencia de pasos para resolver un problema'],
+        ['recursión', 'Cuando algo se llama a sí mismo'],
+        ['depuración', 'Buscar y arreglar bugs'],
+        ['compilador', 'Traduce código fuente a otro lenguaje'],
+        ['petición', 'Lo que haces con fetch a un servidor']
+      ],
+      Deportes: [
+        ['fútbol', 'Once contra once y un balón'],
+        ['baloncesto', 'Se encesta en una canasta'],
+        ['natación', 'Se practica en la piscina'],
+        ['bádminton', 'Con raqueta y volante'],
+        ['esquí', 'Deslizarse por la nieve'],
+        ['balonmano', 'Como el fútbol, pero con las manos']
+      ]
+    }
+
+    const $ = (selector) => document.querySelector(selector)
+
+    const wordElement = $('#word')
+    const keyboardElement = $('#keyboard')
+    const messageElement = $('#message')
+    const hintElement = $('#hint')
+    const hintButton = $('#hint-button')
+    const categoryElement = $('#category')
+    const categorySelect = $('#category-select')
+    const livesElement = $('#lives')
+    const parts = [...document.querySelectorAll('.body-part')]
+    const face = document.querySelectorAll('.face')
+
+    let secret = null // { word, hint, category }
+    let normalizedWord = ''
+    // Un Set guarda valores ÚNICOS y comprobar si contiene algo (has) es inmediato.
+    // Perfecto para las letras usadas: no puede haber repetidas
+    const guessedLetters = new Set()
+    let errors = 0
+    let isOver = false
+    let stats = loadStats()
+
+    // ---------- Normalización ----------
+
+    // Queremos que la "a" acierte la "á" y la "u" la "ü", pero la "ñ" es una
+    // letra propia del español: NO debe coincidir con la "n".
+    // normalize('NFD') separa cada letra de su tilde: "á" -> "a" + "́".
+    // Después quitamos las marcas diacríticas (rango ̀-ͯ)... excepto la
+    // virgulilla (̃) cuando va detrás de una "n". NFC vuelve a juntar "n" + "~" = "ñ"
+    function normalize(text) {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/(?<!n)̃|[̀-̂̄-ͯ]/g, '')
+        .normalize('NFC')
+    }
+
+    const isLetter = (char) => /^[a-zñ]$/.test(char)
+
+    // ---------- Partida ----------
+
+    function pickWord() {
+      const category = categorySelect.value === 'Todas'
+        ? Object.keys(WORDS)[Math.floor(Math.random() * Object.keys(WORDS).length)]
+        : categorySelect.value
+      const list = WORDS[category]
+      let candidate
+      // Evitamos repetir la misma palabra dos veces seguidas
+      do {
+        candidate = list[Math.floor(Math.random() * list.length)]
+      } while (list.length > 1 && candidate[0] === secret?.word)
+
+      const [word, hint] = candidate
+      return { word, hint, category }
+    }
+
+    function newGame() {
+      secret = pickWord()
+      normalizedWord = normalize(secret.word)
+      guessedLetters.clear()
+      errors = 0
+      isOver = false
+
+      categoryElement.innerHTML = `Categoría: <strong>${secret.category}</strong>`
+      hintElement.textContent = ''
+      hintButton.disabled = false
+      messageElement.textContent = ''
+      messageElement.className = 'message'
+      parts.forEach((part) => part.classList.remove('visible'))
+      face.forEach((line) => line.classList.remove('visible'))
+
+      renderWord()
+      renderKeyboard()
+      renderLives()
+    }
+
+    function guess(rawLetter) {
+      const letter = normalize(rawLetter)
+      if (isOver || !isLetter(letter) || guessedLetters.has(letter)) return
+
+      guessedLetters.add(letter)
+
+      if (normalizedWord.includes(letter)) {
+        renderWord(letter)
+      } else {
+        errors++
+        // Cada fallo "dibuja" la siguiente parte del cuerpo
+        parts[errors - 1]?.classList.add('visible')
+        wordElement.classList.remove('shake')
+        void wordElement.offsetWidth // fuerza un reflow para reiniciar la animación
+        wordElement.classList.add('shake')
+        renderLives()
+      }
+
+      renderKeyboard()
+      checkEnd()
+    }
+
+    function checkEnd() {
+      const hasWon = [...normalizedWord].every((char) => !isLetter(char) || guessedLetters.has(char))
+      const hasLost = errors >= MAX_ERRORS
+
+      if (!hasWon && !hasLost) return
+      isOver = true
+      hintButton.disabled = true
+
+      if (hasWon) {
+        stats.wins++
+        stats.streak++
+        messageElement.textContent = `🎉 ¡Has ganado! ${errors === 0 ? 'Sin ningún fallo.' : `Con ${errors} fallo${errors > 1 ? 's' : ''}.`}`
+        messageElement.classList.add('win')
+      } else {
+        stats.losses++
+        stats.streak = 0
+        face.forEach((line) => line.classList.add('visible'))
+        messageElement.textContent = `💀 ¡Ahorcado! La palabra era «${secret.word.toUpperCase()}».`
+        messageElement.classList.add('lose')
+        renderWord(null, true)
+      }
+
+      saveStats()
+      renderStats()
+      renderKeyboard()
+    }
+
+    // ---------- Pintado ----------
+
+    function renderWord(newLetter = null, revealAll = false) {
+      // Recorremos la palabra ORIGINAL (con tildes) pero comparamos con la normalizada
+      const originalChars = [...secret.word]
+      const normalizedChars = [...normalizedWord]
+
+      wordElement.innerHTML = originalChars.map((char, index) => {
+        const normalizedChar = normalizedChars[index]
+        if (!isLetter(normalizedChar)) return '<span class="letter space"></span>'
+
+        const isGuessed = guessedLetters.has(normalizedChar)
+        const classes = ['letter']
+        if (isGuessed && normalizedChar === newLetter) classes.push('revealed')
+        if (!isGuessed && revealAll) classes.push('missed')
+
+        return `<span class="${classes.join(' ')}">${isGuessed || revealAll ? char : ''}</span>`
+      }).join('')
+
+      wordElement.setAttribute('aria-label', `Palabra: ${originalChars.map((char, index) => (guessedLetters.has(normalizedChars[index]) ? char : '_')).join(' ')}`)
+    }
+
+    function renderKeyboard() {
+      keyboardElement.querySelectorAll('.key').forEach((key) => {
+        const { letter } = key.dataset
+        const isUsed = guessedLetters.has(letter)
+        key.classList.toggle('correct', isUsed && normalizedWord.includes(letter))
+        key.classList.toggle('wrong', isUsed && !normalizedWord.includes(letter))
+        key.disabled = isUsed || isOver
+      })
+    }
+
+    function renderLives() {
+      const left = MAX_ERRORS - errors
+      livesElement.textContent = `${'❤️'.repeat(left)}${'🤍'.repeat(errors)} · ${left} intento${left === 1 ? '' : 's'}`
+    }
+
+    function renderStats() {
+      $('#wins').textContent = stats.wins
+      $('#losses').textContent = stats.losses
+      $('#streak').textContent = stats.streak
+    }
+
+    function buildKeyboard() {
+      keyboardElement.innerHTML = KEYBOARD_ROWS.map((row) => `
+        <div class="row">
+          ${[...row].map((letter) => `<button class="key" data-letter="${letter}" aria-label="Letra ${letter}">${letter.toUpperCase()}</button>`).join('')}
+        </div>
+      `).join('')
+    }
+
+    // ---------- Estadísticas ----------
+
+    function loadStats() {
+      try {
+        return { wins: 0, losses: 0, streak: 0, ...JSON.parse(localStorage.getItem(STATS_KEY)) }
+      } catch {
+        return { wins: 0, losses: 0, streak: 0 }
+      }
+    }
+
+    function saveStats() {
+      try {
+        localStorage.setItem(STATS_KEY, JSON.stringify(stats))
+      } catch {
+        // Sin localStorage las estadísticas solo duran esta sesión
+      }
+    }
+
+    // ---------- Eventos ----------
+
+    keyboardElement.addEventListener('click', (event) => {
+      const key = event.target.closest('.key')
+      if (key) guess(key.dataset.letter)
+    })
+
+    document.addEventListener('keydown', (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.target instanceof HTMLSelectElement) return
+
+      if (event.key === 'Enter' && isOver) {
+        newGame()
+        return
+      }
+
+      // event.key ya viene con tilde si el usuario la escribe ("á"): guess la normaliza
+      if (event.key.length === 1) guess(event.key)
+    })
+
+    hintButton.addEventListener('click', () => {
+      hintElement.textContent = `💡 ${secret.hint}`
+      hintButton.disabled = true
+    })
+
+    $('#new-game').addEventListener('click', (event) => {
+      newGame()
+      event.currentTarget.blur()
+    })
+
+    categorySelect.innerHTML = ['Todas', ...Object.keys(WORDS)].map((name) => `<option>${name}</option>`).join('')
+    categorySelect.addEventListener('change', () => {
+      newGame()
+      categorySelect.blur()
+    })
+
+    buildKeyboard()
+    renderStats()
+    newGame()
+
+    // Partida de ejemplo: unas letras ya jugadas para que el dibujo no empiece vacío
+    const vowelInWord = [...'aeo'].find((vowel) => normalizedWord.includes(vowel))
+    const missingLetter = [...'zxkwq'].find((letter) => !normalizedWord.includes(letter))
+    ;[vowelInWord, missingLetter].filter(Boolean).forEach(guess)
+  </script>
+</head>
+
+<body>
+  <main class="game">
+    <div class="drawing">
+      <svg viewBox="0 0 220 260" role="img" aria-label="Dibujo del ahorcado">
+        <!-- Horca: siempre visible -->
+        <g class="gallows">
+          <line x1="20" y1="240" x2="140" y2="240" />
+          <line x1="55" y1="240" x2="55" y2="20" />
+          <line x1="55" y1="20" x2="150" y2="20" />
+          <line x1="55" y1="55" x2="90" y2="20" />
+          <line x1="150" y1="20" x2="150" y2="48" />
+        </g>
+        <!-- Partes del cuerpo en el orden en que aparecen -->
+        <circle class="part body-part" cx="150" cy="70" r="22" pathLength="1" />
+        <line class="part body-part" x1="150" y1="92" x2="150" y2="160" pathLength="1" />
+        <line class="part body-part" x1="150" y1="108" x2="122" y2="138" pathLength="1" />
+        <line class="part body-part" x1="150" y1="108" x2="178" y2="138" pathLength="1" />
+        <line class="part body-part" x1="150" y1="160" x2="128" y2="205" pathLength="1" />
+        <line class="part body-part" x1="150" y1="160" x2="172" y2="205" pathLength="1" />
+        <!-- Cara de derrota -->
+        <path class="part face" d="M139 62 l7 7 m0 -7 l-7 7" pathLength="1" />
+        <path class="part face" d="M154 62 l7 7 m0 -7 l-7 7" pathLength="1" />
+        <path class="part face" d="M140 84 q10 -8 20 0" pathLength="1" />
+      </svg>
+    </div>
+
+    <section class="panel">
+      <header>
+        <h1>🪢 Ahorcado</h1>
+        <div class="stats">
+          <span class="stat">🏆 <span id="wins">0</span></span>
+          <span class="stat">💀 <span id="losses">0</span></span>
+          <span class="stat">🔥 <span id="streak">0</span></span>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <select id="category-select" aria-label="Categoría"></select>
+        <button id="hint-button">💡 Pista</button>
+        <button id="new-game" class="primary">Nueva palabra</button>
+      </div>
+
+      <div>
+        <div id="category" class="category"></div>
+        <p id="hint" class="hint" aria-live="polite"></p>
+      </div>
+
+      <div id="word" class="word" role="status"></div>
+      <div id="lives" class="lives"></div>
+      <p id="message" class="message" aria-live="polite"></p>
+      <div id="keyboard" class="keyboard"></div>
+    </section>
+  </main>
+</body>
+
+</html>

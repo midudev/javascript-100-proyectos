@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>19 - App del tiempo</title>
+  <style>
+    :root {
+      --text: #0f172a;
+      --muted: #64748b;
+      --surface: rgba(255, 255, 255, 0.72);
+      --border: rgba(15, 23, 42, 0.08);
+      --primary: #2563eb;
+      --danger: #dc2626;
+      --sky-1: #e0f2fe;
+      --sky-2: #fef9c3;
+    }
+
+    body[data-sky='sunny'] {
+      --sky-1: #e0f2fe;
+      --sky-2: #fef3c7;
+    }
+
+    body[data-sky='cloudy'] {
+      --sky-1: #e2e8f0;
+      --sky-2: #f1f5f9;
+    }
+
+    body[data-sky='rainy'] {
+      --sky-1: #dbeafe;
+      --sky-2: #e2e8f0;
+    }
+
+    body[data-sky='snowy'] {
+      --sky-1: #f0f9ff;
+      --sky-2: #ffffff;
+    }
+
+    body[data-sky='storm'] {
+      --sky-1: #e0e7ff;
+      --sky-2: #cbd5e1;
+    }
+
+    body[data-sky='night'] {
+      --sky-1: #e0e7ff;
+      --sky-2: #ede9fe;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      align-content: center;
+      background: linear-gradient(160deg, var(--sky-1), var(--sky-2));
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: background 0.6s;
+    }
+
+    main {
+      width: min(100%, 1040px);
+      margin: 0 auto;
+      padding: 20px 16px;
+      display: grid;
+      gap: 16px;
+    }
+
+    /* --- Buscador --- */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .search {
+      flex: 1 1 320px;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+
+    .search input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 10px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      outline: none;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--primary);
+      color: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+
+    .locate {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      backdrop-filter: blur(10px);
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .suggestions:empty {
+      display: none;
+    }
+
+    .suggestions button {
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .error {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: #fee2e2;
+      color: var(--danger);
+      font-weight: 500;
+    }
+
+    .error[hidden] {
+      display: none;
+    }
+
+    /* --- Contenido --- */
+    .content {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 16px;
+      transition: opacity 0.2s;
+    }
+
+    .content[aria-busy='true'] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    .panel {
+      padding: 22px;
+      border-radius: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 50px -25px rgba(15, 23, 42, 0.25);
+      backdrop-filter: blur(12px);
+    }
+
+    .place h2 {
+      margin: 0;
+      font-size: 1.7rem;
+      letter-spacing: -0.02em;
+    }
+
+    .place p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    .now {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .now .emoji {
+      font-size: clamp(4rem, 12vw, 6rem);
+      line-height: 1;
+      filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.15));
+    }
+
+    .now .temperature {
+      font-size: clamp(3.5rem, 10vw, 5rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .now .description {
+      margin-top: 6px;
+      font-size: 1.1rem;
+      color: var(--muted);
+    }
+
+    .details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 0;
+    }
+
+    .details div {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .details dt {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .details dd {
+      margin: 2px 0 0;
+      font-weight: 700;
+    }
+
+    .forecast h3 {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .forecast ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .day {
+      display: grid;
+      grid-template-columns: 5.5em 2em 3em 2.6em 1fr 2.6em;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .day:last-child {
+      border-bottom: 0;
+    }
+
+    .day .name {
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .day .icon {
+      font-size: 1.4rem;
+    }
+
+    .day .rain {
+      font-size: 0.78rem;
+      color: var(--primary);
+    }
+
+    .day .min {
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .day .max {
+      font-weight: 700;
+    }
+
+    .range {
+      position: relative;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.08);
+    }
+
+    .range span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #38bdf8, #facc15, #f97316);
+    }
+
+    .spinner {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .spinner::after {
+      content: '';
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 4px solid rgba(37, 99, 235, 0.2);
+      border-top-color: var(--primary);
+      animation: spin 0.8s linear infinite;
+    }
+
+    .spinner[hidden] {
+      display: none;
+    }
+
+    @keyframes spin {
+      to {
+        rotate: 360deg;
+      }
+    }
+
+    footer {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    footer a {
+      color: inherit;
+    }
+
+    @media (max-width: 760px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <script type="module">
+    const $form = document.querySelector('.search')
+    const $input = $form.querySelector('input')
+    const $searchButton = $form.querySelector('button')
+    const $locate = document.querySelector('.locate')
+    const $suggestions = document.querySelector('.suggestions')
+    const $error = document.querySelector('.error')
+    const $errorText = $error.querySelector('span')
+    const $content = document.querySelector('.content')
+    const $spinner = document.querySelector('.spinner')
+    const $placeName = document.querySelector('#place-name')
+    const $placeRegion = document.querySelector('#place-region')
+    const $emoji = document.querySelector('.now .emoji')
+    const $temperature = document.querySelector('.now .temperature')
+    const $description = document.querySelector('.now .description')
+    const $details = document.querySelector('.details')
+    const $days = document.querySelector('.forecast ol')
+
+    // CONSTANTES
+    const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
+    const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search'
+    const LAST_PLACE_KEY = 'weather-last-place'
+
+    const DEFAULT_PLACE = {
+      name: 'Madrid',
+      admin1: 'Comunidad de Madrid',
+      country: 'España',
+      country_code: 'ES',
+      latitude: 40.4165,
+      longitude: -3.70256
+    }
+
+    // Códigos WMO que devuelve Open-Meteo → [emoji de día, descripción, cielo, emoji de noche]
+    const WEATHER_CODES = {
+      0: ['☀️', 'Despejado', 'sunny', '🌙'],
+      1: ['🌤️', 'Mayormente despejado', 'sunny', '🌙'],
+      2: ['⛅', 'Parcialmente nublado', 'cloudy', '☁️'],
+      3: ['☁️', 'Nublado', 'cloudy'],
+      45: ['🌫️', 'Niebla', 'cloudy'],
+      48: ['🌫️', 'Niebla con escarcha', 'cloudy'],
+      51: ['🌦️', 'Llovizna ligera', 'rainy', '🌧️'],
+      53: ['🌦️', 'Llovizna', 'rainy', '🌧️'],
+      55: ['🌧️', 'Llovizna intensa', 'rainy'],
+      56: ['🌧️', 'Llovizna helada', 'rainy'],
+      57: ['🌧️', 'Llovizna helada intensa', 'rainy'],
+      61: ['🌦️', 'Lluvia ligera', 'rainy', '🌧️'],
+      63: ['🌧️', 'Lluvia', 'rainy'],
+      65: ['🌧️', 'Lluvia intensa', 'rainy'],
+      66: ['🌨️', 'Lluvia helada', 'rainy'],
+      67: ['🌨️', 'Lluvia helada intensa', 'rainy'],
+      71: ['🌨️', 'Nevada ligera', 'snowy'],
+      73: ['❄️', 'Nevada', 'snowy'],
+      75: ['❄️', 'Nevada intensa', 'snowy'],
+      77: ['🌨️', 'Granos de nieve', 'snowy'],
+      80: ['🌦️', 'Chubascos ligeros', 'rainy', '🌧️'],
+      81: ['🌧️', 'Chubascos', 'rainy'],
+      82: ['⛈️', 'Chubascos violentos', 'storm'],
+      85: ['🌨️', 'Chubascos de nieve', 'snowy'],
+      86: ['❄️', 'Chubascos de nieve intensos', 'snowy'],
+      95: ['⛈️', 'Tormenta', 'storm'],
+      96: ['⛈️', 'Tormenta con granizo', 'storm'],
+      99: ['⛈️', 'Tormenta con granizo fuerte', 'storm']
+    }
+
+    // Intl.DateTimeFormat formatea fechas según el idioma sin librerías
+    const WEEKDAY_FORMAT = new Intl.DateTimeFormat('es', { weekday: 'long' })
+    const FULL_DATE_FORMAT = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+    const TIME_FORMAT = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' })
+
+    // Cada nueva búsqueda cancela la anterior con un AbortController.
+    // Así evitamos que una respuesta lenta "antigua" pise a una más reciente
+    let controller = null
+
+    function startRequest() {
+      controller?.abort()
+      controller = new AbortController()
+      return controller.signal
+    }
+
+    // FETCH
+    async function fetchJSON(url, signal) {
+      const response = await fetch(url, { signal })
+
+      // fetch solo rechaza la promesa si falla la red. Un 404 o un 500
+      // se consideran "respuestas", así que hay que comprobar response.ok
+      if (!response.ok) throw new Error(`La API respondió con un error ${response.status}`)
+
+      return response.json()
+    }
+
+    async function searchPlaces(name, signal) {
+      const params = new URLSearchParams({ name, count: 6, language: 'es', format: 'json' })
+      const data = await fetchJSON(`${GEOCODING_URL}?${params}`, signal)
+      return data.results ?? [] // si no hay coincidencias, la API no devuelve `results`
+    }
+
+    async function getForecast({ latitude, longitude }, signal) {
+      const params = new URLSearchParams({
+        latitude,
+        longitude,
+        current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,precipitation',
+        daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset',
+        timezone: 'auto', // horas en la zona horaria del lugar consultado
+        forecast_days: 7
+      })
+      return fetchJSON(`${FORECAST_URL}?${params}`, signal)
+    }
+
+    // GEOLOCALIZACIÓN
+    // getCurrentPosition usa callbacks. La envolvemos en una promesa
+    // para poder usar await con ella
+    function getCurrentPosition(options) {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options)
+      })
+    }
+
+    const GEOLOCATION_ERRORS = {
+      1: 'Has denegado el permiso de ubicación. Puedes buscar una ciudad a mano.',
+      2: 'No se ha podido determinar tu ubicación.',
+      3: 'Se agotó el tiempo esperando tu ubicación. Inténtalo de nuevo.'
+    }
+
+    async function useMyLocation() {
+      if (!('geolocation' in navigator)) {
+        showError('Tu navegador no soporta la geolocalización.')
+        return
+      }
+
+      const signal = startRequest()
+      setLoading(true)
+
+      try {
+        const { coords } = await getCurrentPosition({ timeout: 10_000, maximumAge: 600_000 })
+        if (signal.aborted) return // el usuario buscó otra cosa mientras tanto
+
+        await loadWeather({
+          name: 'Tu ubicación',
+          admin1: `${coords.latitude.toFixed(3)}°, ${coords.longitude.toFixed(3)}°`,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        })
+      } catch (error) {
+        if (signal.aborted) return
+        showError(GEOLOCATION_ERRORS[error.code] ?? 'Error al obtener tu ubicación.')
+        setLoading(false)
+      }
+    }
+
+    // FLUJO PRINCIPAL
+    async function loadWeather(place) {
+      const signal = startRequest()
+      setLoading(true)
+      hideError()
+
+      try {
+        const forecast = await getForecast(place, signal)
+        renderWeather(place, forecast)
+        savePlace(place)
+      } catch (error) {
+        if (error.name === 'AbortError') return
+        showError(`No se pudo cargar el tiempo: ${error.message}`, () => loadWeather(place))
+      } finally {
+        if (!signal.aborted) setLoading(false)
+      }
+    }
+
+    async function handleSearch(event) {
+      event.preventDefault()
+      const query = $input.value.trim()
+
+      if (query.length < 2) {
+        showError('Escribe al menos dos letras para buscar.')
+        return
+      }
+
+      const signal = startRequest()
+      setLoading(true)
+      hideError()
+      renderSuggestions([])
+
+      try {
+        const places = await searchPlaces(query, signal)
+
+        if (places.length === 0) {
+          showError(`No hemos encontrado ningún lugar llamado «${query}».`)
+          setLoading(false)
+          return
+        }
+
+        const [first, ...others] = places
+        renderSuggestions(others)
+        await loadWeather(first)
+      } catch (error) {
+        if (error.name === 'AbortError') return
+        showError(`Error al buscar: ${error.message}`)
+        setLoading(false)
+      }
+    }
+
+    // RENDER
+    function getWeatherInfo(code, isDay = true) {
+      const [dayEmoji, description, sky, nightEmoji] = WEATHER_CODES[code] ?? ['🌡️', 'Desconocido', 'cloudy']
+      return {
+        emoji: isDay ? dayEmoji : (nightEmoji ?? dayEmoji),
+        description,
+        sky: isDay ? sky : 'night'
+      }
+    }
+
+    // ¡Cuidado! new Date('2024-05-01') se interpreta como medianoche UTC,
+    // y en América eso cae en el día ANTERIOR. Añadiendo la hora sin zona
+    // ('2024-05-01T00:00') se interpreta como hora local
+    function parseLocalDate(isoDate) {
+      return new Date(isoDate.length === 10 ? `${isoDate}T00:00` : isoDate)
+    }
+
+    function getFlag(countryCode) {
+      if (!countryCode) return ''
+      // Cada letra se convierte en su "Regional Indicator Symbol": ES → 🇪🇸
+      return String.fromCodePoint(...[...countryCode.toUpperCase()].map((char) => 127397 + char.charCodeAt(0)))
+    }
+
+    function renderWeather(place, { current, daily }) {
+      const info = getWeatherInfo(current.weather_code, current.is_day === 1)
+
+      document.body.dataset.sky = info.sky
+      $placeName.textContent = `${place.name} ${getFlag(place.country_code)}`.trim()
+      $placeRegion.textContent = [
+        [place.admin1, place.country].filter(Boolean).join(', '),
+        // current.time ya viene en la hora local del lugar gracias a timezone=auto
+        FULL_DATE_FORMAT.format(parseLocalDate(current.time))
+      ].filter(Boolean).join(' · ')
+
+      $emoji.textContent = info.emoji
+      $temperature.textContent = `${Math.round(current.temperature_2m)}°`
+      $description.textContent = info.description
+
+      const details = [
+        ['Sensación', `${Math.round(current.apparent_temperature)}°`],
+        ['Humedad', `${current.relative_humidity_2m}%`],
+        ['Viento', `${Math.round(current.wind_speed_10m)} km/h`],
+        ['Precipitación', `${current.precipitation} mm`],
+        ['Amanecer', TIME_FORMAT.format(parseLocalDate(daily.sunrise[0]))],
+        ['Atardecer', TIME_FORMAT.format(parseLocalDate(daily.sunset[0]))]
+      ]
+
+      $details.replaceChildren(...details.map(([label, value]) => {
+        const $item = document.createElement('div')
+        $item.innerHTML = '<dt></dt><dd></dd>'
+        $item.querySelector('dt').textContent = label
+        $item.querySelector('dd').textContent = value
+        return $item
+      }))
+
+      renderForecast(daily)
+    }
+
+    function renderForecast(daily) {
+      // Rango de toda la semana para dibujar las barras de temperatura a escala
+      const weekMin = Math.min(...daily.temperature_2m_min)
+      const weekMax = Math.max(...daily.temperature_2m_max)
+      const span = Math.max(1, weekMax - weekMin)
+
+      $days.replaceChildren(...daily.time.map((date, index) => {
+        const min = daily.temperature_2m_min[index]
+        const max = daily.temperature_2m_max[index]
+        const rain = daily.precipitation_probability_max[index]
+        const { emoji, description } = getWeatherInfo(daily.weather_code[index])
+        const name = index === 0 ? 'Hoy' : index === 1 ? 'Mañana' : WEEKDAY_FORMAT.format(parseLocalDate(date))
+
+        const $day = document.createElement('li')
+        $day.className = 'day'
+        $day.innerHTML = `
+          <span class="name">${name}</span>
+          <span class="icon" title="${description}">${emoji}</span>
+          <span class="rain">${rain > 0 ? `💧${rain}%` : ''}</span>
+          <span class="min">${Math.round(min)}°</span>
+          <div class="range"><span style="left: ${((min - weekMin) / span) * 100}%; right: ${((weekMax - max) / span) * 100}%"></span></div>
+          <span class="max">${Math.round(max)}°</span>
+        `
+        return $day
+      }))
+    }
+
+    function renderSuggestions(places) {
+      if (places.length === 0) {
+        $suggestions.replaceChildren()
+        return
+      }
+
+      const buttons = places.map((place) => {
+        const $button = document.createElement('button')
+        $button.type = 'button'
+        $button.textContent = `${getFlag(place.country_code)} ${place.name}, ${place.admin1 ?? place.country ?? ''}`
+        $button.addEventListener('click', () => loadWeather(place))
+        return $button
+      })
+
+      $suggestions.replaceChildren('¿Querías decir…?', ...buttons)
+    }
+
+    function setLoading(isLoading) {
+      $content.setAttribute('aria-busy', String(isLoading))
+      $spinner.hidden = !isLoading
+      $searchButton.disabled = isLoading
+      $locate.disabled = isLoading
+    }
+
+    function showError(message, retry) {
+      $errorText.textContent = message
+      $error.hidden = false
+
+      const $retry = $error.querySelector('button')
+      $retry.hidden = !retry
+      $retry.onclick = retry ?? null
+    }
+
+    function hideError() {
+      $error.hidden = true
+    }
+
+    // PERSISTENCIA
+    function savePlace(place) {
+      try {
+        localStorage.setItem(LAST_PLACE_KEY, JSON.stringify(place))
+      } catch {
+        // almacenamiento no disponible
+      }
+    }
+
+    function getSavedPlace() {
+      try {
+        return JSON.parse(localStorage.getItem(LAST_PLACE_KEY)) ?? DEFAULT_PLACE
+      } catch {
+        return DEFAULT_PLACE
+      }
+    }
+
+    // EVENTOS
+    $form.addEventListener('submit', handleSearch)
+    $locate.addEventListener('click', useMyLocation)
+
+    loadWeather(getSavedPlace())
+  </script>
+</head>
+
+<body data-sky="sunny">
+  <main>
+    <div class="toolbar">
+      <form class="search" role="search">
+        <input type="search" name="city" placeholder="Busca una ciudad… (p. ej. Buenos Aires)" aria-label="Ciudad"
+          autocomplete="off">
+        <button>Buscar</button>
+      </form>
+      <button class="locate" type="button">📍 Usar mi ubicación</button>
+    </div>
+
+    <div class="suggestions"></div>
+
+    <div class="error" role="alert" hidden>
+      <span></span>
+      <button type="button" hidden>Reintentar</button>
+    </div>
+
+    <section class="content" aria-busy="true" aria-live="polite">
+      <article class="panel">
+        <header class="place">
+          <h2 id="place-name">Cargando…</h2>
+          <p id="place-region">&nbsp;</p>
+        </header>
+
+        <div class="now">
+          <span class="emoji">🌡️</span>
+          <div>
+            <div class="temperature">--°</div>
+            <div class="description">&nbsp;</div>
+          </div>
+        </div>
+
+        <dl class="details"></dl>
+      </article>
+
+      <article class="panel forecast">
+        <h3>Próximos 7 días</h3>
+        <ol></ol>
+      </article>
+
+      <div class="spinner"></div>
+    </section>
+
+    <footer>Datos de <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></footer>
+  </main>
+</body>
+
+</html>

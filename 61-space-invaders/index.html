@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>61 - Space Invaders</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 120%, rgba(34, 197, 94, .18), transparent 60%),
+        radial-gradient(circle at 50% 0%, #0f1530, #04050c 70%);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    canvas {
+      display: block;
+      border-radius: 14px;
+      border: 1px solid rgba(74, 222, 128, .25);
+      box-shadow: 0 0 60px rgba(74, 222, 128, .12), 0 20px 60px rgba(0, 0, 0, .6);
+      background: #03040a;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas aria-label="Juego Space Invaders. Flechas para moverte, espacio para disparar."></canvas>
+
+  <script type="module">
+    const canvas = document.querySelector('canvas')
+    const context = canvas.getContext('2d')
+
+    // ---------- Constantes ----------
+    const WIDTH = 600
+    const HEIGHT = 680
+    const PIXEL = 3
+    const MARGIN = 16
+    const HUD_HEIGHT = 48
+    const GROUND_Y = HEIGHT - 40
+    const PLAYER_Y = GROUND_Y - 36
+    const SHIELD_Y = GROUND_Y - 130
+    const SHIELD_PIXEL = 3
+    const COLUMNS = 11
+    const CELL_X = 42
+    const CELL_Y = 36
+    const STEP_X = 8
+    const STEP_Y = 16
+    const MIN_STEP_INTERVAL = 0.03
+    const MAX_LIVES = 5
+    const RECORD_KEY = 'space-invaders-record'
+    const FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+
+    const COLORS = {
+      player: '#4ade80',
+      shield: '#22c55e',
+      ufo: '#f43f5e',
+      bullet: '#f8fafc',
+      enemyBullet: '#fde047',
+      text: '#e2e8f0',
+      muted: '#64748b'
+    }
+
+    // ---------- Sprites como mapas de píxeles ----------
+    // Cada string es una fila y cada 'X' un píxel encendido. Dos fotogramas
+    // por invasor para la animación de "caminar"
+    const SPRITES = {
+      squid: [
+        ['...XX...', '..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', '..X..X..', '.X.XX.X.', 'X.X..X.X'],
+        ['...XX...', '..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', '.X.XX.X.', 'X......X', '.X....X.']
+      ],
+      crab: [
+        ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XX.XXX.XX.', 'XXXXXXXXXXX', 'X.XXXXXXX.X', 'X.X.....X.X', '...XX.XX...'],
+        ['..X.....X..', 'X..X...X..X', 'X.XXXXXXX.X', 'XXX.XXX.XXX', 'XXXXXXXXXXX', '.XXXXXXXXX.', '..X.....X..', '.X.......X.']
+      ],
+      octopus: [
+        ['....XXXX....', '.XXXXXXXXXX.', 'XXXXXXXXXXXX', 'XXX..XX..XXX', 'XXXXXXXXXXXX', '...XX..XX...', '..XX.XX.XX..', 'XX........XX'],
+        ['....XXXX....', '.XXXXXXXXXX.', 'XXXXXXXXXXXX', 'XXX..XX..XXX', 'XXXXXXXXXXXX', '..XXX..XXX..', '.XX..XX..XX.', '..XX....XX..']
+      ],
+      player: ['......X......', '.....XXX.....', '.....XXX.....', '.XXXXXXXXXXX.', 'XXXXXXXXXXXXX', 'XXXXXXXXXXXXX', 'XXXXXXXXXXXXX', 'XXXXXXXXXXXXX'],
+      ufo: ['.....XXXXXX.....', '...XXXXXXXXXX...', '..XXXXXXXXXXXX..', '.XX.XX.XX.XX.XX.', 'XXXXXXXXXXXXXXXX', '..XXX..XX..XXX..', '...X........X...'],
+      shield: [
+        '....XXXXXXXXXXXXXX....',
+        '...XXXXXXXXXXXXXXXX...',
+        '..XXXXXXXXXXXXXXXXXX..',
+        '.XXXXXXXXXXXXXXXXXXXX.',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXXXXXXXXXXXXXXXXX',
+        'XXXXXXX........XXXXXXX',
+        'XXXXXX..........XXXXXX',
+        'XXXXX............XXXXX',
+        'XXXXX............XXXXX'
+      ]
+    }
+
+    const INVADERS = {
+      squid: { points: 30, color: '#f0abfc' },
+      crab: { points: 20, color: '#67e8f9' },
+      octopus: { points: 10, color: '#a3e635' }
+    }
+    const ROW_TYPES = ['squid', 'crab', 'crab', 'octopus', 'octopus']
+
+    // Pintamos cada sprite una sola vez en un canvas pequeño y luego lo
+    // reutilizamos con drawImage, mucho más rápido que pintar píxel a píxel
+    const spriteCache = new Map()
+
+    function getSprite(map, color) {
+      const key = `${map.join('')}-${color}`
+      if (spriteCache.has(key)) return spriteCache.get(key)
+
+      const sprite = document.createElement('canvas')
+      sprite.width = map[0].length
+      sprite.height = map.length
+      const spriteContext = sprite.getContext('2d')
+      spriteContext.fillStyle = color
+      map.forEach((row, y) => {
+        [...row].forEach((char, x) => {
+          if (char === 'X') spriteContext.fillRect(x, y, 1, 1)
+        })
+      })
+
+      spriteCache.set(key, sprite)
+      return sprite
+    }
+
+    function drawSprite(map, color, x, y, pixel = PIXEL) {
+      context.drawImage(getSprite(map, color), Math.round(x), Math.round(y), map[0].length * pixel, map.length * pixel)
+    }
+
+    const random = (min, max) => min + Math.random() * (max - min)
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
+    // ---------- Sonido (Web Audio, sin archivos) ----------
+    let audio = null
+    let muted = false
+
+    function beep(frequency, duration = 0.08, type = 'square', volume = 0.04, slideTo = null) {
+      if (muted) return
+      audio ??= new AudioContext()
+      const oscillator = audio.createOscillator()
+      const gain = audio.createGain()
+      const now = audio.currentTime
+      oscillator.type = type
+      oscillator.frequency.setValueAtTime(frequency, now)
+      if (slideTo) oscillator.frequency.exponentialRampToValueAtTime(slideTo, now + duration)
+      gain.gain.setValueAtTime(volume, now)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+      oscillator.connect(gain).connect(audio.destination)
+      oscillator.start(now)
+      oscillator.stop(now + duration)
+    }
+
+    // ---------- Clases: Entity y sus herederas ----------
+    // Entity tiene lo común a todo lo que aparece en pantalla: posición,
+    // tamaño, si sigue "vivo" y la detección de colisiones (AABB).
+    // Cada subclase añade su comportamiento sobrescribiendo update() y draw()
+    class Entity {
+      constructor(x, y, width, height) {
+        this.x = x
+        this.y = y
+        this.width = width
+        this.height = height
+        this.alive = true
+      }
+
+      // Colisión entre rectángulos alineados con los ejes
+      intersects(other) {
+        return this.x < other.x + other.width &&
+          this.x + this.width > other.x &&
+          this.y < other.y + other.height &&
+          this.y + this.height > other.y
+      }
+
+      update() { }
+
+      draw() { }
+    }
+
+    class Player extends Entity {
+      constructor() {
+        const map = SPRITES.player
+        super(WIDTH / 2 - (map[0].length * PIXEL) / 2, PLAYER_Y, map[0].length * PIXEL, map.length * PIXEL)
+        this.speed = 280
+        this.cooldown = 0
+        this.invulnerable = 0
+      }
+
+      update(dt) {
+        let direction = input.direction
+
+        // Control táctil: nos movemos hacia donde está el dedo
+        if (input.targetX !== null) {
+          const distance = input.targetX - (this.x + this.width / 2)
+          direction = Math.abs(distance) < 4 ? 0 : Math.sign(distance)
+        }
+
+        // Multiplicar por dt hace que la velocidad sea en píxeles/segundo,
+        // igual en una pantalla de 60 Hz que en una de 144 Hz
+        this.x = clamp(this.x + direction * this.speed * dt, MARGIN, WIDTH - MARGIN - this.width)
+        this.cooldown = Math.max(0, this.cooldown - dt)
+        this.invulnerable = Math.max(0, this.invulnerable - dt)
+      }
+
+      // Como en el original, solo puede haber una bala del jugador en pantalla
+      canShoot(bullets) {
+        return this.cooldown === 0 && !bullets.some(bullet => bullet.owner === 'player')
+      }
+
+      shoot() {
+        this.cooldown = 0.25
+        beep(880, 0.08, 'square', 0.03, 440)
+        return new Bullet(this.x + this.width / 2 - 1.5, this.y - 12, -560, 'player')
+      }
+
+      draw(time) {
+        // Parpadea mientras es invulnerable después de recibir un disparo
+        if (this.invulnerable > 0 && Math.floor(time * 12) % 2 === 0) return
+        drawSprite(SPRITES.player, COLORS.player, this.x, this.y)
+      }
+    }
+
+    class Invader extends Entity {
+      constructor(type, column, x, y) {
+        const map = SPRITES[type][0]
+        super(x, y, map[0].length * PIXEL, map.length * PIXEL)
+        this.type = type
+        this.column = column
+        this.points = INVADERS[type].points
+        this.color = INVADERS[type].color
+      }
+
+      draw(frame) {
+        drawSprite(SPRITES[this.type][frame], this.color, this.x, this.y)
+      }
+    }
+
+    class Ufo extends Entity {
+      constructor() {
+        const map = SPRITES.ufo
+        const fromLeft = Math.random() < 0.5
+        super(fromLeft ? -48 : WIDTH, HUD_HEIGHT + 14, map[0].length * PIXEL, map.length * PIXEL)
+        this.speed = fromLeft ? 110 : -110
+        this.points = [50, 100, 150, 300][Math.floor(Math.random() * 4)]
+      }
+
+      update(dt) {
+        this.x += this.speed * dt
+        if (this.x < -60 || this.x > WIDTH + 60) this.alive = false
+      }
+
+      draw() {
+        drawSprite(SPRITES.ufo, COLORS.ufo, this.x, this.y)
+      }
+    }
+
+    class Bullet extends Entity {
+      constructor(x, y, speed, owner) {
+        super(x, y, owner === 'player' ? 3 : 5, 12)
+        this.speed = speed
+        this.owner = owner
+        this.age = 0
+      }
+
+      update(dt) {
+        this.y += this.speed * dt
+        this.age += dt
+        if (this.y + this.height < HUD_HEIGHT || this.y > GROUND_Y) this.alive = false
+      }
+
+      draw() {
+        if (this.owner === 'player') {
+          context.fillStyle = COLORS.bullet
+          context.fillRect(this.x, this.y, this.width, this.height)
+          return
+        }
+        // Los disparos enemigos son un zigzag que se "retuerce"
+        const phase = Math.floor(this.age * 16) % 2
+        context.fillStyle = COLORS.enemyBullet
+        for (let i = 0; i < 4; i++) {
+          const offset = (i + phase) % 2 === 0 ? 0 : 3
+          context.fillRect(this.x + offset, this.y + i * 3, 2, 3)
+        }
+      }
+    }
+
+    class Shield extends Entity {
+      constructor(x, y) {
+        const map = SPRITES.shield
+        super(x, y, map[0].length * SHIELD_PIXEL, map.length * SHIELD_PIXEL)
+        // Rejilla de celdas: true = sólido. Se van borrando con los impactos
+        this.cells = map.map(row => [...row].map(char => char === 'X'))
+      }
+
+      cellRange(entity) {
+        const firstColumn = Math.max(0, Math.floor((entity.x - this.x) / SHIELD_PIXEL))
+        const lastColumn = Math.min(this.cells[0].length - 1, Math.floor((entity.x + entity.width - this.x) / SHIELD_PIXEL))
+        const firstRow = Math.max(0, Math.floor((entity.y - this.y) / SHIELD_PIXEL))
+        const lastRow = Math.min(this.cells.length - 1, Math.floor((entity.y + entity.height - this.y) / SHIELD_PIXEL))
+        return { firstColumn, lastColumn, firstRow, lastRow }
+      }
+
+      // Devuelve true si el proyectil choca con una parte sólida del escudo
+      hit(bullet) {
+        if (!this.intersects(bullet)) return false
+        const { firstColumn, lastColumn, firstRow, lastRow } = this.cellRange(bullet)
+
+        // Recorremos las filas en el sentido del disparo para encontrar
+        // la primera celda sólida con la que se encuentra
+        const rows = []
+        for (let row = firstRow; row <= lastRow; row++) rows.push(row)
+        if (bullet.speed < 0) rows.reverse()
+
+        for (const row of rows) {
+          for (let column = firstColumn; column <= lastColumn; column++) {
+            if (this.cells[row][column]) {
+              this.damage(row, column)
+              return true
+            }
+          }
+        }
+        return false
+      }
+
+      // Hacemos un cráter irregular alrededor del impacto
+      damage(row, column) {
+        for (let dRow = -2; dRow <= 2; dRow++) {
+          for (let dColumn = -2; dColumn <= 2; dColumn++) {
+            const r = row + dRow
+            const c = column + dColumn
+            const isInside = r >= 0 && r < this.cells.length && c >= 0 && c < this.cells[0].length
+            if (isInside && dRow * dRow + dColumn * dColumn <= 5 && Math.random() > 0.3) {
+              this.cells[r][c] = false
+            }
+          }
+        }
+        this.cells[row][column] = false
+      }
+
+      // Los invasores que bajan hasta los escudos los van destruyendo
+      erase(entity) {
+        if (!this.intersects(entity)) return
+        const { firstColumn, lastColumn, firstRow, lastRow } = this.cellRange(entity)
+        for (let row = firstRow; row <= lastRow; row++) {
+          for (let column = firstColumn; column <= lastColumn; column++) this.cells[row][column] = false
+        }
+      }
+
+      draw() {
+        context.fillStyle = COLORS.shield
+        this.cells.forEach((row, r) => {
+          row.forEach((solid, c) => {
+            if (solid) context.fillRect(this.x + c * SHIELD_PIXEL, this.y + r * SHIELD_PIXEL, SHIELD_PIXEL, SHIELD_PIXEL)
+          })
+        })
+      }
+    }
+
+    class Particle extends Entity {
+      constructor(x, y, color) {
+        super(x, y, 3, 3)
+        const angle = random(0, Math.PI * 2)
+        const speed = random(40, 180)
+        this.vx = Math.cos(angle) * speed
+        this.vy = Math.sin(angle) * speed
+        this.life = random(0.3, 0.7)
+        this.maxLife = this.life
+        this.color = color
+      }
+
+      update(dt) {
+        this.x += this.vx * dt
+        this.y += this.vy * dt
+        this.life -= dt
+        if (this.life <= 0) this.alive = false
+      }
+
+      draw() {
+        context.globalAlpha = Math.max(0, this.life / this.maxLife)
+        context.fillStyle = this.color
+        context.fillRect(this.x, this.y, this.width, this.height)
+        context.globalAlpha = 1
+      }
+    }
+
+    // ---------- El enjambre ----------
+    // Los invasores se mueven todos a la vez, a saltos. Cuanto menos quedan,
+    // más corto es el intervalo entre saltos: ¡se aceleran!
+    class Swarm {
+      constructor(level) {
+        this.invaders = []
+        const startY = HUD_HEIGHT + 60 + Math.min(level - 1, 6) * STEP_Y
+        const left = (WIDTH - COLUMNS * CELL_X) / 2
+
+        ROW_TYPES.forEach((type, row) => {
+          const width = SPRITES[type][0][0].length * PIXEL
+          for (let column = 0; column < COLUMNS; column++) {
+            const x = left + column * CELL_X + (CELL_X - width) / 2
+            this.invaders.push(new Invader(type, column, x, startY + row * CELL_Y))
+          }
+        })
+
+        this.total = this.invaders.length
+        this.direction = 1
+        this.frame = 0
+        this.timer = 0
+        this.note = 0
+        this.baseInterval = 0.6 * 0.86 ** (level - 1)
+      }
+
+      get alive() {
+        return this.invaders.filter(invader => invader.alive)
+      }
+
+      get interval() {
+        return Math.max(MIN_STEP_INTERVAL, this.baseInterval * (this.alive.length / this.total))
+      }
+
+      get bottom() {
+        return Math.max(...this.alive.map(invader => invader.y + invader.height))
+      }
+
+      update(dt) {
+        if (this.alive.length === 0) return
+        this.timer += dt
+        if (this.timer < this.interval) return
+        this.timer = 0
+        this.step()
+      }
+
+      step() {
+        const alive = this.alive
+        const left = Math.min(...alive.map(invader => invader.x))
+        const right = Math.max(...alive.map(invader => invader.x + invader.width))
+        const hitsEdge = this.direction > 0
+          ? right + STEP_X > WIDTH - MARGIN
+          : left - STEP_X < MARGIN
+
+        // Al tocar un borde: bajan una fila y cambian de sentido
+        if (hitsEdge) {
+          alive.forEach(invader => { invader.y += STEP_Y })
+          this.direction *= -1
+        } else {
+          alive.forEach(invader => { invader.x += STEP_X * this.direction })
+        }
+
+        this.frame = 1 - this.frame
+        // La famosa marcha de cuatro notas
+        beep([98, 87, 78, 73][this.note++ % 4], 0.09, 'square', 0.05)
+      }
+
+      // Solo disparan los invasores más bajos de cada columna
+      pickShooter() {
+        const lowest = new Map()
+        for (const invader of this.alive) {
+          const current = lowest.get(invader.column)
+          if (!current || invader.y > current.y) lowest.set(invader.column, invader)
+        }
+        const candidates = [...lowest.values()]
+        return candidates[Math.floor(Math.random() * candidates.length)]
+      }
+
+      draw() {
+        this.alive.forEach(invader => invader.draw(this.frame))
+      }
+    }
+
+    // ---------- Entrada: teclado y táctil ----------
+    const input = {
+      left: false,
+      right: false,
+      fire: false,
+      targetX: null,
+      pointerFire: false,
+      get direction() {
+        return Number(this.right) - Number(this.left)
+      }
+    }
+
+    // ---------- Estado del juego ----------
+    const game = {
+      state: 'menu',
+      score: 0,
+      record: loadRecord(),
+      level: 1,
+      lives: 3,
+      player: null,
+      swarm: null,
+      shields: [],
+      bullets: [],
+      particles: [],
+      ufo: null,
+      ufoTimer: 0,
+      fireTimer: 0,
+      stateTimer: 0,
+      time: 0
+    }
+
+    const stars = Array.from({ length: 70 }, () => ({
+      x: random(0, WIDTH),
+      y: random(HUD_HEIGHT, GROUND_Y),
+      size: Math.random() < 0.2 ? 2 : 1,
+      phase: random(0, Math.PI * 2)
+    }))
+
+    function loadRecord() {
+      try {
+        return Number(localStorage.getItem(RECORD_KEY)) || 0
+      } catch {
+        return 0
+      }
+    }
+
+    function saveRecord() {
+      if (game.score <= game.record) return
+      game.record = game.score
+      try {
+        localStorage.setItem(RECORD_KEY, String(game.record))
+      } catch { }
+    }
+
+    function createShields() {
+      const count = 4
+      const shieldWidth = SPRITES.shield[0].length * SHIELD_PIXEL
+      const gap = (WIDTH - count * shieldWidth) / (count + 1)
+      return Array.from({ length: count }, (_, index) => new Shield(gap + index * (shieldWidth + gap), SHIELD_Y))
+    }
+
+    function startGame() {
+      game.score = 0
+      game.level = 1
+      game.lives = 3
+      game.player = new Player()
+      game.shields = createShields()
+      startLevel()
+    }
+
+    function startLevel() {
+      game.swarm = new Swarm(game.level)
+      game.bullets = []
+      game.ufo = null
+      game.ufoTimer = random(12, 20)
+      game.fireTimer = 1.5
+      game.state = 'playing'
+      // Cada 2 niveles, escudos nuevos
+      if (game.level > 1 && game.level % 2 === 1) game.shields = createShields()
+    }
+
+    function explode(x, y, color, amount = 14) {
+      for (let i = 0; i < amount; i++) game.particles.push(new Particle(x, y, color))
+    }
+
+    function hitPlayer() {
+      const { player } = game
+      explode(player.x + player.width / 2, player.y + player.height / 2, COLORS.player, 30)
+      beep(160, 0.5, 'sawtooth', 0.08, 40)
+      game.lives--
+      // Eliminamos los disparos enemigos para dar un respiro
+      game.bullets.forEach(bullet => {
+        if (bullet.owner === 'enemy') bullet.alive = false
+      })
+      if (game.lives <= 0) return gameOver()
+      player.invulnerable = 2
+    }
+
+    function gameOver() {
+      game.state = 'gameover'
+      game.stateTimer = 0
+      saveRecord()
+    }
+
+    // ---------- Actualización ----------
+    function updatePlaying(dt) {
+      const { player, swarm, bullets } = game
+
+      player.update(dt)
+      swarm.update(dt)
+
+      if ((input.fire || input.pointerFire) && player.canShoot(bullets)) {
+        bullets.push(player.shoot())
+      }
+
+      // Disparos enemigos aleatorios, más frecuentes en niveles altos
+      game.fireTimer -= dt
+      const enemyBullets = bullets.filter(bullet => bullet.owner === 'enemy').length
+      if (game.fireTimer <= 0 && swarm.alive.length > 0) {
+        game.fireTimer = random(0.4, 1.3) / (1 + (game.level - 1) * 0.25)
+        if (enemyBullets < 2 + game.level) {
+          const shooter = swarm.pickShooter()
+          bullets.push(new Bullet(shooter.x + shooter.width / 2 - 2, shooter.y + shooter.height, 230 + game.level * 20, 'enemy'))
+        }
+      }
+
+      // El platillo misterioso aparece de vez en cuando
+      game.ufoTimer -= dt
+      if (game.ufoTimer <= 0 && !game.ufo && swarm.alive.length > 8) {
+        game.ufo = new Ufo()
+        game.ufoTimer = random(15, 25)
+      }
+      game.ufo?.update(dt)
+      if (game.ufo && !game.ufo.alive) game.ufo = null
+
+      bullets.forEach(bullet => bullet.update(dt))
+      handleCollisions()
+
+      game.bullets = bullets.filter(bullet => bullet.alive)
+
+      if (swarm.alive.length === 0) {
+        game.state = 'levelComplete'
+        game.stateTimer = 0
+        game.lives = Math.min(game.lives + 1, MAX_LIVES)
+        beep(523, 0.15, 'square', 0.05, 1046)
+      }
+    }
+
+    function handleCollisions() {
+      const { player, swarm, bullets, shields } = game
+      const invaders = swarm.alive
+
+      for (const bullet of bullets) {
+        if (!bullet.alive) continue
+
+        // Los escudos paran cualquier disparo
+        if (shields.some(shield => shield.hit(bullet))) {
+          bullet.alive = false
+          continue
+        }
+
+        if (bullet.owner === 'player') {
+          const target = invaders.find(invader => invader.alive && invader.intersects(bullet))
+          if (target) {
+            target.alive = false
+            bullet.alive = false
+            game.score += target.points
+            explode(target.x + target.width / 2, target.y + target.height / 2, target.color)
+            beep(220, 0.15, 'sawtooth', 0.05, 60)
+            continue
+          }
+
+          if (game.ufo?.intersects(bullet)) {
+            game.score += game.ufo.points
+            explode(game.ufo.x + game.ufo.width / 2, game.ufo.y + 10, COLORS.ufo, 30)
+            // Una "partícula" especial que muestra los puntos conseguidos
+            const label = new Particle(game.ufo.x, game.ufo.y, COLORS.ufo)
+            Object.assign(label, { vx: 0, vy: -20, life: 1.2, maxLife: 1.2, label: game.ufo.points })
+            game.particles.push(label)
+            game.ufo = null
+            bullet.alive = false
+            beep(660, 0.3, 'square', 0.05, 1320)
+            continue
+          }
+
+          // Dos balas que chocan se destruyen mutuamente
+          const enemyBullet = bullets.find(other => other.owner === 'enemy' && other.alive && other.intersects(bullet))
+          if (enemyBullet) {
+            enemyBullet.alive = false
+            bullet.alive = false
+          }
+        } else if (player.invulnerable === 0 && bullet.intersects(player)) {
+          bullet.alive = false
+          hitPlayer()
+        }
+      }
+
+      for (const invader of invaders) {
+        shields.forEach(shield => shield.erase(invader))
+      }
+
+      // Si llegan a la altura del jugador, se acabó
+      if (game.state === 'playing' && swarm.alive.length > 0 && swarm.bottom >= player.y) {
+        game.lives = 1
+        hitPlayer()
+      }
+    }
+
+    function update(dt) {
+      game.time += dt
+      game.stateTimer += dt
+
+      if (game.state === 'playing') updatePlaying(dt)
+
+      if (game.state === 'levelComplete' && game.stateTimer > 2) {
+        game.level++
+        startLevel()
+      }
+
+      game.particles.forEach(particle => particle.update(dt))
+      game.particles = game.particles.filter(particle => particle.alive)
+    }
+
+    // ---------- Dibujo ----------
+    function text(value, x, y, { size = 16, color = COLORS.text, align = 'left', weight = 'bold' } = {}) {
+      context.font = `${weight} ${size}px ${FONT}`
+      context.fillStyle = color
+      context.textAlign = align
+      context.textBaseline = 'middle'
+      context.fillText(value, x, y)
+    }
+
+    const pad = value => String(value).padStart(5, '0')
+
+    function drawBackground() {
+      context.fillStyle = '#03040a'
+      context.fillRect(0, 0, WIDTH, HEIGHT)
+
+      for (const star of stars) {
+        context.globalAlpha = 0.35 + Math.sin(game.time * 2 + star.phase) * 0.3
+        context.fillStyle = '#c7d2fe'
+        context.fillRect(star.x, star.y, star.size, star.size)
+      }
+      context.globalAlpha = 1
+
+      context.fillStyle = COLORS.player
+      context.fillRect(0, GROUND_Y, WIDTH, 2)
+    }
+
+    function drawHUD() {
+      text('PUNTOS', MARGIN, 18, { size: 12, color: COLORS.muted })
+      text(pad(game.score), MARGIN, 36, { size: 18 })
+      text('RÉCORD', WIDTH / 2, 18, { size: 12, color: COLORS.muted, align: 'center' })
+      text(pad(Math.max(game.record, game.score)), WIDTH / 2, 36, { size: 18, align: 'center' })
+      text('NIVEL', WIDTH - MARGIN, 18, { size: 12, color: COLORS.muted, align: 'right' })
+      text(String(game.level), WIDTH - MARGIN, 36, { size: 18, align: 'right' })
+
+      // Vidas: una nave pequeña por cada vida
+      for (let i = 0; i < game.lives; i++) {
+        drawSprite(SPRITES.player, COLORS.player, MARGIN + i * 34, GROUND_Y + 14, 2)
+      }
+      text(muted ? '🔇 M' : '🔊 M', WIDTH - MARGIN, GROUND_Y + 21, { size: 12, color: COLORS.muted, align: 'right', weight: 'normal' })
+    }
+
+    function drawOverlay(title, subtitle, color = COLORS.text) {
+      context.fillStyle = 'rgba(3, 4, 10, .7)'
+      context.fillRect(0, HEIGHT / 2 - 70, WIDTH, 140)
+      text(title, WIDTH / 2, HEIGHT / 2 - 18, { size: 34, color, align: 'center' })
+      if (Math.floor(game.time * 2) % 2 === 0) {
+        text(subtitle, WIDTH / 2, HEIGHT / 2 + 30, { size: 14, align: 'center' })
+      }
+    }
+
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
+    const START_HINT = isTouch ? 'TOCA LA PANTALLA PARA JUGAR' : 'PULSA ESPACIO PARA JUGAR'
+
+    function drawMenu() {
+      const frame = Math.floor(game.time * 2) % 2
+
+      text('SPACE', WIDTH / 2, 105, { size: 58, color: COLORS.player, align: 'center' })
+      text('INVADERS', WIDTH / 2, 163, { size: 58, color: '#f0abfc', align: 'center' })
+
+      text('TABLA DE PUNTOS', WIDTH / 2, 232, { size: 14, color: COLORS.muted, align: 'center' })
+      const rows = [
+        [SPRITES.ufo, COLORS.ufo, '= ¿? MISTERIO'],
+        [SPRITES.squid[frame], INVADERS.squid.color, '= 30 PUNTOS'],
+        [SPRITES.crab[frame], INVADERS.crab.color, '= 20 PUNTOS'],
+        [SPRITES.octopus[frame], INVADERS.octopus.color, '= 10 PUNTOS']
+      ]
+      rows.forEach(([map, color, label], index) => {
+        const y = 262 + index * 44
+        const width = map[0].length * PIXEL
+        drawSprite(map, color, 215 - width / 2, y)
+        text(label, 260, y + 11, { size: 18 })
+      })
+
+      // En vez de parpadear, el texto "respira" cambiando su opacidad
+      context.globalAlpha = 0.55 + Math.sin(game.time * 4) * 0.45
+      text(START_HINT, WIDTH / 2, 448, { size: 16, color: '#fde047', align: 'center' })
+      context.globalAlpha = 1
+      const controls = isTouch ? 'ARRASTRA PARA MOVERTE · DISPARA AL TOCAR' : '← → MOVER · ESPACIO DISPARAR · P PAUSA · M SONIDO'
+      text(controls, WIDTH / 2, 476, { size: 12, color: COLORS.muted, align: 'center', weight: 'normal' })
+
+      game.shields.forEach(shield => shield.draw())
+      game.player.draw(game.time)
+    }
+
+    function draw() {
+      drawBackground()
+
+      if (game.state === 'menu') {
+        drawMenu()
+        drawHUD()
+        return
+      }
+
+      game.shields.forEach(shield => shield.draw())
+      game.swarm.draw()
+      game.ufo?.draw()
+      if (game.lives > 0) game.player.draw(game.time)
+      game.bullets.forEach(bullet => bullet.draw())
+      game.particles.forEach(particle => {
+        if (particle.label) text(String(particle.label), particle.x + 24, particle.y + 10, { size: 16, color: COLORS.ufo, align: 'center' })
+        else particle.draw()
+      })
+      drawHUD()
+
+      if (game.state === 'paused') drawOverlay('PAUSA', isTouch ? 'TOCA PARA SEGUIR' : 'PULSA P PARA SEGUIR')
+      if (game.state === 'levelComplete') drawOverlay(`¡NIVEL ${game.level} SUPERADO!`, 'PREPÁRATE…', COLORS.player)
+      if (game.state === 'gameover') drawOverlay('GAME OVER', isTouch ? 'TOCA PARA REINTENTAR' : 'PULSA ESPACIO PARA REINTENTAR', COLORS.ufo)
+    }
+
+    // ---------- Bucle principal con delta time ----------
+    // dt es el tiempo real (en segundos) desde el frame anterior. Todo se
+    // mueve en función de dt, así el juego va igual de rápido en cualquier
+    // pantalla. Lo limitamos para evitar saltos enormes si la pestaña
+    // estuvo en segundo plano
+    let lastTime = performance.now()
+
+    function loop(now) {
+      // El primer timestamp de rAF puede ser anterior a performance.now():
+      // evitamos un dt negativo con Math.max
+      const dt = Math.max(0, Math.min((now - lastTime) / 1000, 1 / 30))
+      lastTime = now
+      update(dt)
+      draw()
+      window.requestAnimationFrame(loop)
+    }
+
+    // ---------- Acciones ----------
+    function primaryAction() {
+      if (game.state === 'menu') startGame()
+      else if (game.state === 'paused') game.state = 'playing'
+      else if (game.state === 'gameover' && game.stateTimer > 0.8) startGame()
+    }
+
+    function togglePause() {
+      if (game.state === 'playing') game.state = 'paused'
+      else if (game.state === 'paused') game.state = 'playing'
+    }
+
+    const KEYS = {
+      ArrowLeft: 'left',
+      KeyA: 'left',
+      ArrowRight: 'right',
+      KeyD: 'right',
+      Space: 'fire',
+      ArrowUp: 'fire',
+      KeyW: 'fire'
+    }
+
+    document.addEventListener('keydown', event => {
+      const action = KEYS[event.code]
+      if (action) {
+        event.preventDefault()
+        input[action] = true
+      }
+      if (event.repeat) return
+      if (event.code === 'Space' || event.code === 'Enter') primaryAction()
+      if (event.code === 'KeyP' || event.code === 'Escape') togglePause()
+      if (event.code === 'KeyM') muted = !muted
+    })
+
+    document.addEventListener('keyup', event => {
+      const action = KEYS[event.code]
+      if (action) input[action] = false
+    })
+
+    function toGameX(event) {
+      const rect = canvas.getBoundingClientRect()
+      return ((event.clientX - rect.left) / rect.width) * WIDTH
+    }
+
+    canvas.addEventListener('pointerdown', event => {
+      // Capturamos el puntero para seguir recibiendo eventos aunque el dedo salga del canvas
+      if (event.isPrimary) canvas.setPointerCapture?.(event.pointerId)
+      if (game.state !== 'playing') return primaryAction()
+      input.targetX = toGameX(event)
+      input.pointerFire = true
+    })
+
+    canvas.addEventListener('pointermove', event => {
+      if (input.targetX !== null) input.targetX = toGameX(event)
+    })
+
+    function releasePointer() {
+      input.targetX = null
+      input.pointerFire = false
+    }
+
+    canvas.addEventListener('pointerup', releasePointer)
+    canvas.addEventListener('pointercancel', releasePointer)
+
+    // Si cambiamos de pestaña, pausamos
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && game.state === 'playing') game.state = 'paused'
+    })
+
+    // ---------- Tamaño: escalamos el lienzo lógico a la pantalla ----------
+    function resize() {
+      const padding = window.innerWidth < 640 ? 8 : 16
+      const scale = Math.min((window.innerWidth - padding * 2) / WIDTH, (window.innerHeight - padding * 2) / HEIGHT)
+      const dpr = window.devicePixelRatio || 1
+
+      canvas.style.width = `${WIDTH * scale}px`
+      canvas.style.height = `${HEIGHT * scale}px`
+      canvas.width = Math.round(WIDTH * scale * dpr)
+      canvas.height = Math.round(HEIGHT * scale * dpr)
+
+      // Dibujamos siempre en coordenadas lógicas (600x680) y dejamos que
+      // la transformación del contexto las escale al tamaño real
+      context.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0)
+      context.imageSmoothingEnabled = false
+    }
+
+    // El menú muestra ya la nave y los escudos
+    game.player = new Player()
+    game.shields = createShields()
+
+    window.addEventListener('resize', resize)
+    resize()
+    window.requestAnimationFrame(loop)
+  </script>
+</body>
+
+</html>
