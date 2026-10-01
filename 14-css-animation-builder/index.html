@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSS Animation Builder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>CSS Animation Builder</h1>
+
+      <section class="preview-section">
+        <div class="preview-stage">
+          <div id="preview-box" class="box"></div>
+        </div>
+      </section>
+
+      <section class="controls-section">
+        <!-- Transformaciones -->
+        <div class="group">
+          <h2>Transforms</h2>
+
+          <label>Translate X (px)
+            <input type="range" id="tx" min="-200" max="200" value="0" />
+          </label>
+
+          <label>Translate Y (px)
+            <input type="range" id="ty" min="-200" max="200" value="0" />
+          </label>
+
+          <label>Scale
+            <input type="range" id="scale" min="0.1" max="2" step="0.1" value="1" />
+          </label>
+
+          <label>Rotate (deg)
+            <input type="range" id="rotate" min="-180" max="180" value="0" />
+          </label>
+
+          <label>Opacity
+            <input type="range" id="opacity" min="0" max="1" step="0.1" value="1" />
+          </label>
+        </div>
+
+        <!-- Propiedades de animación -->
+        <div class="group">
+          <h2>Animation</h2>
+
+          <label>Duration (s)
+            <input type="range" id="duration" min="0.1" max="5" step="0.1" value="1" />
+          </label>
+
+          <label>Delay (s)
+            <input type="range" id="delay" min="0" max="3" step="0.1" value="0" />
+          </label>
+
+          <label>Easing
+            <select id="easing">
+              <option value="ease">ease</option>
+              <option value="linear">linear</option>
+              <option value="ease-in">ease-in</option>
+              <option value="ease-out">ease-out</option>
+              <option value="ease-in-out">ease-in-out</option>
+            </select>
+          </label>
+
+          <label>Iterations
+            <input type="number" id="iterations" min="1" value="1" />
+          </label>
+
+          <label>Direction
+            <select id="direction">
+              <option value="normal">normal</option>
+              <option value="alternate">alternate</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="output-section">
+        <h2>Generated CSS</h2>
+        <textarea id="output" readonly></textarea>
+        <button id="copy-btn">Copy</button>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
